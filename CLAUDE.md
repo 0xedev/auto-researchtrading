@@ -11,6 +11,7 @@ uv run run_benchmarks.py     # compare 5 reference strategies
 uv run train.py              # train ML model on GPU → saves ~/.cache/autotrader/model.pt
 uv run prepare_extended.py   # download macro daily data (requires TWELVE_DATA_API_KEY)
 uv run fetch_docs.py         # download 56 trading PDFs from tradebridge/DOCs on GitHub
+uv run extract_knowledge.py  # extract trading insights from PDFs → docs/knowledge.json (requires GOOGLE_API_KEY)
 ```
 
 Output is grep-able:
@@ -75,7 +76,7 @@ Record results in `results.tsv`: `commit\tscore\tsharpe\tmax_dd\tstatus\tdescrip
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `TWELVE_DATA_API_KEY` | Optional | Macro daily data (GOLD, OIL, SPX, DXY, TLT). Without it, macro features are zeros. |
-| `ANTHROPIC_API_KEY` | Optional | `extract_knowledge.py` — PDF parsing via Claude API. Not needed for training. |
+| `GOOGLE_API_KEY` | Optional | `extract_knowledge.py` — PDF extraction via Gemini Flash. Not needed for training. |
 
 ## ML model details
 
