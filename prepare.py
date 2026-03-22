@@ -33,7 +33,17 @@ MAX_LEVERAGE = 20              # max leverage allowed
 LOOKBACK_BARS = 500            # history buffer provided to strategy
 BAR_INTERVAL = "1h"
 
-SYMBOLS = ["BTC", "ETH", "SOL"]
+SYMBOLS = ["BTC", "ETH", "SOL", "GOLD", "SPX", "OIL", "SILVER"]
+
+# Macro symbols sourced from Twelve Data (hourly). No funding rates.
+TWELVE_DATA_URL = "https://api.twelvedata.com/time_series"
+TWELVE_DATA_KEY = os.environ.get("TWELVE_DATA_API_KEY", "")
+MACRO_SYMBOLS = {
+    "GOLD":   "XAU/USD",
+    "SPX":    "SPX",
+    "OIL":    "WTI/USD",
+    "SILVER": "XAG/USD",
+}
 
 # Date splits (UTC timestamps)
 TRAIN_START = "2023-06-01"
@@ -217,6 +227,77 @@ def _download_hl_candles(symbol: str, interval: str, start_ms: int, end_ms: int)
     return pd.DataFrame(all_rows)
 
 
+def _download_twelvedata_hourly(td_symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+    """Download hourly OHLCV from Twelve Data API. Returns DataFrame with timestamp(ms) column."""
+    if not TWELVE_DATA_KEY:
+        print("  [WARN] TWELVE_DATA_API_KEY not set — cannot download macro symbol")
+        return pd.DataFrame()
+
+    all_rows = []
+    current_start = start_date
+    rate_pause = 60.0 / 8  # free tier: 8 calls/min
+
+    while True:
+        params = {
+            "symbol": td_symbol,
+            "interval": "1h",
+            "start_date": current_start,
+            "end_date": end_date,
+            "outputsize": 5000,
+            "order": "ASC",
+            "apikey": TWELVE_DATA_KEY,
+        }
+        try:
+            resp = requests.get(TWELVE_DATA_URL, params=params, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            print(f"  [ERROR] Twelve Data {td_symbol}: {e}")
+            break
+
+        if data.get("status") == "error":
+            msg = data.get("message", "unknown")
+            if "rate limit" in msg.lower():
+                print("  [WARN] Rate limited — sleeping 60s")
+                time.sleep(60)
+                continue
+            print(f"  [ERROR] {td_symbol}: {msg}")
+            break
+
+        values = data.get("values", [])
+        if not values:
+            break
+
+        for bar in values:
+            try:
+                ts_ms = int(pd.Timestamp(bar["datetime"], tz="UTC").timestamp() * 1000)
+                all_rows.append({
+                    "timestamp": ts_ms,
+                    "open":   float(bar.get("open",  bar["close"])),
+                    "high":   float(bar.get("high",  bar["close"])),
+                    "low":    float(bar.get("low",   bar["close"])),
+                    "close":  float(bar["close"]),
+                    "volume": float(bar.get("volume", 0)),
+                    "funding_rate": 0.0,
+                })
+            except (KeyError, ValueError):
+                continue
+
+        if len(values) < 5000:
+            break
+
+        last_dt = pd.Timestamp(values[-1]["datetime"], tz="UTC")
+        current_start = (last_dt + pd.Timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+        if current_start >= end_date:
+            break
+        time.sleep(rate_pause)
+
+    if not all_rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(all_rows).sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
+    return df
+
+
 def download_data(symbols=None):
     """Download historical OHLCV + funding data for all symbols."""
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -233,6 +314,23 @@ def download_data(symbols=None):
             print(f"  {symbol}: already have {len(existing)} bars")
             continue
 
+        # ── Macro symbols: use Twelve Data ────────────────────────────────
+        if symbol in MACRO_SYMBOLS:
+            td_symbol = MACRO_SYMBOLS[symbol]
+            print(f"  {symbol}: downloading from Twelve Data ({td_symbol})...")
+            df = _download_twelvedata_hourly(
+                td_symbol,
+                start_date=TRAIN_START,
+                end_date=TEST_END,
+            )
+            if df.empty:
+                print(f"  {symbol}: NO DATA AVAILABLE, skipping")
+                continue
+            df.to_parquet(filepath, index=False)
+            print(f"  {symbol}: saved {len(df)} bars to {filepath}")
+            continue
+
+        # ── Crypto symbols: use CryptoCompare + Hyperliquid ───────────────
         print(f"  {symbol}: downloading candles from CryptoCompare...")
 
         # Use CryptoCompare for reliable historical OHLCV (no geo-restrictions)

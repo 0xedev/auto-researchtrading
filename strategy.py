@@ -29,8 +29,16 @@ except ImportError:
 MODEL_PATH = os.path.expanduser("~/.cache/autotrader/model.pt")
 
 # ── Shared constants ───────────────────────────────────────────────────────────
-ACTIVE_SYMBOLS = ["BTC", "ETH", "SOL"]
-SYMBOL_WEIGHTS = {"BTC": 0.33, "ETH": 0.33, "SOL": 0.33}
+ACTIVE_SYMBOLS = ["BTC", "ETH", "SOL", "GOLD", "SPX", "OIL", "SILVER"]
+SYMBOL_WEIGHTS = {
+    "BTC":    0.20,
+    "ETH":    0.15,
+    "SOL":    0.15,
+    "GOLD":   0.15,
+    "SPX":    0.15,
+    "OIL":    0.10,
+    "SILVER": 0.10,
+}
 
 # Risk management (applies to BOTH ML and rule-based paths)
 ATR_LOOKBACK     = 24
