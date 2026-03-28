@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import xgboost as xgb
+from sklearn.ensemble import RandomForestClassifier
 import joblib
 import os
 from prepare import load_data
@@ -36,13 +36,18 @@ def calculate_features(df):
     macd_line = ema_12 - ema_26
     signal_line = macd_line.ewm(span=9, adjust=False).mean()
     df['macd_hist'] = macd_line - signal_line
+    df['macd_line'] = macd_line # RAW (matching v4 breakthrough)
     
     # 4. BB Width
     sma = close.rolling(20).mean()
     std = close.rolling(20).std()
     df['bb_width'] = (4 * std) / sma.replace(0, 1e-10)
     
-    # 5. Volatility
+    # 5. Macro Regime (EMA 200)
+    ema_200 = close.ewm(span=200, adjust=False).mean()
+    df['ema_200_dist'] = (close - ema_200) / close
+    
+    # 6. Volatility
     df['vol_24h'] = df['ret_1h'].rolling(24).std()
     
     # 6. Targets (Next 4h return)
@@ -64,10 +69,10 @@ def calculate_features(df):
 def train():
     print("Loading 20-year training data...")
     # Using 'train' split which is 2004 - June 2024
+    from strategy import ACTIVE_SYMBOLS
     data_dict = load_data(split="train")
-    
     all_features = []
-    symbols = sorted(list(data_dict.keys()))
+    symbols = ACTIVE_SYMBOLS
     
     for i, symbol in enumerate(symbols):
         print(f"Processing {symbol}...")
@@ -78,20 +83,18 @@ def train():
         
     full_df = pd.concat(all_features)
     
-    features = ['ret_1h', 'ret_4h', 'ret_12h', 'ret_24h', 'ret_48h', 'rsi_8', 'rsi_24', 'macd_hist', 'bb_width', 'vol_24h', 'symbol_idx']
+    features = ['ret_1h', 'ret_4h', 'ret_12h', 'ret_24h', 'ret_48h', 'rsi_8', 'rsi_24', 'macd_hist', 'macd_line', 'bb_width', 'ema_200_dist', 'vol_24h', 'symbol_idx']
     X = full_df[features]
     y = full_df['label']
     
     print(f"Training on {len(X)} samples with {len(features)} features...")
+    print(f"Class Distribution: {y.value_counts(normalize=True).to_dict()}")
     
-    model = xgb.XGBClassifier(
-        n_estimators=100,
-        max_depth=6,
-        learning_rate=0.1,
-        objective='multi:softprob',
-        num_class=3,
-        tree_method='hist', # Fast on CPU, faster on GPU
-        device='cuda' if os.path.exists('/dev/nvidia0') else 'cpu',
+    model = RandomForestClassifier(
+        n_estimators=200,
+        max_depth=12,
+        min_samples_leaf=50,
+        n_jobs=-1,
         random_state=42
     )
     
