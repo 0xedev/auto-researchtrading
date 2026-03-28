@@ -26,7 +26,7 @@ import os
 
 # Model Settings
 MODEL_PATH = os.path.expanduser("~/.cache/autotrader/model.joblib")
-PROB_THRESHOLD = 0.53  # Lowered for Iteration 1
+PROB_THRESHOLD = 0.50  # RF threshold (exp115 breakthrough)
 
 # Canonical H4 Periods (Reference)
 H4_REF = 4 * 3600  # 4 hours in seconds
@@ -41,9 +41,9 @@ BASE_MACD_SLOW = 23
 BASE_MACD_SIGNAL = 9
 BASE_BB_PERIOD = 100
 
-BASE_POSITION_PCT = 0.04
+BASE_POSITION_PCT = 0.08
 ATR_LOOKBACK = 24
-ATR_STOP_MULT = 5.5
+ATR_STOP_MULT = 6.5
 RSI_OVERBOUGHT = 69
 RSI_OVERSOLD = 31
 
@@ -99,12 +99,12 @@ class Strategy:
 
     def _calc_macd(self, closes, fast, slow, signal_p):
         if len(closes) < slow + signal_p + 5:
-            return 0.0
+            return 0.0, 0.0, 0.0
         fast_ema = ema(closes[-(slow + signal_p + 5):], fast)
         slow_ema = ema(closes[-(slow + signal_p + 5):], slow)
         macd_line = fast_ema - slow_ema
         signal_line = ema(macd_line, signal_p)
-        return macd_line[-1] - signal_line[-1]
+        return macd_line[-1] - signal_line[-1], macd_line[-1], signal_line[-1]
 
     def _calc_bb_stats(self, closes, period):
         period = max(5, int(period))
@@ -147,16 +147,26 @@ class Strategy:
             
             rsi8 = calc_rsi(closes, 8)
             rsi24 = calc_rsi(closes, 24)
-            macd_h = self._calc_macd(closes, 14, 23, 9)
+            macd_h, macd_line_val, _ = self._calc_macd(closes, 12, 26, 9)
+            
+            # BB Width (Sync to 20-period training)
             bbw = self._calc_bb_stats(closes, 20)
+            
+            # EMA 200 Macro
+            ema200_arr = ema(closes[-220:], 200)
+            ema200_dist = (mid - ema200_arr[-1]) / mid
+            
             vol24 = np.std(np.diff(np.log(closes[-25:])))
             
-            # Inference Data
-            feat_vec = [ret1, ret4, ret12, ret24, ret48, rsi8, rsi24, macd_h, bbw, vol24, i]
+            # Inference Data (Exactly 13 features matching v4 Gold)
+            feat_vec = [ret1, ret4, ret12, ret24, ret48, rsi8, rsi24, macd_h, macd_line_val, bbw, ema200_dist, vol24, i]
             
             current_pos = portfolio.positions.get(symbol, 0.0)
             target = current_pos
-            size = equity * BASE_POSITION_PCT
+            long_size = equity * 0.14
+            long_soft_size = equity * 0.10
+            short_size = equity * 0.10
+            short_soft_size = equity * 0.06
 
             if self.model:
                 try:
@@ -168,15 +178,15 @@ class Strategy:
                     
                     if current_pos == 0:
                         if prob_buy > PROB_THRESHOLD:
-                            target = size
+                            target = long_size if prob_buy > 0.64 else long_soft_size
                         elif prob_sell > PROB_THRESHOLD:
-                            target = -size
+                            target = -short_size if prob_sell > 0.65 else -short_soft_size
                     else:
                         # Exit or Flip
                         if current_pos > 0 and prob_sell > PROB_THRESHOLD:
-                            target = -size
+                            target = -short_size if prob_sell > 0.65 else -short_soft_size
                         elif current_pos < 0 and prob_buy > PROB_THRESHOLD:
-                            target = size
+                            target = long_size if prob_buy > 0.64 else long_soft_size
                 except Exception as e:
                     print(f"Inference error for {symbol}: {e}")
             
