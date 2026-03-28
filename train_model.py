@@ -66,16 +66,38 @@ def calculate_features(df):
     
     return df
 
+def load_broad_train_data():
+    """Load training data using full historical range to leverage synthetic altcoin data."""
+    from prepare import DATA_DIR
+    # Use broad date range: altcoin parquets have synthetic data from 2004
+    # BTC/ETH/SOL only start Jun 2023 but others have 20-year synthetic data
+    BROAD_START = "2004-01-01"
+    BROAD_END = "2024-06-30"
+    start_ms = int(pd.Timestamp(BROAD_START, tz='UTC').timestamp() * 1000)
+    end_ms = int(pd.Timestamp(BROAD_END, tz='UTC').timestamp() * 1000)
+    data_dict = {}
+    for fname in sorted(os.listdir(DATA_DIR)):
+        if not fname.endswith('_1h.parquet'):
+            continue
+        symbol = fname.replace('_1h.parquet', '')
+        df = pd.read_parquet(os.path.join(DATA_DIR, fname))
+        mask = (df['timestamp'] >= start_ms) & (df['timestamp'] < end_ms)
+        split_df = df[mask].reset_index(drop=True)
+        if len(split_df) > 0:
+            data_dict[symbol] = split_df
+    return data_dict
+
 def train():
-    print("Loading 20-year training data...")
-    # Using 'train' split which is 2004 - June 2024
+    print("Loading training data (broad historical range for altcoin synthetic data)...")
     from strategy import ACTIVE_SYMBOLS
-    data_dict = load_data(split="train")
+    data_dict = load_broad_train_data()
     all_features = []
     symbols = ACTIVE_SYMBOLS
-    
+
     for i, symbol in enumerate(symbols):
-        print(f"Processing {symbol}...")
+        if symbol not in data_dict:
+            continue
+        print(f"Processing {symbol} (idx={i}, rows={len(data_dict[symbol])})...")
         df = data_dict[symbol]
         df_feat = calculate_features(df)
         df_feat['symbol_idx'] = i # One-hot or label encoding

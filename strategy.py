@@ -26,7 +26,7 @@ import os
 
 # Model Settings
 MODEL_PATH = os.path.expanduser("~/.cache/autotrader/model.joblib")
-PROB_THRESHOLD = 0.50  # RF threshold (exp115 breakthrough)
+PROB_THRESHOLD = 0.50  # RF threshold (1.1M sample model)
 
 # Canonical H4 Periods (Reference)
 H4_REF = 4 * 3600  # 4 hours in seconds
@@ -178,15 +178,15 @@ class Strategy:
                     
                     if current_pos == 0:
                         if prob_buy > PROB_THRESHOLD:
-                            target = long_size if prob_buy > 0.56 else long_soft_size
+                            target = long_size if prob_buy > 0.64 else long_soft_size
                         elif prob_sell > PROB_THRESHOLD:
-                            target = -short_size if prob_sell > 0.57 else -short_soft_size
+                            target = -short_size if prob_sell > 0.65 else -short_soft_size
                     else:
                         # Exit or Flip
                         if current_pos > 0 and prob_sell > PROB_THRESHOLD:
-                            target = -short_size if prob_sell > 0.57 else -short_soft_size
+                            target = -short_size if prob_sell > 0.65 else -short_soft_size
                         elif current_pos < 0 and prob_buy > PROB_THRESHOLD:
-                            target = long_size if prob_buy > 0.56 else long_soft_size
+                            target = long_size if prob_buy > 0.64 else long_soft_size
                 except Exception as e:
                     print(f"Inference error for {symbol}: {e}")
             
