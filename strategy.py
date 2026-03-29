@@ -26,7 +26,7 @@ import os
 
 # Model Settings
 MODEL_PATH = os.path.expanduser("~/.cache/autotrader/model.joblib")
-PROB_THRESHOLD = 0.58  # XGBoost threshold
+PROB_THRESHOLD = 0.58  # XGBoost optimal
 
 # Canonical H4 Periods (Reference)
 H4_REF = 4 * 3600  # 4 hours in seconds
@@ -43,7 +43,7 @@ BASE_BB_PERIOD = 100
 
 BASE_POSITION_PCT = 0.08
 ATR_LOOKBACK = 24
-ATR_STOP_MULT = 6.5
+ATR_STOP_MULT = 7.5
 RSI_OVERBOUGHT = 69
 RSI_OVERSOLD = 31
 
