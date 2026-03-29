@@ -179,22 +179,13 @@ class Strategy:
                     prob_sell = probs[2]
                     
                     if current_pos == 0:
-                        if prob_buy > PROB_THRESHOLD and rsi8 < RSI_ENTRY_LONG_MAX and (prob_buy - prob_sell) > 0.20:
+                        if prob_buy > PROB_THRESHOLD and rsi8 < RSI_ENTRY_LONG_MAX:
                             target = long_size if prob_buy > 0.64 else long_soft_size
-                        elif prob_sell > PROB_THRESHOLD and rsi8 > RSI_ENTRY_SHORT_MIN and (prob_sell - prob_buy) > 0.20:
-                            target = -short_size if prob_sell > 0.65 else -short_soft_size
+                        # No short entries in bull regime
                     else:
-                        # Exit or Flip (with RSI guard on flip destination)
+                        # Exit or Flip (longs only — exit when model says sell)
                         if current_pos > 0 and prob_sell > PROB_THRESHOLD:
-                            if rsi8 > RSI_ENTRY_SHORT_MIN:
-                                target = -short_size if prob_sell > 0.65 else -short_soft_size
-                            else:
-                                target = 0.0  # Exit only, no short flip when RSI already low
-                        elif current_pos < 0 and prob_buy > PROB_THRESHOLD:
-                            if rsi8 < RSI_ENTRY_LONG_MAX:
-                                target = long_size if prob_buy > 0.64 else long_soft_size
-                            else:
-                                target = 0.0  # Exit only, no long flip when RSI already high
+                            target = 0.0  # Exit only, no shorts
                 except Exception as e:
                     print(f"Inference error for {symbol}: {e}")
             
