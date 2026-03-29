@@ -165,8 +165,8 @@ class Strategy:
             
             current_pos = portfolio.positions.get(symbol, 0.0)
             target = current_pos
-            long_size = equity * 0.14
-            long_soft_size = equity * 0.10
+            long_size = equity * 0.18
+            long_soft_size = equity * 0.12
             short_size = equity * 0.10
             short_soft_size = equity * 0.06
 
