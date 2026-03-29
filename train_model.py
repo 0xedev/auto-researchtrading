@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
+import xgboost as xgb
 import joblib
 import os
 from prepare import load_data
@@ -112,11 +112,15 @@ def train():
     print(f"Training on {len(X)} samples with {len(features)} features...")
     print(f"Class Distribution: {y.value_counts(normalize=True).to_dict()}")
     
-    model = RandomForestClassifier(
-        n_estimators=200,
-        max_depth=12,
-        min_samples_leaf=50,
-        n_jobs=-1,
+    model = xgb.XGBClassifier(
+        n_estimators=100,
+        max_depth=6,
+        learning_rate=0.1,
+        objective='multi:softprob',
+        num_class=3,
+        tree_method='hist',
+        reg_alpha=1.0,
+        colsample_bytree=0.7,
         random_state=42
     )
     
