@@ -43,9 +43,11 @@ BASE_BB_PERIOD = 100
 
 BASE_POSITION_PCT = 0.08
 ATR_LOOKBACK = 24
-ATR_STOP_MULT = 7.5
+ATR_STOP_MULT = 6.5
 RSI_OVERBOUGHT = 69
 RSI_OVERSOLD = 31
+RSI_ENTRY_LONG_MAX = 63   # Don't enter long if already near overbought
+RSI_ENTRY_SHORT_MIN = 37  # Don't enter short if already near oversold
 
 def ema(values, span):
     span = max(2, int(span))
@@ -177,9 +179,9 @@ class Strategy:
                     prob_sell = probs[2]
                     
                     if current_pos == 0:
-                        if prob_buy > PROB_THRESHOLD:
+                        if prob_buy > PROB_THRESHOLD and rsi8 < RSI_ENTRY_LONG_MAX:
                             target = long_size if prob_buy > 0.64 else long_soft_size
-                        elif prob_sell > PROB_THRESHOLD:
+                        elif prob_sell > PROB_THRESHOLD and rsi8 > RSI_ENTRY_SHORT_MIN:
                             target = -short_size if prob_sell > 0.65 else -short_soft_size
                     else:
                         # Exit or Flip
