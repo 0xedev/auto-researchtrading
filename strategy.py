@@ -26,7 +26,7 @@ import os
 
 # Model Settings
 MODEL_PATH = os.path.expanduser("~/.cache/autotrader/model.joblib")
-PROB_THRESHOLD = 0.58  # XGBoost optimal
+PROB_THRESHOLD = 0.57  # Slightly lower to add more quality trades
 
 # Canonical H4 Periods (Reference)
 H4_REF = 4 * 3600  # 4 hours in seconds
