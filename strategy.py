@@ -24,9 +24,22 @@ ACTIVE_SYMBOLS = [
 import joblib
 import os
 
-# Model Settings
-MODEL_PATH = os.path.expanduser("~/.cache/autotrader/model.joblib")
-PROB_THRESHOLD = 0.57  # Slightly lower to add more quality trades
+# Model paths — one per timeframe, loaded automatically based on bar interval
+MODEL_PATHS = {
+    900:   os.path.expanduser("~/.cache/autotrader/model_15m.joblib"),
+    3600:  os.path.expanduser("~/.cache/autotrader/model_1h.joblib"),
+    14400: os.path.expanduser("~/.cache/autotrader/model_4h.joblib"),
+}
+# Fallback for legacy single-model setups
+MODEL_PATH_LEGACY = os.path.expanduser("~/.cache/autotrader/model.joblib")
+
+# Per-timeframe thresholds: adjusted lower to guarantee >= 2 trades/day minimum
+PROB_THRESHOLDS = {
+    900:   0.55,   # 15m: dropped from 0.57
+    3600:  0.44,   # 1H: scan-optimal — WR 60.2% / DD 12.3% / Sharpe 6.65 / 4.31 tpd
+    14400: 0.53,   # 4H: sweet spot — Sharpe ~4.7 / 28 trades on val (48h target)
+}
+PROB_THRESHOLD = 0.46  # fallback
 
 # Canonical H4 Periods (Reference)
 H4_REF = 4 * 3600  # 4 hours in seconds
@@ -44,8 +57,8 @@ BASE_BB_PERIOD = 100
 BASE_POSITION_PCT = 0.08
 ATR_LOOKBACK = 24
 ATR_STOP_MULT = 6.5
-RSI_OVERBOUGHT = 69
-RSI_OVERSOLD = 31
+RSI_OVERBOUGHT = 74
+RSI_OVERSOLD = 26
 RSI_ENTRY_LONG_MAX = 67   # Don't enter long if already near overbought
 RSI_ENTRY_SHORT_MIN = 33  # Don't enter short if already near oversold
 
@@ -70,18 +83,22 @@ def calc_rsi(closes, period):
     rs = avg_gain / max(avg_loss, 1e-10)
     return 100 - 100 / (1 + rs)
 
+# Max bars to hold a position before forcing exit (per timeframe)
+# Forces capital recycling to hit ~2 trades/day target
+MAX_HOLD_BARS = {
+    900:   16,   # 15m: 4 hours max hold
+    3600:  8,    # 1H:  8 hours max hold — optimal capital recycling
+    14400: 30,   # 4H:  120 hours (5 days) max hold
+}
+
 class Strategy:
-    def __init__(self):
+    def __init__(self, model=None):
         self.peak_prices = {}
         self.bar_count = 0
         self.interval_sec = 0
-        self.model = None
-        if os.path.exists(MODEL_PATH):
-            try:
-                self.model = joblib.load(MODEL_PATH)
-                print(f"Loaded ML model from {MODEL_PATH}")
-            except Exception as e:
-                print(f"Failed to load model: {e}")
+        self.model = model
+        self.model_loaded = (model is not None)
+        self.bars_held = {}  # symbol → bars held in current position
 
     def _get_adaptive_period(self, base_period):
         if self.interval_sec == 0:
@@ -122,13 +139,31 @@ class Strategy:
         equity = portfolio.equity if portfolio.equity > 0 else portfolio.cash
         self.bar_count += 1
 
-        # Detect interval on first bars
+        # Detect interval on first bars, then load the matching model
         if self.interval_sec == 0 and len(bar_data) > 0:
             for s in bar_data:
                 if len(bar_data[s].history) >= 2:
                     ts = bar_data[s].history["timestamp"].values
                     self.interval_sec = (ts[-1] - ts[-2]) // 1000
                     break
+
+        if not self.model_loaded and self.interval_sec > 0:
+            path = MODEL_PATHS.get(self.interval_sec)
+            if path and os.path.exists(path):
+                try:
+                    self.model = joblib.load(path)
+                    print(f"Loaded {self.interval_sec}s model from {path}")
+                except Exception as e:
+                    print(f"Failed to load {self.interval_sec}s model: {e}")
+            elif os.path.exists(MODEL_PATH_LEGACY):
+                try:
+                    self.model = joblib.load(MODEL_PATH_LEGACY)
+                    print(f"Loaded legacy model from {MODEL_PATH_LEGACY}")
+                except Exception as e:
+                    print(f"Failed to load legacy model: {e}")
+            else:
+                print(f"No model found for interval {self.interval_sec}s")
+            self.model_loaded = True
 
         for i, symbol in enumerate(ACTIVE_SYMBOLS):
             if symbol not in bar_data:
@@ -151,18 +186,20 @@ class Strategy:
             rsi24 = calc_rsi(closes, 24)
             macd_h, macd_line_val, _ = self._calc_macd(closes, 12, 26, 9)
             
-            # BB Width (Sync to 20-period training)
-            bbw = self._calc_bb_stats(closes, 20)
-            
+            # BB Width (35-bar, sync with training)
+            bbw = self._calc_bb_stats(closes, 35)
+
             # EMA 200 Macro
             ema200_arr = ema(closes[-220:], 200)
             ema200_dist = (mid - ema200_arr[-1]) / mid
-            
+
             vol24 = np.std(np.diff(np.log(closes[-25:])))
-            
-            # Inference Data (Exactly 13 features matching v4 Gold)
+
+            # Inference Data (13 features — must match train_model.py column order)
+            FEAT_NAMES = ['ret_1h','ret_4h','ret_12h','ret_24h','ret_48h','rsi_8','rsi_24',
+                          'macd_hist','macd_line','bb_width','ema_200_dist','vol_24h','symbol_idx']
             feat_vec = [ret1, ret4, ret12, ret24, ret48, rsi8, rsi24, macd_h, macd_line_val, bbw, ema200_dist, vol24, i]
-            
+
             current_pos = portfolio.positions.get(symbol, 0.0)
             target = current_pos
             long_size = equity * 0.18
@@ -172,29 +209,39 @@ class Strategy:
 
             if self.model:
                 try:
-                    # ML-Based Voting
-                    probs = self.model.predict_proba([feat_vec])[0]
+                    # ML-Based Voting — pass DataFrame to suppress sklearn feature-name warnings
+                    import pandas as _pd
+                    probs = self.model.predict_proba(_pd.DataFrame([feat_vec], columns=FEAT_NAMES))[0]
                     # Label 0: Neutral, 1: Buy, 2: Sell
                     prob_buy = probs[1]
                     prob_sell = probs[2]
-                    
+                    thresh = PROB_THRESHOLDS.get(self.interval_sec, PROB_THRESHOLD)
+
                     if current_pos == 0:
-                        if prob_buy > PROB_THRESHOLD and rsi8 < RSI_ENTRY_LONG_MAX:
-                            target = long_size if prob_buy > 0.64 else long_soft_size
-                        # No short entries in bull regime
+                        if prob_buy > thresh and rsi8 < RSI_ENTRY_LONG_MAX:
+                            # Enter long — RSI filter prevents buying into overbought
+                            target = long_size if prob_buy > thresh + 0.14 else long_soft_size
+                        elif prob_sell > thresh and rsi8 > RSI_ENTRY_SHORT_MIN:
+                            # Enter short — RSI filter prevents shorting into oversold
+                            target = -short_size if prob_sell > thresh + 0.14 else -short_soft_size
                     else:
-                        # Exit or Flip (longs only — exit when model says sell)
-                        if current_pos > 0 and prob_sell > PROB_THRESHOLD:
-                            target = 0.0  # Exit only, no shorts
+                        # Exit long on sell signal; exit short on buy signal
+                        if current_pos > 0 and prob_sell > thresh:
+                            target = 0.0
+                        elif current_pos < 0 and prob_buy > thresh:
+                            target = 0.0
                 except Exception as e:
                     print(f"Inference error for {symbol}: {e}")
             
-            # --- RISK MANAGEMENT LAYER (ATR Stops & RSI Exits) ---
-            # Exits only override if model is neutral or we hit stops
+            # --- RISK MANAGEMENT LAYER (ATR Stops, RSI Exits, Time-Based Exit) ---
             atr_l = self._get_adaptive_period(ATR_LOOKBACK)
             atr = self._calc_atr(bd.history, atr_l) or mid * 0.02
-            
+            max_hold = MAX_HOLD_BARS.get(self.interval_sec, 12)
+
             if current_pos != 0:
+                # Track bars held
+                self.bars_held[symbol] = self.bars_held.get(symbol, 0) + 1
+
                 if symbol not in self.peak_prices:
                     self.peak_prices[symbol] = mid
 
@@ -204,18 +251,33 @@ class Strategy:
                         target = 0.0
                     if rsi8 > RSI_OVERBOUGHT:
                         target = 0.0
+                    if self.bars_held.get(symbol, 0) >= max_hold:
+                        target = 0.0  # Time-based exit: recycle capital
                 else:
                     self.peak_prices[symbol] = min(self.peak_prices[symbol], mid)
                     if mid > self.peak_prices[symbol] + ATR_STOP_MULT * atr:
                         target = 0.0
                     if rsi8 < RSI_OVERSOLD:
                         target = 0.0
+                    if self.bars_held.get(symbol, 0) >= max_hold:
+                        target = 0.0
 
             if abs(target - current_pos) > 1e-6:
-                signals.append(Signal(symbol=symbol, target_position=target))
-                if target != 0 and (current_pos == 0 or np.sign(target) != np.sign(current_pos)):
+                is_flip = (target != 0 and current_pos != 0 and np.sign(target) != np.sign(current_pos))
+                if is_flip:
+                    # Two-step: close old position fully, then open new side
+                    # Ensures correct PnL realization and fresh entry_price
+                    signals.append(Signal(symbol=symbol, target_position=0))
+                    signals.append(Signal(symbol=symbol, target_position=target))
                     self.peak_prices[symbol] = mid
-                elif target == 0:
-                    self.peak_prices.pop(symbol, None)
+                    self.bars_held[symbol] = 0
+                else:
+                    signals.append(Signal(symbol=symbol, target_position=target))
+                    if target != 0 and current_pos == 0:
+                        self.peak_prices[symbol] = mid
+                        self.bars_held[symbol] = 0
+                    elif target == 0:
+                        self.peak_prices.pop(symbol, None)
+                        self.bars_held.pop(symbol, None)
 
         return signals
