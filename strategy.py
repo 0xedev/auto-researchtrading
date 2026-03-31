@@ -220,17 +220,18 @@ class Strategy:
                     prob_buy = probs[1]
                     prob_sell = probs[2]
                     thresh = PROB_THRESHOLDS.get(self.interval_sec, PROB_THRESHOLD)
+                    thresh_sell = thresh + 0.04  # Shorts need higher confidence (model trained on more bull data)
 
                     if current_pos == 0:
                         if prob_buy > thresh and rsi8 < RSI_ENTRY_LONG_MAX:
                             # Enter long — RSI filter prevents buying into overbought
                             target = long_size if prob_buy > thresh + 0.14 else long_soft_size
-                        elif prob_sell > thresh and rsi8 > RSI_ENTRY_SHORT_MIN:
-                            # Enter short — RSI filter prevents shorting into oversold
-                            target = -short_size if prob_sell > thresh + 0.14 else -short_soft_size
+                        elif prob_sell > thresh_sell and rsi8 > RSI_ENTRY_SHORT_MIN:
+                            # Enter short — higher bar for shorts (noisier signal)
+                            target = -short_size if prob_sell > thresh_sell + 0.14 else -short_soft_size
                     else:
                         # Exit long on sell signal; exit short on buy signal
-                        if current_pos > 0 and prob_sell > thresh:
+                        if current_pos > 0 and prob_sell > thresh_sell:
                             target = 0.0
                         elif current_pos < 0 and prob_buy > thresh:
                             target = 0.0
