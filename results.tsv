@@ -90,3 +90,4 @@ exp185b	3.278	3.278	14.35	KEEP	ATR 4.5 + t=0.42 + vol_adj — OOS -8.65 (vol-ada
 exp187	7.049	7.049	11.05	KEEP	t=0.44 + ATR 4.5 + max_hold=4 + vol_adj — OOS -4.67 but 1.98 tpd FAILS 2/day
 exp188	3.141	3.141	11.29	KEEP	t=0.44 + ATR 4.5 + max_hold=3 + vol_adj — OOS -6.85 / 2.21 tpd VALID
 exp189	5.492	5.492	12.89	KEEP	t=0.43 + ATR 4.5 + max_hold=4 + vol_adj — OOS -5.55 / 2.36 tpd VALID BEST OOS
+exp190	3.272	3.272	11.27	REVERT	t=0.43 + max_hold=3 — OOS -9.55 worse than exp189 (max_hold=4 is sweet spot)
