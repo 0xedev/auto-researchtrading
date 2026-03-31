@@ -87,7 +87,7 @@ def calc_rsi(closes, period):
 # Forces capital recycling to hit ~2 trades/day target
 MAX_HOLD_BARS = {
     900:   16,   # 15m: 4 hours max hold
-    3600:  4,    # 1H:  4 hours max hold — fast recycling to boost OOS frequency with t=0.44
+    3600:  3,    # 1H:  3 hours max hold — push OOS tpd above 2.0 (was 1.98 at max_hold=4)
     14400: 30,   # 4H:  120 hours (5 days) max hold
 }
 
