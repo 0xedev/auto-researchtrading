@@ -139,6 +139,15 @@ class Strategy:
         equity = portfolio.equity if portfolio.equity > 0 else portfolio.cash
         self.bar_count += 1
 
+        # BTC macro regime (computed once per bar, applies to all symbols)
+        btc_regime = 0.0  # 0 = neutral/unknown
+        if "BTC" in bar_data:
+            btc_closes = bar_data["BTC"].history["close"].values
+            if len(btc_closes) >= 210:
+                btc_ema200 = ema(btc_closes[-210:], 200)[-1]
+                btc_price = bar_data["BTC"].close
+                btc_regime = (btc_price - btc_ema200) / btc_price  # + bull, - bear
+
         # Detect interval on first bars, then load the matching model
         if self.interval_sec == 0 and len(bar_data) > 0:
             for s in bar_data:
@@ -205,15 +214,14 @@ class Strategy:
             # Volatility-adaptive sizing: scale down in high-vol regimes
             atr_pct = vol24
             vol_adj = min(1.0, 0.03 / max(atr_pct, 1e-6))
-            # BTC macro regime: ema200_dist > 0 → bull, < 0 → bear
-            # In bear regime, cut long exposure 60%, boost short to full
-            # Uses this symbol's own EMA200 distance (already computed above)
-            if ema200_dist >= 0:
-                regime_long_mult = 1.0   # bull: full longs
-                regime_short_mult = 0.5  # bull: half shorts (fewer bear signals in uptrend)
+            # BTC macro regime gate (global, not per-symbol)
+            # In BTC bear regime, cut long exposure and boost short exposure
+            if btc_regime >= 0:
+                regime_long_mult = 1.0   # BTC bull: full longs
+                regime_short_mult = 0.5  # BTC bull: half shorts
             else:
-                regime_long_mult = 0.4   # bear: cut longs 60%
-                regime_short_mult = 1.0  # bear: full shorts
+                regime_long_mult = 0.4   # BTC bear: cut longs 60%
+                regime_short_mult = 1.0  # BTC bear: full shorts
             long_size = equity * 0.18 * vol_adj * regime_long_mult
             long_soft_size = equity * 0.12 * vol_adj * regime_long_mult
             short_size = equity * 0.10 * vol_adj * regime_short_mult
