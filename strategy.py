@@ -36,7 +36,7 @@ MODEL_PATH_LEGACY = os.path.expanduser("~/.cache/autotrader/model.joblib")
 # Per-timeframe thresholds: adjusted lower to guarantee >= 2 trades/day minimum
 PROB_THRESHOLDS = {
     900:   0.55,   # 15m: dropped from 0.57
-    3600:  0.44,   # 1H: scan-optimal — WR 60.2% / DD 12.3% / Sharpe 6.65 / 4.31 tpd
+    3600:  0.42,   # 1H: OOS-compatible — vol-adaptive sizing handles the high-vol reduction
     14400: 0.53,   # 4H: sweet spot — Sharpe ~4.7 / 28 trades on val (48h target)
 }
 PROB_THRESHOLD = 0.46  # fallback
@@ -202,10 +202,14 @@ class Strategy:
 
             current_pos = portfolio.positions.get(symbol, 0.0)
             target = current_pos
-            long_size = equity * 0.18
-            long_soft_size = equity * 0.12
-            short_size = equity * 0.10
-            short_soft_size = equity * 0.06
+            # Volatility-adaptive sizing: scale down in high-vol regimes
+            # Target 3% ATR exposure; uncapped in low-vol (bull) markets
+            atr_pct = vol24  # vol24 = std of log-returns over 24 bars ≈ 1H ATR proxy
+            vol_adj = min(1.0, 0.03 / max(atr_pct, 1e-6))
+            long_size = equity * 0.18 * vol_adj
+            long_soft_size = equity * 0.12 * vol_adj
+            short_size = equity * 0.10 * vol_adj
+            short_soft_size = equity * 0.06 * vol_adj
 
             if self.model:
                 try:
