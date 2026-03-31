@@ -257,6 +257,8 @@ class Strategy:
             atr_l = self._get_adaptive_period(ATR_LOOKBACK)
             atr = self._calc_atr(bd.history, atr_l) or mid * 0.02
             max_hold = MAX_HOLD_BARS.get(self.interval_sec, 12)
+            # Tighter ATR stop in BTC bear regime (cut losses faster)
+            atr_mult = ATR_STOP_MULT if btc_regime >= 0 else ATR_STOP_MULT * 0.75
 
             if current_pos != 0:
                 # Track bars held
@@ -267,7 +269,7 @@ class Strategy:
 
                 if current_pos > 0:
                     self.peak_prices[symbol] = max(self.peak_prices[symbol], mid)
-                    if mid < self.peak_prices[symbol] - ATR_STOP_MULT * atr:
+                    if mid < self.peak_prices[symbol] - atr_mult * atr:
                         target = 0.0
                     if rsi8 > RSI_OVERBOUGHT:
                         target = 0.0
@@ -275,7 +277,7 @@ class Strategy:
                         target = 0.0  # Time-based exit: recycle capital
                 else:
                     self.peak_prices[symbol] = min(self.peak_prices[symbol], mid)
-                    if mid > self.peak_prices[symbol] + ATR_STOP_MULT * atr:
+                    if mid > self.peak_prices[symbol] + atr_mult * atr:
                         target = 0.0
                     if rsi8 < RSI_OVERSOLD:
                         target = 0.0
