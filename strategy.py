@@ -203,13 +203,21 @@ class Strategy:
             current_pos = portfolio.positions.get(symbol, 0.0)
             target = current_pos
             # Volatility-adaptive sizing: scale down in high-vol regimes
-            # Target 3% ATR exposure; uncapped in low-vol (bull) markets
-            atr_pct = vol24  # vol24 = std of log-returns over 24 bars ≈ 1H ATR proxy
+            atr_pct = vol24
             vol_adj = min(1.0, 0.03 / max(atr_pct, 1e-6))
-            long_size = equity * 0.18 * vol_adj
-            long_soft_size = equity * 0.12 * vol_adj
-            short_size = equity * 0.10 * vol_adj
-            short_soft_size = equity * 0.06 * vol_adj
+            # BTC macro regime: ema200_dist > 0 → bull, < 0 → bear
+            # In bear regime, cut long exposure 60%, boost short to full
+            # Uses this symbol's own EMA200 distance (already computed above)
+            if ema200_dist >= 0:
+                regime_long_mult = 1.0   # bull: full longs
+                regime_short_mult = 0.5  # bull: half shorts (fewer bear signals in uptrend)
+            else:
+                regime_long_mult = 0.4   # bear: cut longs 60%
+                regime_short_mult = 1.0  # bear: full shorts
+            long_size = equity * 0.18 * vol_adj * regime_long_mult
+            long_soft_size = equity * 0.12 * vol_adj * regime_long_mult
+            short_size = equity * 0.10 * vol_adj * regime_short_mult
+            short_soft_size = equity * 0.06 * vol_adj * regime_short_mult
 
             if self.model:
                 try:
