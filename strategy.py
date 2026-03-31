@@ -218,9 +218,9 @@ class Strategy:
             # In BTC bear regime, cut long exposure and boost short exposure
             if btc_regime >= 0:
                 regime_long_mult = 1.0   # BTC bull: full longs
-                regime_short_mult = 0.5  # BTC bull: half shorts
+                regime_short_mult = 0.8  # BTC bull: mostly full shorts
             else:
-                regime_long_mult = 0.4   # BTC bear: cut longs 60%
+                regime_long_mult = 0.6   # BTC bear: cut longs 40%
                 regime_short_mult = 1.0  # BTC bear: full shorts
             long_size = equity * 0.18 * vol_adj * regime_long_mult
             long_soft_size = equity * 0.12 * vol_adj * regime_long_mult
