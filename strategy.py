@@ -87,7 +87,7 @@ def calc_rsi(closes, period):
 # Forces capital recycling to hit ~2 trades/day target
 MAX_HOLD_BARS = {
     900:   16,   # 15m: 4 hours max hold
-    3600:  3,    # 1H:  3 hours max hold — exp190: faster recycling, smaller losses
+    3600:  4,    # 1H:  4 hours max hold — sweet spot: quality exits + adequate recycling
     14400: 30,   # 4H:  120 hours (5 days) max hold
 }
 
