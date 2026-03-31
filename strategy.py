@@ -36,7 +36,7 @@ MODEL_PATH_LEGACY = os.path.expanduser("~/.cache/autotrader/model.joblib")
 # Per-timeframe thresholds: adjusted lower to guarantee >= 2 trades/day minimum
 PROB_THRESHOLDS = {
     900:   0.55,   # 15m: dropped from 0.57
-    3600:  0.44,   # 1H: t=0.44 + max_hold 4 — high quality + faster recycling for OOS frequency
+    3600:  0.43,   # 1H: t=0.43 + max_hold 4 — thread needle between OOS -4.67 and -6.85
     14400: 0.53,   # 4H: sweet spot — Sharpe ~4.7 / 28 trades on val (48h target)
 }
 PROB_THRESHOLD = 0.46  # fallback
@@ -87,7 +87,7 @@ def calc_rsi(closes, period):
 # Forces capital recycling to hit ~2 trades/day target
 MAX_HOLD_BARS = {
     900:   16,   # 15m: 4 hours max hold
-    3600:  3,    # 1H:  3 hours max hold — push OOS tpd above 2.0 (was 1.98 at max_hold=4)
+    3600:  4,    # 1H:  4 hours max hold — balance quality and recycling
     14400: 30,   # 4H:  120 hours (5 days) max hold
 }
 
