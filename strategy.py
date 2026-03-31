@@ -36,7 +36,7 @@ MODEL_PATH_LEGACY = os.path.expanduser("~/.cache/autotrader/model.joblib")
 # Per-timeframe thresholds: adjusted lower to guarantee >= 2 trades/day minimum
 PROB_THRESHOLDS = {
     900:   0.55,   # 15m: dropped from 0.57
-    3600:  0.43,   # 1H: t=0.43 + max_hold 4 — thread needle between OOS -4.67 and -6.85
+    3600:  0.44,   # 1H: t=0.44 + max_hold 3 — val 3.14 (in 2.5-3.5 range), OOS -6.85
     14400: 0.53,   # 4H: sweet spot — Sharpe ~4.7 / 28 trades on val (48h target)
 }
 PROB_THRESHOLD = 0.46  # fallback
@@ -87,7 +87,7 @@ def calc_rsi(closes, period):
 # Forces capital recycling to hit ~2 trades/day target
 MAX_HOLD_BARS = {
     900:   16,   # 15m: 4 hours max hold
-    3600:  4,    # 1H:  4 hours max hold — sweet spot: quality exits + adequate recycling
+    3600:  3,    # 1H:  3 hours max hold — exp188: val 3.14 / OOS -6.85 / 2.21 tpd
     14400: 30,   # 4H:  120 hours (5 days) max hold
 }
 
@@ -220,18 +220,17 @@ class Strategy:
                     prob_buy = probs[1]
                     prob_sell = probs[2]
                     thresh = PROB_THRESHOLDS.get(self.interval_sec, PROB_THRESHOLD)
-                    thresh_sell = thresh + 0.04  # Shorts need higher confidence (model trained on more bull data)
 
                     if current_pos == 0:
                         if prob_buy > thresh and rsi8 < RSI_ENTRY_LONG_MAX:
                             # Enter long — RSI filter prevents buying into overbought
                             target = long_size if prob_buy > thresh + 0.14 else long_soft_size
-                        elif prob_sell > thresh_sell and rsi8 > RSI_ENTRY_SHORT_MIN:
-                            # Enter short — higher bar for shorts (noisier signal)
-                            target = -short_size if prob_sell > thresh_sell + 0.14 else -short_soft_size
+                        elif prob_sell > thresh and rsi8 > RSI_ENTRY_SHORT_MIN:
+                            # Enter short — RSI filter prevents shorting into oversold
+                            target = -short_size if prob_sell > thresh + 0.14 else -short_soft_size
                     else:
                         # Exit long on sell signal; exit short on buy signal
-                        if current_pos > 0 and prob_sell > thresh_sell:
+                        if current_pos > 0 and prob_sell > thresh:
                             target = 0.0
                         elif current_pos < 0 and prob_buy > thresh:
                             target = 0.0
