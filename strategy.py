@@ -57,10 +57,10 @@ BASE_BB_PERIOD = 100
 BASE_POSITION_PCT = 0.08
 ATR_LOOKBACK = 24
 ATR_STOP_MULT = 4.5
-RSI_OVERBOUGHT = 68
-RSI_OVERSOLD = 32
-RSI_ENTRY_LONG_MAX = 63   # Don't enter long if already near overbought
-RSI_ENTRY_SHORT_MIN = 37  # Don't enter short if already near oversold
+RSI_OVERBOUGHT = 74
+RSI_OVERSOLD = 26
+RSI_ENTRY_LONG_MAX = 67   # Don't enter long if already near overbought
+RSI_ENTRY_SHORT_MIN = 33  # Don't enter short if already near oversold
 
 def ema(values, span):
     span = max(2, int(span))
