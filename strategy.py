@@ -36,7 +36,7 @@ MODEL_PATH_LEGACY = os.path.expanduser("~/.cache/autotrader/model.joblib")
 # Per-timeframe thresholds: adjusted lower to guarantee >= 2 trades/day minimum
 PROB_THRESHOLDS = {
     900:   0.55,   # 15m: dropped from 0.57
-    3600:  0.42,   # 1H: restored for OOS frequency — ATR 5.5 tighter to fix profit factor
+    3600:  0.44,   # 1H: scan-optimal — WR 60.2% / DD 12.3% / Sharpe 6.65 / 4.31 tpd
     14400: 0.53,   # 4H: sweet spot — Sharpe ~4.7 / 28 trades on val (48h target)
 }
 PROB_THRESHOLD = 0.46  # fallback
