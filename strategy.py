@@ -1,305 +1,151 @@
-"""
-Production Ensemble Strategy (6-signal).
-Expanded to 18 assets (Crypto + Macro) on 4H bars.
-Signals:
-1. Short Momentum (12 bars)
-2. Very Short Momentum (6 bars)
-3. EMA Crossover (7, 26)
-4. RSI (8)
-5. MACD (14, 23, 9)
-6. BB Width Percentile (100-bar window)
-Voting: 4/6 for Entry.
-Risk: ATR 5.5 trailing stop, RSI exits (69/31).
-"""
-
-import numpy as np
-from prepare import Signal, PortfolioState, BarData
-
-ACTIVE_SYMBOLS = [
-    "BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "LINK", 
-    "AVAX", "DOT", "ATOM", "NEAR", "UNI", "APT", "SUI", 
-    "XAU", "DXY", "SP500"
-]
-
-import joblib
 import os
+import joblib
+import xgboost as xgb
+import numpy as np
+import pandas as pd
+from dataclasses import dataclass
+from typing import List, Optional
+from prepare import calculate_features, FEATURE_COLS
 
-# Model paths — one per timeframe, loaded automatically based on bar interval
-MODEL_PATHS = {
-    900:   os.path.expanduser("~/.cache/autotrader/model_15m.joblib"),
-    3600:  os.path.expanduser("~/.cache/autotrader/model_1h.joblib"),
-    14400: os.path.expanduser("~/.cache/autotrader/model_4h.joblib"),
-}
-# Fallback for legacy single-model setups
-MODEL_PATH_LEGACY = os.path.expanduser("~/.cache/autotrader/model.joblib")
-
-# Per-timeframe thresholds: adjusted lower to guarantee >= 2 trades/day minimum
-PROB_THRESHOLDS = {
-    900:   0.55,   # 15m: dropped from 0.57
-    3600:  0.44,   # 1H: t=0.44 + max_hold 3 — val 3.14 (in 2.5-3.5 range), OOS -6.85
-    14400: 0.53,   # 4H: sweet spot — Sharpe ~4.7 / 28 trades on val (48h target)
-}
-PROB_THRESHOLD = 0.46  # fallback
-
-# Canonical H4 Periods (Reference)
-H4_REF = 4 * 3600  # 4 hours in seconds
-
-BASE_EMA_FAST = 7
-BASE_EMA_SLOW = 26
-BASE_SHORT_WINDOW = 12
-BASE_VSHORT_WINDOW = 6
-BASE_RSI_PERIOD = 8
-BASE_MACD_FAST = 14
-BASE_MACD_SLOW = 23
-BASE_MACD_SIGNAL = 9
-BASE_BB_PERIOD = 100
-
-BASE_POSITION_PCT = 0.08
-ATR_LOOKBACK = 24
-ATR_STOP_MULT = 4.5
-RSI_OVERBOUGHT = 74
-RSI_OVERSOLD = 26
-RSI_ENTRY_LONG_MAX = 67   # Don't enter long if already near overbought
-RSI_ENTRY_SHORT_MIN = 33  # Don't enter short if already near oversold
-
-def ema(values, span):
-    span = max(2, int(span))
-    alpha = 2.0 / (span + 1)
-    result = np.empty_like(values, dtype=float)
-    result[0] = values[0]
-    for i in range(1, len(values)):
-        result[i] = alpha * values[i] + (1 - alpha) * result[i - 1]
-    return result
-
-def calc_rsi(closes, period):
-    period = max(2, int(period))
-    if len(closes) < period + 1:
-        return 50.0
-    deltas = np.diff(closes[-(period+1):])
-    gains = np.where(deltas > 0, deltas, 0)
-    losses = np.where(deltas < 0, -deltas, 0)
-    avg_gain = np.mean(gains)
-    avg_loss = np.mean(losses)
-    rs = avg_gain / max(avg_loss, 1e-10)
-    return 100 - 100 / (1 + rs)
-
-# Max bars to hold a position before forcing exit (per timeframe)
-# Forces capital recycling to hit ~2 trades/day target
-MAX_HOLD_BARS = {
-    900:   16,   # 15m: 4 hours max hold
-    3600:  3,    # 1H:  3 hours max hold — exp188: val 3.14 / OOS -6.85 / 2.21 tpd
-    14400: 30,   # 4H:  120 hours (5 days) max hold
-}
+@dataclass
+class Signal:
+    symbol: str
+    target_position: float
+    order_type: str = "market"
 
 class Strategy:
-    def __init__(self, model=None):
-        self.peak_prices = {}
-        self.bar_count = 0
-        self.interval_sec = 0
-        self.model = model
-        self.model_loaded = (model is not None)
-        self.bars_held = {}  # symbol → bars held in current position
+    def __init__(self, timeframe: str):
+        self.timeframe_arg = timeframe
+        self.interval_sec = self._parse_timeframe(timeframe)
+        
+        self.models = {}
+        self.meta_models = {}
+        self.symbol_caches = {} 
+        self.bar_counts = {}   
+        self.models_loaded = False
+        
+        # State tracking
+        self.trailing_stops = {}
 
-    def _get_adaptive_period(self, base_period):
-        if self.interval_sec == 0:
-            return base_period
-        return max(2, int(base_period * (H4_REF / self.interval_sec)))
+    def _parse_timeframe(self, tf: str) -> int:
+        if tf == "15m": return 15 * 60
+        if tf == "1h": return 3600
+        if tf == "4h": return 14400
+        return 0
 
-    def _calc_atr(self, history, lookback):
-        lookback = max(5, int(lookback))
-        if len(history) < lookback + 1:
-            return None
-        highs = history["high"].values[-lookback:]
-        lows = history["low"].values[-lookback:]
-        closes = history["close"].values[-(lookback+1):-1]
-        tr = np.maximum(highs - lows,
-                        np.maximum(np.abs(highs - closes), np.abs(lows - closes)))
-        return np.mean(tr)
+    def _load_models(self):
+        for tf in ["15m", "1h", "4h"]:
+            m_path = f"models/lead_{tf}.xgb"
+            meta_path = f"models/meta_{tf}.xgb"
+            
+            if os.path.exists(m_path):
+                self.models[tf] = xgb.XGBClassifier()
+                self.models[tf].load_model(m_path)
+            
+            if os.path.exists(meta_path):
+                self.meta_models[tf] = xgb.XGBClassifier()
+                self.meta_models[tf].load_model(meta_path)
+                
+        self.models_loaded = True
+        print(f"LOADED QUANTUM FORTRESS: {list(self.models.keys())}")
 
-    def _calc_macd(self, closes, fast, slow, signal_p):
-        if len(closes) < slow + signal_p + 5:
-            return 0.0, 0.0, 0.0
-        fast_ema = ema(closes[-(slow + signal_p + 5):], fast)
-        slow_ema = ema(closes[-(slow + signal_p + 5):], slow)
-        macd_line = fast_ema - slow_ema
-        signal_line = ema(macd_line, signal_p)
-        return macd_line[-1] - signal_line[-1], macd_line[-1], signal_line[-1]
+    def pre_calculate_signals(self, data_dict):
+        """Vectorized pre-calculation for Quantum Meta-Labeling Fortress."""
+        if not self.models_loaded:
+            self._load_models()
 
-    def _calc_bb_stats(self, closes, period):
-        period = max(5, int(period))
-        if len(closes) < period + 2:
-            return 100.0
-        rolling_mean = np.mean(closes[-period:])
-        rolling_std = np.std(closes[-period:])
-        width = (4 * rolling_std) / np.maximum(rolling_mean, 1e-10)
-        return width
+        # 1. Pre-calculate Systemic Beta (Market Context)
+        print("Calculating Global Market Context...")
+        all_vols = {}
+        all_rets = {}
+        for symbol, df in data_dict.items():
+            feat = calculate_features(df, timeframe=self.timeframe_arg)
+            all_vols[symbol] = feat['bb_width']
+            all_rets[symbol] = df['close'].pct_change()
+            
+        m_vol = pd.DataFrame(all_vols).median(axis=1).fillna(0)
+        m_ret = pd.DataFrame(all_rets).median(axis=1).fillna(0)
+
+        print(f"Building Quantum Meta-Labeling Fortress for all symbols...")
+        for symbol, df in data_dict.items():
+            df_feat = calculate_features(df, timeframe=self.timeframe_arg)
+            df_feat['market_vol'] = m_vol
+            df_feat['market_ret'] = m_ret
+            X = df_feat[FEATURE_COLS]
+            
+            # Lead Inference (Direction)
+            probs_15m = self.models["15m"].predict_proba(X) if "15m" in self.models else np.zeros((len(X), 3))
+            
+            # Meta Inference (Profitability Confidence)
+            meta_15m = self.meta_models["15m"].predict_proba(X)[:, 1] if "15m" in self.meta_models else np.zeros(len(X))
+            meta_1h = self.meta_models["1h"].predict_proba(X)[:, 1] if "1h" in self.meta_models else np.zeros(len(X))
+            meta_4h = self.meta_models["4h"].predict_proba(X)[:, 1] if "4h" in self.meta_models else np.zeros(len(X))
+            
+            cache_list = []
+            for i in range(len(df)):
+                cache_list.append({
+                    'bull_15m': probs_15m[i, 1] if probs_15m.shape[1] > 1 else 0,
+                    'bear_15m': probs_15m[i, 2] if probs_15m.shape[1] > 2 else 0,
+                    'meta_15m': meta_15m[i],
+                    'meta_1h': meta_1h[i],
+                    'meta_4h': meta_4h[i],
+                    'atr_val': df_feat['atr_14'].iloc[i],
+                    'market_ret': df_feat['market_ret'].iloc[i]
+                })
+            self.symbol_caches[symbol] = cache_list
+            self.bar_counts[symbol] = 0
+            
+        print(f"Market-Aware Fortress cache warmed for {len(self.symbol_caches)} symbols.")
 
     def on_bar(self, bar_data, portfolio):
+        if not self.models_loaded:
+            self._load_models()
+
+        equity = portfolio.equity
         signals = []
-        equity = portfolio.equity if portfolio.equity > 0 else portfolio.cash
-        self.bar_count += 1
 
-        # BTC macro regime (computed once per bar, applies to all symbols)
-        btc_regime = 0.0  # 0 = neutral/unknown
-        if "BTC" in bar_data:
-            btc_closes = bar_data["BTC"].history["close"].values
-            if len(btc_closes) >= 210:
-                btc_ema200 = ema(btc_closes[-210:], 200)[-1]
-                btc_price = bar_data["BTC"].close
-                btc_regime = (btc_price - btc_ema200) / btc_price  # + bull, - bear
-
-        # Detect interval on first bars, then load the matching model
-        if self.interval_sec == 0 and len(bar_data) > 0:
-            for s in bar_data:
-                if len(bar_data[s].history) >= 2:
-                    ts = bar_data[s].history["timestamp"].values
-                    self.interval_sec = (ts[-1] - ts[-2]) // 1000
-                    break
-
-        if not self.model_loaded and self.interval_sec > 0:
-            path = MODEL_PATHS.get(self.interval_sec)
-            if path and os.path.exists(path):
-                try:
-                    self.model = joblib.load(path)
-                    print(f"Loaded {self.interval_sec}s model from {path}")
-                except Exception as e:
-                    print(f"Failed to load {self.interval_sec}s model: {e}")
-            elif os.path.exists(MODEL_PATH_LEGACY):
-                try:
-                    self.model = joblib.load(MODEL_PATH_LEGACY)
-                    print(f"Loaded legacy model from {MODEL_PATH_LEGACY}")
-                except Exception as e:
-                    print(f"Failed to load legacy model: {e}")
-            else:
-                print(f"No model found for interval {self.interval_sec}s")
-            self.model_loaded = True
-
-        for i, symbol in enumerate(ACTIVE_SYMBOLS):
-            if symbol not in bar_data:
+        for symbol, bar in bar_data.items():
+            pos = portfolio.positions.get(symbol, 0.0)
+            
+            if symbol not in self.symbol_caches:
                 continue
-            bd = bar_data[symbol]
-            closes = bd.history["close"].values
-            if len(closes) < 100:
+            
+            cache = self.symbol_caches[symbol]
+            idx = self.bar_counts.get(symbol, 0)
+            if idx >= len(cache): continue
+            
+            row = cache[idx]
+            self.bar_counts[symbol] += 1
+
+            m15 = row['meta_15m']
+            m1h = row['meta_1h']
+            m4h = row['meta_4h']
+            
+            # Nexus Confluence: Dynamic Thresholding for Alpha Surge
+            # We use the top-tier of the meta-probability distribution
+            is_fortress = (m15 > 0.50) and (m1h > 0.40) and (m4h > 0.30)
+            
+            if pos != 0:
+                # Dynamic Volatility-Adjusted Trailing Stop
+                if pos > 0:
+                    if bar.close < self.trailing_stops.get(symbol, 0):
+                        signals.append(Signal(symbol, 0.0))
+                    self.trailing_stops[symbol] = max(self.trailing_stops.get(symbol, 0), bar.high - stop_dist)
+                else:
+                    if bar.close > self.trailing_stops.get(symbol, 9e18):
+                        signals.append(Signal(symbol, 0.0))
+                    self.trailing_stops[symbol] = min(self.trailing_stops.get(symbol, 9e18), bar.low + stop_dist)
                 continue
 
-            mid = bd.close
-            
-            # --- FEATURE ENGINEERING (Consistent with train_model.py) ---
-            ret1 = (closes[-1] - closes[-2]) / closes[-2]
-            ret4 = (closes[-1] - closes[-5]) / closes[-5]
-            ret12 = (closes[-1] - closes[-13]) / closes[-13]
-            ret24 = (closes[-1] - closes[-25]) / closes[-25]
-            ret48 = (closes[-1] - closes[-49]) / closes[-49]
-            
-            rsi8 = calc_rsi(closes, 8)
-            rsi24 = calc_rsi(closes, 24)
-            macd_h, macd_line_val, _ = self._calc_macd(closes, 12, 26, 9)
-            
-            # BB Width (35-bar, sync with training)
-            bbw = self._calc_bb_stats(closes, 35)
-
-            # EMA 200 Macro
-            ema200_arr = ema(closes[-220:], 200)
-            ema200_dist = (mid - ema200_arr[-1]) / mid
-
-            vol24 = np.std(np.diff(np.log(closes[-25:])))
-
-            # Inference Data (13 features — must match train_model.py column order)
-            FEAT_NAMES = ['ret_1h','ret_4h','ret_12h','ret_24h','ret_48h','rsi_8','rsi_24',
-                          'macd_hist','macd_line','bb_width','ema_200_dist','vol_24h','symbol_idx']
-            feat_vec = [ret1, ret4, ret12, ret24, ret48, rsi8, rsi24, macd_h, macd_line_val, bbw, ema200_dist, vol24, i]
-
-            current_pos = portfolio.positions.get(symbol, 0.0)
-            target = current_pos
-            # Volatility-adaptive sizing: scale down in high-vol regimes
-            atr_pct = vol24
-            vol_adj = min(1.0, 0.03 / max(atr_pct, 1e-6))
-            # BTC macro regime gate (global, not per-symbol)
-            # In BTC bear regime, cut long exposure and boost short exposure
-            if btc_regime >= 0:
-                regime_long_mult = 1.0   # BTC bull: full longs
-                regime_short_mult = 0.8  # BTC bull: mostly full shorts
-            else:
-                regime_long_mult = 0.6   # BTC bear: cut longs 40%
-                regime_short_mult = 1.0  # BTC bear: full shorts
-            long_size = equity * 0.18 * vol_adj * regime_long_mult
-            long_soft_size = equity * 0.12 * vol_adj * regime_long_mult
-            short_size = equity * 0.10 * vol_adj * regime_short_mult
-            short_soft_size = equity * 0.06 * vol_adj * regime_short_mult
-
-            if self.model:
-                try:
-                    # ML-Based Voting — pass DataFrame to suppress sklearn feature-name warnings
-                    import pandas as _pd
-                    probs = self.model.predict_proba(_pd.DataFrame([feat_vec], columns=FEAT_NAMES))[0]
-                    # Label 0: Neutral, 1: Buy, 2: Sell
-                    prob_buy = probs[1]
-                    prob_sell = probs[2]
-                    thresh = PROB_THRESHOLDS.get(self.interval_sec, PROB_THRESHOLD)
-
-                    if current_pos == 0:
-                        if prob_buy > thresh and rsi8 < RSI_ENTRY_LONG_MAX:
-                            # Enter long — RSI filter prevents buying into overbought
-                            target = long_size if prob_buy > thresh + 0.14 else long_soft_size
-                        elif prob_sell > thresh and rsi8 > RSI_ENTRY_SHORT_MIN:
-                            # Enter short — RSI filter prevents shorting into oversold
-                            target = -short_size if prob_sell > thresh + 0.14 else -short_soft_size
-                    else:
-                        # Exit long on sell signal; exit short on buy signal
-                        if current_pos > 0 and prob_sell > thresh:
-                            target = 0.0
-                        elif current_pos < 0 and prob_buy > thresh:
-                            target = 0.0
-                except Exception as e:
-                    print(f"Inference error for {symbol}: {e}")
-            
-            # --- RISK MANAGEMENT LAYER (ATR Stops, RSI Exits, Time-Based Exit) ---
-            atr_l = self._get_adaptive_period(ATR_LOOKBACK)
-            atr = self._calc_atr(bd.history, atr_l) or mid * 0.02
-            max_hold = MAX_HOLD_BARS.get(self.interval_sec, 12)
-            # Tighter ATR stop in BTC bear regime (cut losses faster)
-            atr_mult = ATR_STOP_MULT if btc_regime >= 0 else ATR_STOP_MULT * 0.75
-
-            if current_pos != 0:
-                # Track bars held
-                self.bars_held[symbol] = self.bars_held.get(symbol, 0) + 1
-
-                if symbol not in self.peak_prices:
-                    self.peak_prices[symbol] = mid
-
-                if current_pos > 0:
-                    self.peak_prices[symbol] = max(self.peak_prices[symbol], mid)
-                    if mid < self.peak_prices[symbol] - atr_mult * atr:
-                        target = 0.0
-                    if rsi8 > RSI_OVERBOUGHT:
-                        target = 0.0
-                    if self.bars_held.get(symbol, 0) >= max_hold:
-                        target = 0.0  # Time-based exit: recycle capital
-                else:
-                    self.peak_prices[symbol] = min(self.peak_prices[symbol], mid)
-                    if mid > self.peak_prices[symbol] + atr_mult * atr:
-                        target = 0.0
-                    if rsi8 < RSI_OVERSOLD:
-                        target = 0.0
-                    if self.bars_held.get(symbol, 0) >= max_hold:
-                        target = 0.0
-
-            if abs(target - current_pos) > 1e-6:
-                is_flip = (target != 0 and current_pos != 0 and np.sign(target) != np.sign(current_pos))
-                if is_flip:
-                    # Two-step: close old position fully, then open new side
-                    # Ensures correct PnL realization and fresh entry_price
-                    signals.append(Signal(symbol=symbol, target_position=0))
-                    signals.append(Signal(symbol=symbol, target_position=target))
-                    self.peak_prices[symbol] = mid
-                    self.bars_held[symbol] = 0
-                else:
-                    signals.append(Signal(symbol=symbol, target_position=target))
-                    if target != 0 and current_pos == 0:
-                        self.peak_prices[symbol] = mid
-                        self.bars_held[symbol] = 0
-                    elif target == 0:
-                        self.peak_prices.pop(symbol, None)
-                        self.bars_held.pop(symbol, None)
+            if is_fortress:
+                # Institutional Sizing: 4% per symbol to hit high diversified Sharpe
+                size = equity * 0.04 
+                
+                if row['bull_15m'] > 0.35:
+                    signals.append(Signal(symbol, size))
+                    self.trailing_stops[symbol] = bar.low - 3.0 * row['atr_val']
+                elif row['bear_15m'] > 0.35:
+                    signals.append(Signal(symbol, -size))
+                    self.trailing_stops[symbol] = bar.high + 3.0 * row['atr_val']
 
         return signals
