@@ -24,7 +24,7 @@ import pyarrow.parquet as pq
 # Constants (fixed, do not modify)
 # ---------------------------------------------------------------------------
 
-TIME_BUDGET = 120              # backtest time budget in seconds (2 minutes)
+TIME_BUDGET = 1200             # Increased for complex 17-symbol dual-model backtests
 INITIAL_CAPITAL = 100_000.0    # $100K starting capital
 MAKER_FEE = 0.0002             # 2 bps
 TAKER_FEE = 0.0005             # 5 bps
@@ -33,15 +33,74 @@ MAX_LEVERAGE = 20              # max leverage allowed
 LOOKBACK_BARS = 500            # history buffer provided to strategy
 BAR_INTERVAL = "1h"
 
-SYMBOLS = ["BTC", "ETH", "SOL"]
+SYMBOLS = [
+    "BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "LINK",
+    "AVAX", "DOT", "ATOM", "NEAR", "UNI", "APT", "SUI",
+    "XAU", "SP500"
+]
 
-# Date splits (UTC timestamps)
-TRAIN_START = "2023-06-01"
-TRAIN_END = "2024-06-30"
-VAL_START = "2024-07-01"
-VAL_END = "2025-03-31"
-TEST_START = "2025-04-01"
-TEST_END = "2025-12-31"
+SYMBOLS_15M = [
+    "BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "LINK",
+    "AVAX", "DOT", "ATOM", "NEAR", "UNI", "APT", "SUI", "XAU"
+]  # SP500/DXY excluded — no free 15min intraday source
+
+# Earliest Binance USDT listing dates (approx) for 15m downloads
+BINANCE_15M_START = {
+    "BTC": "2017-08-17", "ETH": "2017-08-17", "SOL": "2020-08-11",
+    "BNB": "2017-11-06", "XRP": "2018-04-23", "ADA": "2018-04-17",
+    "DOGE": "2019-07-05", "LINK": "2019-01-16", "AVAX": "2020-09-22",
+    "DOT": "2020-08-19", "ATOM": "2019-04-29", "NEAR": "2020-10-15",
+    "UNI": "2020-09-17", "APT": "2022-10-19", "SUI": "2023-05-03",
+}
+
+BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
+HF_XAU_15M_URL = "https://huggingface.co/datasets/ZombitX64/xauusd-gold-price-historical-data-2004-2025/resolve/main/XAU_15m_data.jsonl"
+
+# Date splits (UTC timestamps) - 2025 Strictly Quarantined as OOS
+# Training: 2017-01-01 → 2022-06-30 (pre-crash baseline)
+# Validation: 2022-07-01 → 2024-06-30 (2 full years: bear, recovery, early bull)
+# Robustness: 2018-01-01 → 2024-06-30 (all meaningful crypto history)
+# OOS: 2025-01-01 → 2025-12-31 (full year of unseen data)
+TRAIN_START = "2017-01-01"   # Default global start (overridden per-symbol below)
+TRAIN_END   = "2022-06-30"   # Cut before validation starts
+VAL_START   = "2022-07-01"   # 2-year window: crash → recovery → bull
+VAL_END     = "2024-06-30"
+TEST_START  = "2022-07-01"
+TEST_END    = "2024-06-30"
+ROBUST_START = "2018-01-01"
+ROBUST_END   = "2024-06-30"
+
+# Per-symbol earliest usable training start
+# Universal goal: use deepest available price history for each asset
+SYMBOL_TRAIN_START = {
+    "BTC":   "2011-08-01",  # Earliest reliable CryptoCompare exchange data
+    "ETH":   "2015-08-01",  # Ethereum mainnet launch
+    "XRP":   "2013-08-01",  # XRP had liquid markets from 2013
+    "BNB":   "2017-07-01",
+    "ADA":   "2017-10-01",
+    "DOGE":  "2014-01-01",  # DOGE launched Jan 2014
+    "LINK":  "2017-09-01",
+    "DOT":   "2020-08-01",
+    "ATOM":  "2019-04-01",
+    "AVAX":  "2020-09-01",
+    "NEAR":  "2020-10-01",
+    "UNI":   "2020-09-01",
+    "APT":   "2022-10-01",
+    "SUI":   "2023-05-01",
+    "SOL":   "2020-04-01",
+    "XAU":   "2004-01-01",  # Gold — full history
+    "SP500": "2004-01-01",  # S&P — full history
+}
+
+# Asset class labels — universal feature, works across any market
+# 0=Crypto (volatile, 24/7), 1=Commodity (macro-driven), 2=Equity Index (session-based)
+ASSET_CLASS = {
+    "BTC": 0, "ETH": 0, "SOL": 0, "BNB": 0, "XRP": 0,
+    "ADA": 0, "DOGE": 0, "LINK": 0, "AVAX": 0, "DOT": 0,
+    "ATOM": 0, "NEAR": 0, "UNI": 0, "APT": 0, "SUI": 0,
+    "XAU": 1,
+    "SP500": 2,
+}
 
 HOURS_PER_YEAR = 8760
 
@@ -52,9 +111,137 @@ HOURS_PER_YEAR = 8760
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "autotrader")
 DATA_DIR = os.path.join(CACHE_DIR, "data")
 
-# ---------------------------------------------------------------------------
-# Data types
-# ---------------------------------------------------------------------------
+# Quantitative Feature Columns
+FEATURE_COLS = [
+    'ret_1h', 'ret_4h', 'ret_12h', 'ret_24h', 'ret_48h', 
+    'rsi_8', 'rsi_24', 'macd_hist', 'macd_line', 
+    'bb_width', 'ema_200_dist', 'vol_24h', 'atr_pct', 
+    'dist_to_high', 'dist_to_low', 'vol_ratio_24h', 'asset_class',
+    'dist_to_vwap', 'vol_ema_50', 'market_vol', 'market_ret',
+    'fvg_detected', 'msb_status', 'ob_dist', 'frac_diff_close'
+]
+
+def get_frac_diff_weights(d, size):
+    """Calculates weights for fractional differentiation."""
+    w = [1.0]
+    for k in range(1, size):
+        w.append(-w[-1] * (d - k + 1) / k)
+    return np.array(w[::-1]).reshape(-1, 1)
+
+def apply_frac_diff(series, d, threshold=1e-5):
+    """Applies fixed-window fractional differentiation to a series."""
+    weights = get_frac_diff_weights(d, size=50) # Fixed window of 50 for HFT
+    res = []
+    for i in range(len(series)):
+        if i < 50:
+            res.append(0)
+            continue
+        window = series.iloc[i-50:i].values.reshape(-1, 1)
+        res.append(np.dot(weights.T, window)[0][0])
+    return pd.Series(res, index=series.index)
+
+def calculate_features(df, timeframe="1h"):
+    """Vectorized feature calculation for a single symbol dataframe."""
+    df = df.copy()
+    close = df['close']
+    high = df['high']
+    low = df['low']
+    
+    # 1. Returns
+    df['ret_1h'] = close.pct_change(1)
+    df['ret_4h'] = close.pct_change(4)
+    df['ret_12h'] = close.pct_change(12)
+    df['ret_24h'] = close.pct_change(24)
+    df['ret_48h'] = close.pct_change(48)
+    
+    # 2. RSI
+    def v_rsi(s, p):
+        d = s.diff()
+        g = (d.where(d > 0, 0)).rolling(window=p).mean()
+        l = (-d.where(d < 0, 0)).rolling(window=p).mean()
+        rs = g / l.replace(0, 1e-10)
+        return 100 - (100 / (1 + rs))
+
+    df['rsi_8'] = v_rsi(close, 8)
+    df['rsi_24'] = v_rsi(close, 24)
+    
+    # 3. MACD
+    ema_12 = close.ewm(span=12, adjust=False).mean()
+    ema_26 = close.ewm(span=26, adjust=False).mean()
+    macd_line = ema_12 - ema_26
+    signal_line = macd_line.ewm(span=9, adjust=False).mean()
+    df['macd_hist'] = macd_line - signal_line
+    df['macd_line'] = macd_line 
+    
+    # 4. BB Width (35-bar)
+    sma35 = close.rolling(35).mean()
+    std35 = close.rolling(35).std()
+    df['bb_width'] = (4 * std35) / sma35.replace(0, 1e-10)
+    
+    # 5. ATR (Average True Range)
+    tr1 = high - low
+    tr2 = (high - close.shift(1)).abs()
+    tr3 = (low - close.shift(1)).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    df['atr_14'] = tr.rolling(14).mean()
+    df['atr_pct'] = df['atr_14'] / close
+    
+    # 6. Donchian Distance
+    df['donchian_high_20'] = high.rolling(20).max()
+    df['donchian_low_20'] = low.rolling(20).min()
+    df['dist_to_high'] = (df['donchian_high_20'] - close) / close
+    df['dist_to_low'] = (close - df['donchian_low_20']) / close
+    
+    # 7. Macro Regime (EMA 200)
+    ema_200 = close.ewm(span=200, adjust=False).mean()
+    df['ema_200_dist'] = (close - ema_200) / close
+    
+    # 8. Volume momentum
+    df['vol_ratio_24h'] = df['volume'] / df['volume'].rolling(24).mean().replace(0, 1e-10)
+    df['vol_24h'] = df['volume'].rolling(24).mean()
+    df['vol_ema_50'] = df['volume'].ewm(span=50, adjust=False).mean()
+    
+    # 9. VWAP (Approximate via typical price)
+    tp = (high + low + close) / 3
+    df['vwap'] = (tp * df['volume']).rolling(24).sum() / df['volume'].rolling(24).sum().replace(0, 1e-10)
+    df['dist_to_vwap'] = (close - df['vwap']) / close
+
+    # 10. Microstructure: Refined FVG (Fair Value Gaps >= 0.5 ATR)
+    atr = df['atr_14']
+    df['fvg_bull'] = ((df['low'] > df['high'].shift(2)) & (df['low'] - df['high'].shift(2) > 0.5 * atr)).astype(int)
+    df['fvg_bear'] = ((df['high'] < df['low'].shift(2)) & (df['low'].shift(2) - df['high'] > 0.5 * atr)).astype(int)
+    df['fvg_detected'] = df['fvg_bull'] - df['fvg_bear']
+
+    # 11. Liquidity Sweep Detection
+    # Price dips below 24-period low but closes back above it within 1-2 bars
+    local_low = df['low'].rolling(24).min().shift(1)
+    local_high = df['high'].rolling(24).max().shift(1)
+    
+    is_low_sweep = (df['low'] < local_low) & (close > local_low)
+    is_high_sweep = (df['high'] > local_high) & (close < local_high)
+    df['liquidity_sweep'] = np.where(is_low_sweep, 1, np.where(is_high_sweep, -1, 0))
+
+    # 12. Market Structure Break (MSB) Proxy
+    recent_high = df['high'].rolling(24).max()
+    recent_low = df['low'].rolling(24).min()
+    df['msb_status'] = np.where(close > recent_high.shift(1), 1, np.where(close < recent_low.shift(1), -1, 0))
+
+    # 12. Order Block (OB) Distance
+    # Approximate OB as the high-volume candle before a MSB
+    df['ob_zone'] = np.where(df['volume'] > df['volume'].rolling(24).mean() * 1.5, close, np.nan)
+    df['ob_zone'] = df['ob_zone'].ffill()
+    df['ob_dist'] = (close - df['ob_zone']) / close
+
+    # 13. Fractional Differentiation (Stationary Memory)
+    # d=0.4 is the industry sweet spot for crypto ADF stationarity
+    df['frac_diff_close'] = apply_frac_diff(close, d=0.4)
+
+    # 14. Sanitization
+    df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
+    
+    return df
+
+# Index data types 
 
 @dataclass
 class BarData:
@@ -92,6 +279,7 @@ class BacktestResult:
     profit_factor: float = 0.0
     annual_turnover: float = 0.0
     backtest_seconds: float = 0.0
+    duration_days: float = 0.0
     equity_curve: list = field(default_factory=list)
     trade_log: list = field(default_factory=list)
 
@@ -101,6 +289,100 @@ class BacktestResult:
 
 HL_INFO_URL = "https://api.hyperliquid.xyz/info"
 CRYPTOCOMPARE_URL = "https://min-api.cryptocompare.com/data/v2/histohour"
+BINANCE_FUNDING_URL = "https://fapi.binance.com/fapi/v1/fundingRate"
+
+def get_triple_barrier_labels(df, timeframe):
+    """De Prado's Triple Barrier Method for conviction labeling.
+    1 = Hit PT, 2 = Hit SL, 0 = Vertical/Breath exit.
+    """
+    close = df['close']
+    vol = close.pct_change().rolling(24).std().fillna(0.01)
+    lookahead = {"1h": 48, "4h": 24, "15m": 64}.get(timeframe, 24)
+    
+    labels = np.zeros(len(df))
+    for i in range(len(df) - lookahead):
+        price_now = close.iloc[i]
+        pt = price_now * (1 + 2.0 * vol.iloc[i])
+        sl = price_now * (1 - 1.0 * vol.iloc[i])
+        
+        # Check future path
+        future_path = close.iloc[i+1 : i+lookahead]
+        hit_pt = future_path[future_path >= pt].index
+        hit_sl = future_path[future_path <= sl].index
+        
+        first_pt = hit_pt[0] if len(hit_pt) > 0 else 9e18
+        first_sl = hit_sl[0] if len(hit_sl) > 0 else 9e18
+        
+        if first_pt < first_sl and first_pt != 9e18:
+            labels[i] = 1 # Profit
+        elif first_sl < first_pt and first_sl != 9e18:
+            labels[i] = 2 # Loss
+        else:
+            labels[i] = 0 # Vertical
+            
+    return labels
+
+def get_n_trees_depth(timeframe):
+    n_trees = 100
+    depth = {"1h": 12, "4h": 14, "15m": 12}.get(timeframe, 12)
+    return n_trees, depth
+
+def prepare_dataset(timeframe, split_name):
+    # This logic is now shared by the trainer
+    data_dict = load_data(split=split_name)
+    all_features, all_y, all_y_meta = [], [], []
+    
+    # Pre-calculate Market Regime (Systemic Beta)
+    print("Pre-calculating Market Regime Context...")
+    market_vols = []
+    market_rets = []
+    for s, df in data_dict.items():
+        if len(df) < 300: continue
+        market_vols.append(calculate_features(df, timeframe=timeframe)['bb_width'])
+        market_rets.append(df['close'].pct_change())
+    
+    m_vol = pd.concat(market_vols, axis=1).median(axis=1).fillna(0)
+    m_ret = pd.concat(market_rets, axis=1).median(axis=1).fillna(0)
+
+    for symbol, df in data_dict.items():
+        df_feat = calculate_features(df, timeframe=timeframe)
+        if len(df_feat) < 300: continue
+        
+        # Inject Market Context
+        df_feat['market_vol'] = m_vol
+        df_feat['market_ret'] = m_ret
+        
+        # Cross-Sectional Proxy: Label 1 if return > 1.5*vol (Bullish Outlier)
+        vol = df_feat['close'].pct_change().rolling(24).std()
+        ret4 = df_feat['close'].shift(-4) / df_feat['close'] - 1
+        
+        labels = np.zeros(len(df_feat))
+        labels[ret4 > 1.5 * vol] = 1 # Extreme Bull
+        labels[ret4 < -1.5 * vol] = 2 # Extreme Bear
+        
+        meta = get_triple_barrier_labels(df_feat, timeframe)
+        
+        valid_mask = ~(df_feat[FEATURE_COLS].isna().any(axis=1) | ret4.isna() | np.isinf(ret4))
+        
+        sliced_X = df_feat[FEATURE_COLS][valid_mask].values[50:-100]
+        sliced_y = labels[valid_mask][50:-100]
+        sliced_meta = meta[valid_mask][50:-100]
+        
+        all_features.append(pd.DataFrame(sliced_X, columns=FEATURE_COLS))
+        all_y.append(sliced_y)
+        all_y_meta.append(sliced_meta)
+
+    if not all_features: return None, None, None, None, None
+    return pd.concat(all_features), np.concatenate(all_y), np.concatenate(all_y_meta), None, FEATURE_COLS
+
+# Binance symbol mapping
+BINANCE_SYMBOL_MAP = {
+    "BTC": "BTCUSDT", "ETH": "ETHUSDT", "SOL": "SOLUSDT",
+    "BNB": "BNBUSDT", "XRP": "XRPUSDT", "ADA": "ADAUSDT",
+    "DOGE": "DOGEUSDT", "LINK": "LINKUSDT", "AVAX": "AVAXUSDT",
+    "DOT": "DOTUSDT", "ATOM": "ATOMUSDT", "NEAR": "NEARUSDT",
+    "UNI": "UNIUSDT", "APT": "APTUSDT", "SUI": "SUIUSDT",
+}
 
 def _download_cryptocompare_candles(symbol: str, start_ms: int, end_ms: int) -> pd.DataFrame:
     """Download hourly OHLCV from CryptoCompare (no geo-restrictions)."""
@@ -145,6 +427,42 @@ def _download_cryptocompare_candles(symbol: str, start_ms: int, end_ms: int) -> 
         return pd.DataFrame()
     df = pd.DataFrame(all_rows).sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
     return df
+
+
+def _download_binance_funding(symbol: str, start_ms: int, end_ms: int) -> pd.DataFrame:
+    """Download funding rate history from Binance Futures (no API key needed)."""
+    binance_sym = BINANCE_SYMBOL_MAP.get(symbol)
+    if not binance_sym:
+        return pd.DataFrame(columns=["timestamp", "funding_rate"])
+
+    all_rows = []
+    current = start_ms
+    while current < end_ms:
+        params = {
+            "symbol": binance_sym,
+            "startTime": current,
+            "endTime": min(current + 90 * 24 * 3600 * 1000, end_ms),
+            "limit": 1000,
+        }
+        try:
+            resp = requests.get(BINANCE_FUNDING_URL, params=params, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+            if not data:
+                break
+            for row in data:
+                all_rows.append({
+                    "timestamp": int(row["fundingTime"]),
+                    "funding_rate": float(row["fundingRate"]),
+                })
+            current = int(data[-1]["fundingTime"]) + 1
+        except Exception:
+            break
+        time.sleep(0.2)
+
+    if not all_rows:
+        return pd.DataFrame(columns=["timestamp", "funding_rate"])
+    return pd.DataFrame(all_rows)
 
 
 def _download_hl_funding(symbol: str, start_ms: int, end_ms: int) -> pd.DataFrame:
@@ -217,6 +535,88 @@ def _download_hl_candles(symbol: str, interval: str, start_ms: int, end_ms: int)
     return pd.DataFrame(all_rows)
 
 
+def _download_binance_15m(symbol: str, start_ms: int, end_ms: int) -> pd.DataFrame:
+    """Download 15-minute OHLCV from Binance Spot (no API key needed)."""
+    binance_sym = BINANCE_SYMBOL_MAP.get(symbol)
+    if not binance_sym:
+        return pd.DataFrame()
+
+    all_rows = []
+    current = start_ms
+    chunk_ms = 1000 * 15 * 60 * 1000  # 1000 bars * 15min in ms
+
+    while current < end_ms:
+        params = {
+            "symbol": binance_sym,
+            "interval": "15m",
+            "startTime": current,
+            "endTime": min(current + chunk_ms, end_ms),
+            "limit": 1000,
+        }
+        try:
+            resp = requests.get(BINANCE_KLINES_URL, params=params, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+            if not data:
+                break
+            for bar in data:
+                all_rows.append({
+                    "timestamp": int(bar[0]),
+                    "open": float(bar[1]),
+                    "high": float(bar[2]),
+                    "low": float(bar[3]),
+                    "close": float(bar[4]),
+                    "volume": float(bar[5]),
+                })
+            current = int(data[-1][0]) + 15 * 60 * 1000
+        except Exception as e:
+            print(f"    Binance 15m error for {symbol}: {e}")
+            break
+        time.sleep(0.1)  # Binance rate limit: 1200 req/min
+
+    if not all_rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(all_rows).sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
+    return df
+
+
+def _download_hf_xau_15m() -> pd.DataFrame:
+    """Download XAU 15-minute data from HuggingFace JSONL dataset."""
+    import json
+    print("    Downloading XAU 15m from HuggingFace (may take a moment)...")
+    try:
+        resp = requests.get(HF_XAU_15M_URL, timeout=120, stream=True)
+        resp.raise_for_status()
+    except Exception as e:
+        print(f"    HuggingFace download failed: {e}")
+        return pd.DataFrame()
+
+    all_rows = []
+    for line in resp.iter_lines(decode_unicode=True):
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+            # Parse "YYYY.MM.DD HH:MM" format
+            dt = pd.to_datetime(row["Date"], format="%Y.%m.%d %H:%M", utc=True)
+            all_rows.append({
+                "timestamp": int(dt.timestamp() * 1000),
+                "open": float(row["Open"]),
+                "high": float(row["High"]),
+                "low": float(row["Low"]),
+                "close": float(row["Close"]),
+                "volume": float(row.get("Volume", 0)),
+            })
+        except Exception:
+            continue
+
+    if not all_rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(all_rows).sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
+    print(f"    XAU: parsed {len(df)} bars from HuggingFace")
+    return df
+
+
 def download_data(symbols=None):
     """Download historical OHLCV + funding data for all symbols."""
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -245,9 +645,12 @@ def download_data(symbols=None):
             print(f"  {symbol}: NO DATA AVAILABLE, skipping")
             continue
 
-        # Download funding rates
-        print(f"  {symbol}: downloading funding rates...")
-        funding = _download_hl_funding(symbol, start_ms, end_ms)
+        # Download funding rates (Binance first, fallback to Hyperliquid)
+        print(f"  {symbol}: downloading funding rates from Binance...")
+        funding = _download_binance_funding(symbol, start_ms, end_ms)
+        if funding.empty:
+            print(f"  {symbol}: Binance funding unavailable, trying Hyperliquid...")
+            funding = _download_hl_funding(symbol, start_ms, end_ms)
 
         # Merge
         df = df.drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
@@ -263,29 +666,117 @@ def download_data(symbols=None):
         print(f"  {symbol}: saved {len(df)} bars to {filepath}")
 
 
-def load_data(split: str = "val") -> dict:
-    """Load OHLCV+funding data for the given split. Returns {symbol: DataFrame}."""
+def download_15m_data(symbols=None):
+    """Download 15-minute OHLCV data for SYMBOLS_15M."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    if symbols is None:
+        symbols = SYMBOLS_15M
+
+    end_ms = int(pd.Timestamp(TEST_END, tz="UTC").timestamp() * 1000)
+
+    for symbol in symbols:
+        filepath = os.path.join(DATA_DIR, f"{symbol}_15m.parquet")
+        if os.path.exists(filepath):
+            existing = pd.read_parquet(filepath)
+            print(f"  {symbol}: already have {len(existing)} 15m bars")
+            continue
+
+        if symbol == "XAU":
+            df = _download_hf_xau_15m()
+        else:
+            start_date = BINANCE_15M_START.get(symbol, "2020-01-01")
+            start_ms = int(pd.Timestamp(start_date, tz="UTC").timestamp() * 1000)
+            print(f"  {symbol}: downloading 15m candles from Binance (since {start_date})...")
+            df = _download_binance_15m(symbol, start_ms, end_ms)
+
+        if df is None or df.empty:
+            print(f"  {symbol}: NO 15m DATA AVAILABLE, skipping")
+            continue
+
+        # No funding rate on 15min source
+        df["funding_rate"] = 0.0
+
+        df.to_parquet(filepath, index=False)
+        print(f"  {symbol}: saved {len(df)} 15m bars to {filepath}")
+
+
+def _resample_to_4h(df: pd.DataFrame) -> pd.DataFrame:
+    """Resample 1H dataframe to 4H candles (aligned to 00:00, 04:00, etc. UTC)."""
+    df = df.copy()
+    df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms', utc=True)
+    df = df.set_index('datetime')
+    resampled = df.resample('4h', origin='start_day').agg({
+        'timestamp': 'first',
+        'open': 'first',
+        'high': 'max',
+        'low': 'min',
+        'close': 'last',
+        'volume': 'sum',
+        'funding_rate': 'mean',
+    })
+    resampled = resampled.dropna(subset=['open', 'close'])
+    resampled = resampled.reset_index(drop=True)
+    return resampled
+
+
+def load_data(split: str = "val", resample_4h: bool = False, resample_15m: bool = False) -> dict:
+    """Load OHLCV+funding data for the given split. Returns {symbol: DataFrame}.
+    
+    Per-symbol training starts: newer assets (APT, SUI, SOL, etc.) use their
+    real listing date as the training floor so we never train on zero-padded noise.
+    For val/oos/robustness splits the global split dates are used for all symbols.
+    When resample_15m=True, loads from {symbol}_15m.parquet files instead of 1h.
+    """
     splits = {
-        "train": (TRAIN_START, TRAIN_END),
-        "val": (VAL_START, VAL_END),
-        "test": (TEST_START, TEST_END),
+        "train":      (TRAIN_START, TRAIN_END),
+        "val":        (VAL_START,   VAL_END),
+        "test":       (TEST_START,  TEST_END),
+        "robustness": (ROBUST_START, ROBUST_END),
+        "val_15m":    (VAL_START,   VAL_END),
+        "train_15m":  (TRAIN_START, TRAIN_END),
+        "oos":        ("2025-01-01", "2025-12-31"),
     }
     assert split in splits, f"split must be one of {list(splits.keys())}"
-    start_str, end_str = splits[split]
-    start_ms = int(pd.Timestamp(start_str, tz="UTC").timestamp() * 1000)
+    global_start_str, end_str = splits[split]
     end_ms = int(pd.Timestamp(end_str, tz="UTC").timestamp() * 1000)
 
+    # Determine which symbols and file suffix to use
+    use_15m = resample_15m or split.endswith("_15m")
+    symbol_list = SYMBOLS_15M if use_15m else SYMBOLS
+    suffix = "_15m.parquet" if use_15m else "_1h.parquet"
+
     result = {}
-    for symbol in SYMBOLS:
-        filepath = os.path.join(DATA_DIR, f"{symbol}_1h.parquet")
+    for symbol in symbol_list:
+        filepath = os.path.join(DATA_DIR, f"{symbol}{suffix}")
         if not os.path.exists(filepath):
             continue
         df = pd.read_parquet(filepath)
+
+        # Apply per-symbol training start floor only on training splits
+        if split in ("train", "train_15m") and symbol in SYMBOL_TRAIN_START:
+            sym_start = SYMBOL_TRAIN_START[symbol]
+            # Use the later of the global split start and the symbol's listing date
+            effective_start = max(global_start_str, sym_start)
+        else:
+            effective_start = global_start_str
+
+        start_ms = int(pd.Timestamp(effective_start, tz="UTC").timestamp() * 1000)
         mask = (df["timestamp"] >= start_ms) & (df["timestamp"] < end_ms)
         split_df = df[mask].reset_index(drop=True)
         if len(split_df) > 0:
+            if resample_4h:
+                split_df = _resample_to_4h(split_df)
+            # Inject asset_class — universal feature for cross-asset generalization
+            split_df["asset_class"] = ASSET_CLASS.get(symbol, 0)
+            # Zero funding_rate for non-perp assets (XAU, SP500) so model
+            # doesn't learn perp-specific patterns as universal signals
+            if ASSET_CLASS.get(symbol, 0) != 0:
+                split_df["funding_rate"] = 0.0
+            elif "funding_rate" not in split_df.columns:
+                split_df["funding_rate"] = 0.0
             result[symbol] = split_df
     return result
+
 
 # ---------------------------------------------------------------------------
 # Backtesting engine (DO NOT CHANGE)
@@ -500,6 +991,10 @@ def run_backtest(strategy, data: dict) -> BacktestResult:
 
     t_end = time.time()
 
+    duration_days = 0.0
+    if len(timestamps) > 1:
+        duration_days = (timestamps[-1] - timestamps[0]) / (1000 * 60 * 60 * 24)
+
     # Compute metrics
     returns = np.array(hourly_returns) if hourly_returns else np.array([0.0])
     eq = np.array(equity_curve)
@@ -549,6 +1044,7 @@ def run_backtest(strategy, data: dict) -> BacktestResult:
         profit_factor=profit_factor,
         annual_turnover=annual_turnover,
         backtest_seconds=t_end - t_start,
+        duration_days=duration_days,
         equity_curve=equity_curve,
         trade_log=trade_log,
     )
@@ -568,6 +1064,8 @@ def compute_score(result: BacktestResult) -> float:
     # Hard cutoffs
     if result.num_trades < 10:
         return -999.0
+    if result.duration_days > 0 and (result.num_trades / result.duration_days) < 1.0:
+        return -999.0    # Strictly enforced minimum: 1 trade per day
     if result.max_drawdown_pct > 50.0:
         return -999.0
     final_equity = result.equity_curve[-1] if result.equity_curve else INITIAL_CAPITAL
@@ -594,12 +1092,18 @@ def compute_score(result: BacktestResult) -> float:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Prepare data for autotrader")
     parser.add_argument("--symbols", nargs="+", default=None, help="Symbols to download (default: all)")
+    parser.add_argument("--mode", choices=["data", "15m"], default="data",
+                        help="'data' = 1H candles (default), '15m' = 15-minute candles")
     args = parser.parse_args()
 
     print(f"Cache directory: {CACHE_DIR}")
     print()
 
-    print("Downloading data...")
-    download_data(args.symbols)
+    if args.mode == "15m":
+        print("Downloading 15-minute data...")
+        download_15m_data(args.symbols)
+    else:
+        print("Downloading data...")
+        download_data(args.symbols)
     print()
     print("Done! Ready to backtest.")
