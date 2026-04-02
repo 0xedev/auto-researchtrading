@@ -12,12 +12,60 @@ import prepare
 from prepare import load_data, run_backtest, compute_score, TIME_BUDGET
 from strategy import Strategy
 
+BENCHMARKS = {
+    "sharpe": 3.5,
+    "win_rate_pct": 60.0,
+    "trades_per_day_per_symbol": 1.0,
+    "profit_factor": 4.0,
+    "max_drawdown_pct": 10.0,
+}
+
+
 def timeout_handler(signum, frame):
     print("TIMEOUT: backtest exceeded time budget")
     exit(1)
 
 sig.signal(sig.SIGALRM, timeout_handler)
 # Alarm set later after args parsed (4H needs extra budget for regime breakdown)
+
+
+def print_benchmark_audit(result, num_symbols):
+    duration_days = result.duration_days if result.duration_days > 0 else 0.0
+    trades_per_day = result.num_trades / duration_days if duration_days > 0 else 0.0
+    trades_per_day_per_symbol = trades_per_day / num_symbols if num_symbols > 0 else 0.0
+
+    checks = [
+        ("Sharpe", result.sharpe, BENCHMARKS["sharpe"], result.sharpe >= BENCHMARKS["sharpe"]),
+        ("Win Rate %", result.win_rate_pct, BENCHMARKS["win_rate_pct"], result.win_rate_pct >= BENCHMARKS["win_rate_pct"]),
+        (
+            "Trades/Day/Symbol",
+            trades_per_day_per_symbol,
+            BENCHMARKS["trades_per_day_per_symbol"],
+            trades_per_day_per_symbol >= BENCHMARKS["trades_per_day_per_symbol"],
+        ),
+        (
+            "Profit Factor",
+            result.profit_factor,
+            BENCHMARKS["profit_factor"],
+            result.profit_factor >= BENCHMARKS["profit_factor"],
+        ),
+        (
+            "Max Drawdown %",
+            result.max_drawdown_pct,
+            BENCHMARKS["max_drawdown_pct"],
+            result.max_drawdown_pct < BENCHMARKS["max_drawdown_pct"],
+        ),
+    ]
+
+    print("\n" + "=" * 60)
+    print("  BENCHMARK AUDIT")
+    print("=" * 60)
+    print(f"trades_per_day:             {trades_per_day:.6f}")
+    print(f"trades_per_day_per_symbol:  {trades_per_day_per_symbol:.6f}")
+    for label, value, target, passed in checks:
+        status = "PASS" if passed else "FAIL"
+        comparator = "<" if label == "Max Drawdown %" else ">="
+        print(f"{label:<24} {value:>10.6f}   target {comparator} {target:<8.3f} {status}")
 
 def detect_regimes(data, anchor_symbol="BTC"):
     """
@@ -106,7 +154,7 @@ def print_regimes(result, data):
         if not regime_data:
             continue
 
-        regime_strategy = Strategy()
+        regime_strategy = Strategy(timeframe="4h")
         regime_result = run_backtest(regime_strategy, regime_data)
 
         start_str = pd.Timestamp(t_start, unit='ms', tz='UTC').strftime('%Y-%m-%d')
@@ -119,7 +167,7 @@ def print_regimes(result, data):
               f"{regime_result.num_trades:6d}  "
               f"{regime_result.total_return_pct:+7.2f}%")
 
-def run_stress_fees(data):
+def run_stress_fees(data, timeframe):
     print("\n" + "=" * 60)
     print("  FEE STRESS TEST (Alpha vs Costs Decay)")
     print("=" * 60)
@@ -133,7 +181,7 @@ def run_stress_fees(data):
         prepare.TAKER_FEE = base_taker * m
         print(f"\nEvaluating with {m}x fees (Taker: {prepare.TAKER_FEE*10000:.1f} bps):")
         
-        strat = Strategy()
+        strat = Strategy(timeframe=timeframe)
         res = run_backtest(strat, data)
         print(f"  Sharpe: {res.sharpe:.3f} | Return: {res.total_return_pct:.2f}% | "
               f"Trades: {res.num_trades} | Profit Factor: {res.profit_factor:.2f}")
@@ -141,7 +189,7 @@ def run_stress_fees(data):
     prepare.MAKER_FEE = base_maker
     prepare.TAKER_FEE = base_taker
 
-def run_capacity(data):
+def run_capacity(data, timeframe):
     print("\n" + "=" * 60)
     print("  CAPACITY ANALYSIS (Liquidity Scaling)")
     print("=" * 60)
@@ -158,7 +206,7 @@ def run_capacity(data):
         prepare.SLIPPAGE_BPS = max(1.0, base_slippage + penalty)
         
         print(f"\nCapital Size: ${cap:,.0f} (Slippage: {prepare.SLIPPAGE_BPS:.1f} bps):")
-        strat = Strategy()
+        strat = Strategy(timeframe=timeframe)
         res = run_backtest(strat, data)
         print(f"  Sharpe: {res.sharpe:.3f} | Return: {res.total_return_pct:.2f}% | "
               f"DD: {res.max_drawdown_pct:.1f}%")
@@ -192,6 +240,10 @@ if __name__ == "__main__":
         prepare.SLIPPAGE_BPS = 0.0
         split_name = "oos" if args.oos else "robustness"
         data = load_data(split_name, resample_4h=True)
+    elif args.timeframe == "15m":
+        print("Mode: 15M VALIDATION")
+        split_name = "oos_15m" if args.oos else "val_15m"
+        data = load_data(split_name)
     else:
         print("Mode: 1H VALIDATION")
         split_name = "oos" if args.oos else "val"
@@ -201,7 +253,7 @@ if __name__ == "__main__":
     
     strategy = Strategy(timeframe=args.timeframe)
     if hasattr(strategy, 'pre_calculate_signals'):
-        strategy.pre_calculate_signals(data)
+        strategy.pre_calculate_signals(data, split_name=split_name)
         
     result = run_backtest(strategy, data)
     score = compute_score(result)
@@ -220,15 +272,16 @@ if __name__ == "__main__":
     print(f"annual_turnover:    {result.annual_turnover:.2f}")
     print(f"backtest_seconds:   {result.backtest_seconds:.1f}")
     print(f"total_seconds:      {t_end - t_start:.1f}")
+    print_benchmark_audit(result, len(data))
     
     if args.timeframe == "4h" and not args.oos:
         print_regimes(result, data)
         
     if args.stress_fees:
-        run_stress_fees(data)
+        run_stress_fees(data, args.timeframe)
         
     if args.capacity:
-        run_capacity(data)
+        run_capacity(data, args.timeframe)
 
     # Autonomous Logging to results.tsv
     try:

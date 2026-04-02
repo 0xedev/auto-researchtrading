@@ -118,6 +118,7 @@ FEATURE_COLS = [
     'bb_width', 'ema_200_dist', 'vol_24h', 'atr_pct', 
     'dist_to_high', 'dist_to_low', 'vol_ratio_24h', 'asset_class',
     'dist_to_vwap', 'vol_ema_50', 'market_vol', 'market_ret',
+    'rel_ret_1h', 'rel_ret_4h', 'rel_bb_width',
     'fvg_detected', 'msb_status', 'ob_dist', 'frac_diff_close'
 ]
 
@@ -322,6 +323,32 @@ def get_triple_barrier_labels(df, timeframe):
             
     return labels
 
+
+def get_directional_labels(df, timeframe):
+    """Volatility-normalized directional labels.
+
+    The 15m system was previously labeled only on extreme 4-bar outliers, which
+    produced very sparse action. For intraday alpha discovery we use a slightly
+    longer horizon and normalized forward returns so the lead model sees more
+    tradable opportunities without discarding volatility context.
+    """
+    close = df["close"]
+    vol = close.pct_change().rolling(24).std().replace(0, np.nan)
+
+    horizon_map = {"15m": 8, "1h": 4, "4h": 4}
+    threshold_map = {"15m": 0.50, "1h": 1.50, "4h": 1.50}
+
+    horizon = horizon_map.get(timeframe, 4)
+    threshold = threshold_map.get(timeframe, 1.50)
+
+    forward_ret = close.shift(-horizon) / close - 1
+    scaled_ret = forward_ret / (vol * np.sqrt(horizon))
+
+    labels = np.zeros(len(df))
+    labels[scaled_ret > threshold] = 1
+    labels[scaled_ret < -threshold] = 2
+    return labels, forward_ret
+
 def get_n_trees_depth(timeframe):
     n_trees = 100
     depth = {"1h": 12, "4h": 14, "15m": 12}.get(timeframe, 12)
@@ -351,18 +378,16 @@ def prepare_dataset(timeframe, split_name):
         # Inject Market Context
         df_feat['market_vol'] = m_vol
         df_feat['market_ret'] = m_ret
+        market_ret_4h = m_ret.rolling(4).sum().fillna(0)
+        df_feat['rel_ret_1h'] = df_feat['ret_1h'] - df_feat['market_ret']
+        df_feat['rel_ret_4h'] = df_feat['ret_4h'] - market_ret_4h
+        df_feat['rel_bb_width'] = df_feat['bb_width'] - df_feat['market_vol']
         
-        # Cross-Sectional Proxy: Label 1 if return > 1.5*vol (Bullish Outlier)
-        vol = df_feat['close'].pct_change().rolling(24).std()
-        ret4 = df_feat['close'].shift(-4) / df_feat['close'] - 1
-        
-        labels = np.zeros(len(df_feat))
-        labels[ret4 > 1.5 * vol] = 1 # Extreme Bull
-        labels[ret4 < -1.5 * vol] = 2 # Extreme Bear
-        
+        labels, forward_ret = get_directional_labels(df_feat, timeframe)
+
         meta = get_triple_barrier_labels(df_feat, timeframe)
-        
-        valid_mask = ~(df_feat[FEATURE_COLS].isna().any(axis=1) | ret4.isna() | np.isinf(ret4))
+
+        valid_mask = ~(df_feat[FEATURE_COLS].isna().any(axis=1) | forward_ret.isna() | np.isinf(forward_ret))
         
         sliced_X = df_feat[FEATURE_COLS][valid_mask].values[50:-100]
         sliced_y = labels[valid_mask][50:-100]

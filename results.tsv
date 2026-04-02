@@ -1,0 +1,50 @@
+commit	score	sharpe	max_dd	status	description
+exp0	-999.000	0.000	0.00	BASELINE	clean audited branch, no trades before 1h fallback
+exp1	1.079	1.079	8.74	KEEP	1h fallback + stop_dist fix (first live audited baseline)
+exp2	-999.000	0.715	4.17	REVERT	tighten meta and lead thresholds (too restrictive)
+exp3	0.680	0.680	4.39	REVERT	require market-ret alignment for entries (worse Sharpe)
+exp4	1.136	1.136	9.15	KEEP	raise meta threshold to 0.45 (new best audited baseline)
+exp5	-999.000	0.934	6.24	REVERT	raise lead threshold to 0.40 (lower Sharpe)
+exp6	-999.000	0.797	10.02	REVERT	widen ATR stop to 4.5x (worse)
+exp7	1.100	1.100	5.14	REVERT	confidence-scaled position sizing (close but below exp4)
+exp8	-999.000	1.120	9.28	REVERT	require stronger short threshold (close but below exp4)
+exp9	-999.000	1.075	9.28	REVERT	Auto-research iteration
+exp10	-999.000	0.048	14.17	REVERT	exp10: first true mtf fortress
+exp11	0.472	0.472	6.32	REVERT	exp11: first 15m mtf baseline
+exp12	-999.000	0.256	1.17	REVERT	exp12: sniper gate 15m meta and lead thresholds
+exp13	-999.000	0.606	2.34	REVERT	exp13: relax sniper gate to recover trade count
+exp14	-999.000	0.384	0.98	REVERT	exp14: align exits to 4-bar label horizon
+exp15	-999.000	0.446	0.95	REVERT	exp15: denser 15m lead labels at 1.0x vol
+exp16	-999.000	0.719	3.55	REVERT	exp16: relax 15m sniper gate on denser model
+exp17	-999.000	0.606	1.17	REVERT	exp17: 15m-only entry gate with regime-sized positions
+exp18	-999.000	0.663	1.17	REVERT	exp18: lower 15m directional threshold to 0.25
+exp19	-999.000	0.640	1.16	REVERT	exp19: shorten 15m max hold to 2 bars
+exp20	-999.000	0.618	1.37	REVERT	exp20: shorten 15m max hold to 1 bar
+exp21	-999.000	0.545	1.18	REVERT	exp21: shorten 15m lead label horizon to 2 bars
+exp22	0.559	0.559	0.95	REVERT	exp22: lower meta gate with tiered confidence sizing
+exp23	0.502	0.502	0.87	REVERT	exp23: widen meta ladder with micro-size weak signals
+exp24	-3.632	-2.651	34.60	REVERT	exp24: balanced lead/meta sample weights
+exp25	0.604	0.604	0.88	REVERT	exp25: staged 15m sizing with adaptive in-position updates
+exp26	0.815	0.815	0.66	REVERT	exp26: require strong continuation before full-size scale-up
+exp27	-999.000	0.580	0.42	REVERT	exp27: require market tape agreement for marginal 15m entries
+exp28	0.815	0.815	0.66	REVERT	exp28: refresh 1h and 4h regime models
+exp29	0.741	0.741	0.50	REVERT	exp29: polarize size ladder toward strongest 15m setups
+exp30	-999.000	0.617	0.49	REVERT	exp30: tighten staged 15m fortress gate to 0.60
+exp31	0.888	0.888	1.02	REVERT	exp31: 15m model with colsample 0.7
+exp32	0.641	0.641	1.37	REVERT	exp32: relax staged fortress gate to 0.50 on improved 15m model
+exp33	-999.000	0.481	0.42	REVERT	exp33: benchmark audit + 15m directional split
+exp34	-999.000	0.562	0.53	REVERT	exp34: add soft 15m quarter-size entries
+exp35	-999.000	0.542	0.50	REVERT	exp35: tighten soft entry and full-size scale-up
+exp36	-999.000	0.472	0.46	REVERT	exp36: shorten 15m max hold to 2 bars
+exp37	-999.000	0.545	0.51	REVERT	exp37: shrink soft entry size to preserve PF
+exp38	-999.000	0.493	0.49	REVERT	exp38: weaker 15m entries in strong HTF regimes
+exp39	-999.000	0.424	0.00	REVERT	exp40: densify 15m directional labels
+exp40	-4.287	-3.283	35.10	REVERT	exp41: calibrate thresholds for dense-label 15m model
+exp41	-999.000	0.006	1.39	REVERT	exp42: tighten calibrated dense-model gates
+exp42	-0.574	-0.574	4.61	REVERT	exp44: long-only dense 15m with regime support
+exp43	-999.000	0.000	0.00	REVERT	exp45: medium-density 15m labels + exp35 shell
+exp44	-0.469	-0.469	3.65	REVERT	exp46: calibrated medium-density long-only
+exp45	-0.826	-0.826	5.13	REVERT	exp47b: relative strength features with aligned model inputs
+exp46	-999.000	-26.322	99.00	REVERT	exp48: dense relative-strength labels with ranked entries
+exp47	-999.000	-27.556	99.00	REVERT	exp49: medium relative-strength models with ranker
+exp48	-999.000	-9.109	93.73	REVERT	exp50: tighten ranker with cooldown and top-1 picks
