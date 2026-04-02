@@ -2,6 +2,75 @@
 
 Every experiment we ran, what worked, what didn't, and why. The "keeps" are strategies that beat the previous best and were retained. The "discards" were reverted.
 
+## Apr 2026 Research Lessons (exp33-exp50)
+
+These are the recent structural lessons from the `autotrader/apr01` server loop. They are written as "do not repeat blindly" notes so we do not waste cycles retesting failed families.
+
+### What Actually Worked
+
+- **15m directional split improved trade quality**:
+  - Separate `lead_long_15m`, `lead_short_15m`, `meta_long_15m`, and `meta_short_15m` models improved win rate and profit factor.
+  - Best quality from this family came from the stricter staged 15m shell around `exp35`: strong PF and win rate, low DD, but still very low trades/day/symbol.
+
+- **Benchmark audit in `backtest.py` was necessary**:
+  - It exposed that many "good score" runs still failed the real institutional target because `trades/day/symbol` stayed far below `1.0`.
+  - This should stay in the loop permanently.
+
+### What Failed And Should Not Be Repeated Naively
+
+- **Dense 15m labels by themselves**:
+  - Lowering the normalized 15m threshold to make labels denser did solve the frequency problem in principle.
+  - But the resulting live systems produced heavy overtrading, sub-1 PF, and drawdowns as high as 35% to 99%.
+  - Conclusion: dense labels need a much stronger event filter or regime gate before they are usable.
+
+- **Medium-density 15m labels**:
+  - Moving from dense to medium-density labels (`~0.70` normalized threshold) restored some selectivity, but the model became too sparse again under the older shell.
+  - Relaxing thresholds enough to make it active again still did not recover profitability.
+
+- **Cross-sectional relative-strength features as a standalone fix**:
+  - Features like `rel_ret_1h`, `rel_ret_4h`, and `rel_bb_width` improved some validation diagnostics.
+  - In live backtests they did not, on their own, fix the quality/frequency tradeoff.
+  - Conclusion: relative-strength features are additive, not a complete architecture change.
+
+- **Top-N / rank-based 15m allocator**:
+  - This family was explicitly tested with:
+    - dense relative-strength models,
+    - medium relative-strength models,
+    - tighter cooldowns,
+    - top-1 picks instead of top-2,
+    - longer holds.
+  - Every version still overtraded and failed catastrophically:
+    - `exp48`: dense relative-strength + ranker
+    - `exp49`: medium relative-strength + ranker
+    - `exp50`: tighter ranker with cooldown + top-1
+  - Conclusion: raw cross-sectional ranking on current 15m scores is rejected for now.
+
+### Operational Lessons
+
+- **Always keep a restore point**:
+  - After structural experiments fail, restore the server to the exp35-style live baseline before continuing.
+  - This avoids stacking new ideas on top of already-broken state.
+
+- **Feature migrations need compatibility handling**:
+  - When new features are added, older 1h/4h models may still be live on disk.
+  - Strategy-side feature alignment is mandatory to avoid feature mismatch crashes.
+
+- **Do not trust validation-only improvements**:
+  - Some branches improved validation "sniper win rate" meaningfully, but still failed in the full backtest.
+  - Backtest behavior, not validation uplift, decides whether a branch survives.
+
+### Current Best Direction
+
+- The next branch should focus on:
+  - regime-conditioned 15m models,
+  - event-driven sampling / information-driven bars,
+  - stronger pre-trade gating for dense intraday models.
+
+- The next branch should not focus on:
+  - more raw threshold sweeps,
+  - more 15m top-N ranking variants,
+  - denser labels without an accompanying event or regime filter.
+
 ## Scoring Formula
 
 ```
