@@ -95,6 +95,10 @@ class Strategy:
             df_feat = calculate_features(df, timeframe=timeframe)
             df_feat["market_vol"] = m_vol
             df_feat["market_ret"] = m_ret
+            market_ret_4h = m_ret.rolling(4, min_periods=1).sum().fillna(0.0)
+            df_feat["rel_ret_1h"] = df_feat["ret_1h"] - df_feat["market_ret"]
+            df_feat["rel_ret_4h"] = df_feat["ret_4h"] - market_ret_4h
+            df_feat["rel_bb_width"] = df_feat["bb_width"] - df_feat["market_vol"]
             X = df_feat[FEATURE_COLS]
             use_directional = (
                 timeframe == "15m" and timeframe in self.long_models and timeframe in self.short_models
@@ -125,6 +129,7 @@ class Strategy:
             if include_state:
                 table["atr_val"] = df_feat["atr_14"].values
                 table["market_ret"] = df_feat["market_ret"].values
+                table["rsi_8"] = df_feat["rsi_8"].values if "rsi_8" in df_feat else 50.0
             tables[symbol] = table.sort_values("timestamp").reset_index(drop=True)
         return tables
 
@@ -177,6 +182,7 @@ class Strategy:
             main_meta_col = f"meta_{self.timeframe_arg}"
 
             base = main_df[["timestamp", "atr_val", "market_ret"]].copy()
+            base["rsi_8"] = main_df["rsi_8"].fillna(50.0).values if "rsi_8" in main_df else 50.0
             base["bull_15m"] = main_df[main_bull_col].fillna(0).values if main_bull_col in main_df else 0.0
             base["bear_15m"] = main_df[main_bear_col].fillna(0).values if main_bear_col in main_df else 0.0
             base["meta_15m"] = main_df[main_meta_col].fillna(0).values if self.timeframe_arg == "15m" and main_meta_col in main_df else 0.0
@@ -256,35 +262,46 @@ class Strategy:
             m1h = row["meta_1h"]
             m4h = row["meta_4h"]
 
+            # RSI-8 for entry filter
+            rsi_8 = row.get("rsi_8", 50.0)
+
+            # 1h and 4h must AGREE when present — 0 means abstain, not disagree
+            htf_long_ok = (m1h <= 0 or m1h > 0.40) and (m4h <= 0 or m4h > 0.30)
+            htf_short_ok = (m1h <= 0 or m1h > 0.40) and (m4h <= 0 or m4h > 0.30)
+
             active_meta = [m for m in (max(m15_long, m15_short), m1h, m4h) if m > 0]
             meta_score = float(np.mean(active_meta)) if active_meta else 0.0
-            supportive_regime = (m1h <= 0 or m1h > 0.45) and (m4h <= 0 or m4h > 0.30)
-            stop_dist = 3.0 * row["atr_val"] if row["atr_val"] > 0 else max(bar.close * 0.01, 1e-6)
-            bull_signal = row["bull_15m"] > 0.22
-            bear_signal = row["bear_15m"] > 0.22
-            bull_fortress = bull_signal and m15_long > 0.55
-            bear_fortress = bear_signal and m15_short > 0.55
+            supportive_regime = htf_long_ok  # kept for sizing logic compatibility
+            stop_dist = 1.5 * row["atr_val"] if row["atr_val"] > 0 else max(bar.close * 0.01, 1e-6)
+            bull_signal = row["bull_15m"] > 0.42
+            bear_signal = row["bear_15m"] > 0.55
+
+            # Consensus: HTF models must agree when firing (0 = abstain, not veto)
+            bull_fortress = bull_signal and m15_long > 0.28 and rsi_8 < 68 and htf_long_ok
+            bear_fortress = bear_signal and m15_short > 0.28 and rsi_8 > 32 and htf_short_ok
             bull_soft = bull_signal and supportive_regime and m15_long > 0.50
             bear_soft = bear_signal and supportive_regime and m15_short > 0.50
 
-            if m15_long > 0.75 and supportive_regime:
+            # Symmetric 8%/5%/2% equity sizing — no short throttle
+            if m15_long > 0.75:
                 long_size = equity * 0.08
             elif m15_long > 0.65:
-                long_size = equity * (0.05 if supportive_regime else 0.03)
+                long_size = equity * 0.05
             else:
-                long_size = equity * (0.02 if supportive_regime else 0.01)
+                long_size = equity * 0.02
 
-            if m15_short > 0.75 and supportive_regime:
+            if m15_short > 0.75:
                 short_size = equity * 0.08
             elif m15_short > 0.65:
-                short_size = equity * (0.05 if supportive_regime else 0.03)
+                short_size = equity * 0.05
             else:
-                short_size = equity * (0.02 if supportive_regime else 0.01)
+                short_size = equity * 0.02
 
+            # No short throttle multiplier — symmetric sizing
             if pos != 0:
                 age = self.position_ages.get(symbol, 0) + 1
                 self.position_ages[symbol] = age
-                max_hold_bars = 3 if self.timeframe_arg == "15m" else 4
+                max_hold_bars = 3 if self.timeframe_arg == "15m" else 12
 
                 if pos > 0:
                     should_exit = age >= max_hold_bars or bar.close < self.trailing_stops.get(symbol, 0)
@@ -296,7 +313,7 @@ class Strategy:
                         half_size = long_size * 0.5
                         if bull_signal and m15_long > 0.65 and abs(pos) + 1.0 < long_size:
                             desired = long_size
-                        elif (not bull_soft) and abs(pos) - 1.0 > half_size:
+                        elif False and (not bull_soft) and abs(pos) - 1.0 > half_size:
                             desired = half_size
                         if abs(desired - pos) > 1.0:
                             signals.append(Signal(symbol, desired))
@@ -311,7 +328,7 @@ class Strategy:
                         half_size = short_size * 0.5
                         if bear_signal and m15_short > 0.65 and abs(pos) + 1.0 < short_size:
                             desired = -short_size
-                        elif (not bear_soft) and abs(pos) - 1.0 > half_size:
+                        elif False and (not bear_soft) and abs(pos) - 1.0 > half_size:
                             desired = -half_size
                         if abs(desired - pos) > 1.0:
                             signals.append(Signal(symbol, desired))
