@@ -283,7 +283,7 @@ class Strategy:
             stop_dist = atr_mult * row["atr_val"] if row["atr_val"] > 0 else max(bar.close * 0.02, 1e-6)
             bull_signal = row["bull_15m"] > 0.32
             bear_signal = row["bear_15m"] > 0.55
-            bull_fortress = bull_signal and m15_long > 0.28 and rsi_8 < 68
+            bull_fortress = bull_signal and m15_long > 0.28 and rsi_8 < 65
             raw_bear_fortress = (
                 row["bear_15m"] > 0.62
                 and row["bear_15m"] > row["bull_15m"] + 0.12
@@ -364,24 +364,25 @@ class Strategy:
                 continue
 
             self.position_ages[symbol] = 0
-            meta_gate_ok = meta_score > 0.355
+            long_gate_ok = meta_score > 0.36
+            short_gate_ok = meta_score > 0.25
             macro_bull_ok = not self._macro_bear or meta_score > 0.40
-            if bull_fortress and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short) and macro_bull_ok and meta_gate_ok:
+            if bull_fortress and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short) and macro_bull_ok and long_gate_ok:
                 entry_size = long_size * 0.5 if self.timeframe_arg == "15m" else long_size
                 signals.append(Signal(symbol, entry_size))
                 self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
-            elif bull_soft and (not bear_soft or m15_long >= m15_short) and meta_gate_ok:
+            elif bull_soft and (not bear_soft or m15_long >= m15_short) and long_gate_ok:
                 entry_size = long_size * 0.25 if self.timeframe_arg == "15m" else long_size * 0.5
                 signals.append(Signal(symbol, entry_size))
                 self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
-            elif bear_fortress and meta_gate_ok:
+            elif bear_fortress and short_gate_ok:
                 entry_size = short_size * 0.5 if self.timeframe_arg == "15m" else short_size
                 signals.append(Signal(symbol, -entry_size))
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
-            elif bear_soft and meta_gate_ok:
+            elif bear_soft and short_gate_ok:
                 entry_size = short_size * 0.25 if self.timeframe_arg == "15m" else short_size * 0.5
                 signals.append(Signal(symbol, -entry_size))
                 self.trailing_stops[symbol] = bar.high + stop_dist
