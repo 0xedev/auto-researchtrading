@@ -167,7 +167,7 @@ def print_regimes(result, data):
               f"{regime_result.num_trades:6d}  "
               f"{regime_result.total_return_pct:+7.2f}%")
 
-def run_stress_fees(data, timeframe):
+def run_stress_fees(data, timeframe, split_name):
     print("\n" + "=" * 60)
     print("  FEE STRESS TEST (Alpha vs Costs Decay)")
     print("=" * 60)
@@ -182,6 +182,8 @@ def run_stress_fees(data, timeframe):
         print(f"\nEvaluating with {m}x fees (Taker: {prepare.TAKER_FEE*10000:.1f} bps):")
         
         strat = Strategy(timeframe=timeframe)
+        if hasattr(strat, "pre_calculate_signals"):
+            strat.pre_calculate_signals(data, split_name=split_name)
         res = run_backtest(strat, data)
         print(f"  Sharpe: {res.sharpe:.3f} | Return: {res.total_return_pct:.2f}% | "
               f"Trades: {res.num_trades} | Profit Factor: {res.profit_factor:.2f}")
@@ -189,7 +191,7 @@ def run_stress_fees(data, timeframe):
     prepare.MAKER_FEE = base_maker
     prepare.TAKER_FEE = base_taker
 
-def run_capacity(data, timeframe):
+def run_capacity(data, timeframe, split_name):
     print("\n" + "=" * 60)
     print("  CAPACITY ANALYSIS (Liquidity Scaling)")
     print("=" * 60)
@@ -207,6 +209,8 @@ def run_capacity(data, timeframe):
         
         print(f"\nCapital Size: ${cap:,.0f} (Slippage: {prepare.SLIPPAGE_BPS:.1f} bps):")
         strat = Strategy(timeframe=timeframe)
+        if hasattr(strat, "pre_calculate_signals"):
+            strat.pre_calculate_signals(data, split_name=split_name)
         res = run_backtest(strat, data)
         print(f"  Sharpe: {res.sharpe:.3f} | Return: {res.total_return_pct:.2f}% | "
               f"DD: {res.max_drawdown_pct:.1f}%")
@@ -278,10 +282,10 @@ if __name__ == "__main__":
         print_regimes(result, data)
         
     if args.stress_fees:
-        run_stress_fees(data, args.timeframe)
+        run_stress_fees(data, args.timeframe, split_name)
         
     if args.capacity:
-        run_capacity(data, args.timeframe)
+        run_capacity(data, args.timeframe, split_name)
 
     # Autonomous Logging to results.tsv
     try:

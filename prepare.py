@@ -474,7 +474,9 @@ def _download_binance_funding(symbol: str, start_ms: int, end_ms: int) -> pd.Dat
             resp.raise_for_status()
             data = resp.json()
             if not data:
-                break
+                # No data in this window — skip ahead (funding may start later)
+                current += 90 * 24 * 3600 * 1000
+                continue
             for row in data:
                 all_rows.append({
                     "timestamp": int(row["fundingTime"]),
@@ -760,6 +762,7 @@ def load_data(split: str = "val", resample_4h: bool = False, resample_15m: bool 
         "val_15m":    (VAL_START,   VAL_END),
         "train_15m":  (TRAIN_START, TRAIN_END),
         "oos":        ("2025-01-01", "2025-12-31"),
+        "oos_15m":    ("2025-01-01", "2025-12-31"),
     }
     assert split in splits, f"split must be one of {list(splits.keys())}"
     global_start_str, end_str = splits[split]

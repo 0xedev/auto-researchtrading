@@ -65,3 +65,194 @@ exp62	1.951	1.951	5.86	REVERT	Auto-research iteration
 exp63	2.309	2.309	5.83	REVERT	Auto-research iteration
 exp64	1.886	1.886	13.16	REVERT	Auto-research iteration
 exp65	2.309	2.309	5.83	REVERT	Auto-research iteration
+exp66	2.312	2.312	5.83	REVERT	Auto-research iteration
+exp67	2.244	2.244	5.83	REVERT	Auto-research iteration
+exp68	2.276	2.276	5.83	REVERT	Auto-research iteration
+exp69	1.302	1.302	7.35	REVERT	Auto-research iteration
+exp70	2.312	2.312	5.83	REVERT	Auto-research iteration
+
+exp71	0.011	0.011	1.79	REVERT	recovered from run_exp71_1h.log
+exp72	0.593	0.593	1.50	REVERT	recovered from run_exp72_1h.log
+exp73	0.685	0.685	1.56	REVERT	recovered from run_exp73_1h.log
+exp74	0.686	0.686	1.56	REVERT	recovered from run_exp74_1h.log
+exp75	0.687	0.687	1.56	REVERT	recovered from run_exp75_1h.log
+exp76	0.688	0.688	1.56	REVERT	recovered from run_exp76_1h.log
+exp77	0.688	0.688	1.56	REVERT	recovered from run_exp77_1h.log
+exp78	-999.000	1.054	0.65	REVERT	recovered from run_exp78_1h.log
+exp79	-999.000	0.984	0.97	REVERT	recovered from run_exp79_1h.log
+exp80	0.904	0.904	1.00	REVERT	recovered from run_exp80_1h.log
+exp81	0.940	0.940	0.89	REVERT	recovered from run_exp81_1h.log
+exp82	0.976	0.976	0.79	REVERT	recovered from run_exp82_1h.log
+exp83	1.008	1.008	0.69	REVERT	recovered from run_exp83_1h.log
+exp84	1.024	1.024	0.66	REVERT	recovered from run_exp84_1h.log
+exp85	0.894	0.894	0.66	REVERT	recovered from run_exp85_1h.log
+exp86	-999.000	0.565	0.43	REVERT	recovered from run_exp86_1h.log
+exp87	0.713	0.713	0.44	REVERT	recovered from run_exp87_1h.log
+exp88	0.619	0.619	0.44	REVERT	recovered from run_exp88_1h.log
+exp89	-999.000	0.360	0.21	REVERT	recovered from run_exp89_1h.log
+exp90	1.039	1.039	0.65	REVERT	recovered from run_exp90_1h.log
+exp91	0.954	0.954	0.65	REVERT	recovered from run_exp91_1h.log
+exp92	0.686	0.686	0.63	REVERT	recovered from run_exp92_1h.log
+exp93	-999.000	0.448	0.98	REVERT	recovered from run_exp93_1h.log
+exp94	1.010	1.010	0.33	REVERT	recovered from run_exp94_1h.log
+exp95	0.092	0.092	3.30	REVERT	recovered from run_exp95_1h.log
+exp96	0.870	0.870	0.91	REVERT	recovered from run_exp96_1h.log
+exp97	1.039	1.039	0.65	REVERT	recovered from run_exp97_1h.log
+exp98	-999.000	0.468	0.55	REVERT	recovered from run_exp98_1h.log
+exp99	1.031	1.031	0.65	REVERT	recovered from run_exp99_1h.log
+exp100	0.840	0.840	0.65	REVERT	recovered from run_exp100_1h.log
+exp101	-999.000	0.000	0.00	MISSING	no run artifact found
+exp102	0.810	0.810	0.70	REVERT	recovered from run_exp102_1h.log
+exp103	1.039	1.039	0.65	REVERT	recovered from run_exp103_1h.log
+exp104	-999.000	0.000	0.00	MISSING	no run artifact found
+exp105	0.727	0.727	1.39	REVERT	recovered from run_exp105_1h.log
+exp106	-999.000	0.000	0.00	MISSING	no run artifact found
+exp107	-999.000	0.000	0.00	MISSING	no run artifact found
+exp108	-999.000	0.000	0.00	MISSING	no run artifact found
+exp109	-999.000	0.536	0.53	REVERT	recovered from run_exp109_1h.log
+exp110	0.959	0.959	0.84	REVERT	recovered from run_exp110_1h.log
+exp111	-999.000	0.941	1.17	REVERT	recovered from run_exp111_1h.log
+exp112	0.748	0.748	7.94	REVERT	recovered from run_exp112_1h.log
+exp113	0.785	0.785	0.49	REVERT	recovered from run_exp113_1h.log
+exp114	0.998	0.998	0.74	REVERT	recovered from run_exp114_1h.log
+exp115	0.993	0.993	0.74	REVERT	recovered from run_exp115_1h.log
+exp116	0.826	0.826	0.75	REVERT	recovered from run_exp116_1h.log
+exp117	-999.000	1.056	0.64	REVERT	recovered from run_exp117_1h.log
+exp118	1.039	1.039	0.65	REVERT	recovered from run_exp118_1h.log
+exp119	1.146	1.146	0.80	REVERT	recovered from run_exp119_1h.log
+exp120	1.141	1.141	0.80	REVERT	recovered from run_exp120_1h.log
+exp121	1.168	1.168	2.39	REVERT	recovered from run_exp121_1h.log
+exp122	1.200	1.200	5.91	REVERT	recovered from run_exp122_1h.log
+exp123	1.215	1.215	7.85	REVERT	recovered from run_exp123_1h.log
+exp124	1.028	1.199	18.42	REVERT	recovered from run_exp124_1h.log
+exp125	-999.000	0.000	0.00	NO_BACKTEST	RSI entry filter 67/33 — push toward 52-56 trades [no run log]
+exp126	1.237	1.237	0.83	REVERT	recovered from run_exp126_1h.log
+exp127	1.253	1.253	0.83	REVERT	recovered from run_exp127_1h.log
+exp128	-999.000	0.216	0.09	REVERT	recovered from run_exp128_1h.log
+exp129	-999.000	0.501	0.38	REVERT	recovered from run_exp129_1h.log
+exp130	-999.000	1.180	0.62	REVERT	recovered from run_exp130_1h.log
+exp131	-999.000	1.125	5.03	REVERT	recovered from run_exp131_1h.log
+exp132	0.264	0.264	9.25	REVERT	recovered from run_exp132_1h.log
+exp133	1.585	1.585	4.93	REVERT	recovered from run_exp133_1h.log
+exp134	0.995	1.361	20.00	REVERT	recovered from run_exp134_1h.log
+exp135	1.794	1.794	4.12	REVERT	recovered from run_exp135_1h.log
+exp136	1.794	1.794	4.12	REVERT	recovered from run_exp136_1h.log
+exp137	1.164	1.164	1.17	REVERT	recovered from run_exp137_1h.log
+exp138	1.037	1.037	9.32	REVERT	recovered from run_exp138_1h.log
+exp139	-999.000	0.000	0.00	NO_BACKTEST	vol scaling 0.4+0.6*vol [no run log]
+exp140	1.120	1.120	1.25	REVERT	recovered from run_exp140_1h.log
+exp141	1.906	1.906	4.21	REVERT	recovered from run_exp141_1h.log
+exp142	1.896	1.896	4.21	REVERT	recovered from run_exp142_1h.log
+exp143	-1.348	-0.560	30.76	REVERT	recovered from run_exp143_1h.log
+exp144	0.388	0.388	4.40	REVERT	recovered from run_exp144_1h.log
+exp145	2.304	2.304	5.84	REVERT	recovered from run_exp145_1h.log
+exp146	0.719	0.719	8.38	REVERT	recovered from run_exp146_1h.log
+exp147	2.304	2.304	5.84	REVERT	recovered from run_exp147_1h.log
+exp148	-999.000	0.000	0.00	NO_BACKTEST	EMA_FAST 9 EMA_SLOW 22 [no run log]
+exp149	2.304	2.304	5.84	REVERT	recovered from run_exp149_1h.log
+exp150	1.824	1.824	7.66	REVERT	recovered from run_exp150_1h.log
+exp151	1.804	1.804	7.67	REVERT	recovered from run_exp151_1h.log
+exp152	2.304	2.304	5.84	REVERT	recovered from run_exp152_1h.log
+exp153	-999.000	1.943	12.08	REVERT	recovered from run_exp153_1h.log
+exp154	-999.000	0.958	55.72	REVERT	recovered from run_exp154_1h.log
+exp155	-0.113	0.368	24.63	REVERT	recovered from run_exp155_1h.log
+exp156	2.304	2.304	5.84	REVERT	recovered from run_exp156_1h.log
+exp157	2.322	2.322	4.33	REVERT	recovered from run_exp157_1h.log
+exp158	2.086	2.086	5.84	REVERT	recovered from run_exp158_1h.log
+exp159	2.304	2.304	5.84	REVERT	recovered from run_exp159_1h.log
+exp160	2.204	2.204	7.55	REVERT	recovered from run_exp160_1h.log
+exp161	1.951	1.951	5.86	REVERT	recovered from run_exp161_1h.log
+exp162	2.309	2.309	5.83	REVERT	recovered from run_exp162_1h.log
+exp163	1.886	1.886	13.16	REVERT	recovered from run_exp163_1h.log
+exp164	2.244	2.244	5.83	REVERT	recovered from run_exp164_1h.log
+exp165	-999.000	0.000	0.00	NO_BACKTEST	tighter funding filter — FR>0.05%/FR<-0.05% (top 2.3%) [no run log]
+exp166	-999.000	0.000	0.00	NO_BACKTEST	add funding_rate to FEATURE_COLS — model can now learn from funding dynamics [no run log]exp167	2.312	2.312	5.83	REVERT	Auto-research iteration
+exp1	2.312	2.312	5.83	REVERT	Auto-research iteration
+exp1	2.312	2.312	5.83	REVERT	Auto-research iteration
+exp167	2.312	2.312	5.83	REVERT	tighter short fortress + smaller short sizing (no effect)
+exp1	2.312	2.312	5.83	REVERT	Auto-research iteration
+exp168	2.312	2.312	5.83	REVERT	lower bearish gates + half-size shorts (still no short entries)
+exp1	2.266	2.266	6.58	REVERT	Auto-research iteration
+exp169	2.266	2.266	6.58	REVERT	raw-bear fallback created 832 short opens but hurt PF/DD
+exp1	2.338	2.338	5.72	REVERT	Auto-research iteration
+
+exp170	2.338	2.338	5.72	KEEP	stricter raw-bear fallback + 35% short sizing (284 short opens)exp1	2.330	2.330	5.73	REVERT	Auto-research iteration
+
+exp171	2.330	2.330	5.73	KEEP	tighter raw-bear override + 25% short sizingexp1	2.319	2.319	5.69	REVERT	Auto-research iteration
+
+exp172	2.319	2.319	5.69	KEEP	very selective raw-bear override + 20% short sizing (54 short opens)exp1	1.314	1.314	5.24	REVERT	Auto-research iteration
+
+exp173	1.314	1.314	5.24	REVERT	strong raw bull dominance gate cut too many core long tradesexp1	2.319	2.319	5.69	REVERT	Auto-research iteration
+
+exp174	2.319	2.319	5.69	REVERT	tightened soft longs had no effectexp1	2.341	2.341	4.19	REVERT	Auto-research iteration
+
+exp175	2.341	2.341	4.19	KEEP	widen ATR stop 3.0x->4.5x on short-capable base (better score and DD)
+exp1	2.348	2.348	4.19	REVERT	Auto-research iteration
+
+exp176	2.348	2.348	4.19	KEEP	4h-aware soft entries + include 4h in sizing meta (small PF/score gain)
+exp1	2.313	2.313	4.33	REVERT	Auto-research iteration
+
+exp177	2.313	2.313	4.33	KEEP	signal-decay exits improved win rate and PF but slightly reduced score
+exp1	1.782	1.782	4.82	REVERT	Auto-research iteration
+
+exp178	1.782	1.782	4.82	REVERT	mild bull-dominance gate over-pruned long flow
+exp1	2.313	2.313	4.33	REVERT	Auto-research iteration
+
+exp179	2.313	2.313	4.33	REVERT	reduced 1h soft-entry size had no measurable effect
+exp1	2.313	2.313	4.33	REVERT	Auto-research iteration
+exp1	2.176	2.176	5.26	REVERT	Auto-research iteration
+exp1	1.212	1.212	3.97	REVERT	Auto-research iteration
+exp1	2.313	2.313	4.33	REVERT	Auto-research iteration
+exp1	-0.449	-0.449	8.31	REVERT	Auto-research iteration
+exp1	2.263	2.263	4.67	REVERT	Auto-research iteration
+exp1	2.346	2.346	5.46	REVERT	Auto-research iteration
+exp1	2.368	2.368	6.60	REVERT	Auto-research iteration
+exp1	2.383	2.383	7.74	REVERT	Auto-research iteration
+exp1	2.393	2.393	8.88	REVERT	Auto-research iteration
+exp1	2.401	2.401	10.02	REVERT	Auto-research iteration
+exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
+exp1	0.390	0.390	5.34	REVERT	Auto-research iteration
+exp1	0.366	0.366	5.41	REVERT	Auto-research iteration
+exp1	2.373	2.373	9.85	REVERT	Auto-research iteration
+exp1	2.398	2.398	9.44	REVERT	Auto-research iteration
+exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
+exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
+exp1	-999.000	2.512	0.14	REVERT	Auto-research iteration
+exp1	-999.000	-1.479	74.81	REVERT	Auto-research iteration
+exp1	-1.061	-0.523	25.75	REVERT	Auto-research iteration
+exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
+exp1	-999.000	2.512	0.14	REVERT	Auto-research iteration
+exp1	-999.000	2.512	0.14	REVERT	Auto-research iteration
+exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
+exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
+exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
+exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
+exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
+exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
+exp1	2.311	2.311	9.46	REVERT	Auto-research iteration
+exp1	-1.094	-0.526	26.36	REVERT	Auto-research iteration
+exp1	1.825	1.825	4.51	REVERT	Auto-research iteration
+exp1	0.288	0.288	9.83	REVERT	Auto-research iteration
+exp1	2.179	2.179	4.67	REVERT	Auto-research iteration
+exp1	-0.041	-0.041	13.18	REVERT	Auto-research iteration
+exp1	-999.000	-0.477	0.00	REVERT	Auto-research iteration
+exp1	-1.270	-0.988	20.64	REVERT	Auto-research iteration
+exp1	1.758	1.758	4.53	REVERT	Auto-research iteration
+exp1	0.233	0.233	7.72	REVERT	Auto-research iteration
+exp1	1.966	1.966	4.51	REVERT	Auto-research iteration
+exp1	0.063	0.063	9.59	REVERT	Auto-research iteration
+exp1	2.049	2.049	4.59	REVERT	Auto-research iteration
+exp1	0.113	0.113	11.49	REVERT	Auto-research iteration
+exp1	2.389	2.389	9.48	REVERT	Auto-research iteration
+exp1	-1.079	-0.530	25.97	REVERT	Auto-research iteration
+exp1	1.825	1.825	4.51	REVERT	Auto-research iteration
+exp1	0.288	0.288	9.83	REVERT	Auto-research iteration
+exp1	1.890	1.890	4.51	REVERT	Auto-research iteration
+exp1	0.101	0.101	10.20	REVERT	Auto-research iteration
+exp1	1.848	1.848	4.51	REVERT	Auto-research iteration
+exp1	-0.000	-0.000	11.39	REVERT	Auto-research iteration
+exp1	1.848	1.848	4.51	REVERT	Auto-research iteration
+exp1	-0.000	-0.000	11.39	REVERT	Auto-research iteration
+exp1	2.104	2.104	4.51	REVERT	Auto-research iteration
+exp1	0.077	0.077	10.58	REVERT	Auto-research iteration
+exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
