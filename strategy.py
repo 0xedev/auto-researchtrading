@@ -30,6 +30,12 @@ class Strategy:
         self.models_loaded = False
         self.trailing_stops = {}
         self.position_ages = {}
+        self._market_ret_buf = []
+        self._macro_bear = False
+        self._market_ret_buf = []
+        self._macro_bear = False
+        self._market_ret_buf = []
+        self._macro_bear = False
 
     def _parse_timeframe(self, tf: str) -> int:
         if tf == "15m":
@@ -241,6 +247,17 @@ class Strategy:
         equity = portfolio.equity
         signals: List[Signal] = []
 
+        # Macro regime: rolling 72-bar market return detects sustained bear trends
+        any_sym = next(iter(bar_data), None)
+        if any_sym and any_sym in self.symbol_caches:
+            idx = self.bar_counts.get(any_sym, 0)
+            if idx < len(self.symbol_caches[any_sym]):
+                mret = self.symbol_caches[any_sym][idx].get("market_ret", 0.0)
+                self._market_ret_buf.append(mret)
+                if len(self._market_ret_buf) > 72:
+                    self._market_ret_buf.pop(0)
+                self._macro_bear = sum(self._market_ret_buf) < -0.02
+
         for symbol, bar in bar_data.items():
             pos = portfolio.positions.get(symbol, 0.0)
 
@@ -281,13 +298,13 @@ class Strategy:
 
             # meta_score-based continuous sizing with regime gating
             if meta_score > 0.65 and supportive_regime:
-                risk_per_trade = equity * 0.1900; long_size = (risk_per_trade * bar.close) / stop_dist
+                risk_per_trade = equity * 0.2200; long_size = (risk_per_trade * bar.close) / stop_dist
                 short_size = (risk_per_trade * bar.close) / stop_dist
             elif meta_score > 0.50 and supportive_regime:
-                risk_per_trade = equity * 0.0950; long_size = (risk_per_trade * bar.close) / stop_dist
+                risk_per_trade = equity * 0.1100; long_size = (risk_per_trade * bar.close) / stop_dist
                 short_size = (risk_per_trade * bar.close) / stop_dist
             elif supportive_regime:
-                risk_per_trade = equity * 0.0750; long_size = (risk_per_trade * bar.close) / stop_dist
+                risk_per_trade = equity * 0.0900; long_size = (risk_per_trade * bar.close) / stop_dist
                 short_size = (risk_per_trade * bar.close) / stop_dist
             else:
                 long_size = equity * 0.08
@@ -295,7 +312,11 @@ class Strategy:
             # Regime-throttled risk: keep flow, but cut weak-regime exposure hard.
             if not supportive_regime:
                 long_size *= 0.05
-            short_size *= 0.20
+            # Regime-adaptive: crush counter-trend side
+            if self._macro_bear:
+                long_size *= 0.20
+            else:
+                short_size *= 0.20
 
             if pos != 0:
                 age = self.position_ages.get(symbol, 0) + 1
@@ -345,7 +366,8 @@ class Strategy:
                 continue
 
             self.position_ages[symbol] = 0
-            if bull_fortress and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short):
+            macro_bull_ok = not self._macro_bear or meta_score > 0.40
+            if bull_fortress and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short) and macro_bull_ok:
                 entry_size = long_size * 0.5 if self.timeframe_arg == "15m" else long_size
                 signals.append(Signal(symbol, entry_size))
                 self.trailing_stops[symbol] = bar.low - stop_dist
