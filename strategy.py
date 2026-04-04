@@ -32,10 +32,6 @@ class Strategy:
         self.position_ages = {}
         self._market_ret_buf = []
         self._macro_bear = False
-        self._market_ret_buf = []
-        self._macro_bear = False
-        self._market_ret_buf = []
-        self._macro_bear = False
 
     def _parse_timeframe(self, tf: str) -> int:
         if tf == "15m":
@@ -283,7 +279,8 @@ class Strategy:
             meta_score = float(np.mean(active_meta)) if active_meta else 0.0
             supportive_regime = (m1h <= 0 or m1h > 0.45)
             supportive_regime_4h = (m4h <= 0 or m4h > 0.45)
-            stop_dist = 4.5 * row["atr_val"] if row["atr_val"] > 0 else max(bar.close * 0.02, 1e-6)
+            atr_mult = 3.0 if self._macro_bear else 7.0
+            stop_dist = atr_mult * row["atr_val"] if row["atr_val"] > 0 else max(bar.close * 0.02, 1e-6)
             bull_signal = row["bull_15m"] > 0.32
             bear_signal = row["bear_15m"] > 0.55
             bull_fortress = bull_signal and m15_long > 0.28 and rsi_8 < 68
@@ -312,11 +309,12 @@ class Strategy:
             # Regime-throttled risk: keep flow, but cut weak-regime exposure hard.
             if not supportive_regime:
                 long_size *= 0.05
-            # Regime-adaptive: crush counter-trend side
-            if self._macro_bear:
-                long_size *= 0.20
-            else:
-                short_size *= 0.20
+            # Continuous regime scaling (25x) — smooth crush based on macro intensity
+            mret_sum = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
+            long_factor = max(0.20, min(1.0, 1.0 + 25.0 * mret_sum))
+            short_factor = max(0.20, min(1.0, 1.0 - 25.0 * mret_sum))
+            long_size *= long_factor
+            short_size *= short_factor
 
             if pos != 0:
                 age = self.position_ages.get(symbol, 0) + 1
@@ -366,23 +364,24 @@ class Strategy:
                 continue
 
             self.position_ages[symbol] = 0
+            meta_gate_ok = meta_score > 0.355
             macro_bull_ok = not self._macro_bear or meta_score > 0.40
-            if bull_fortress and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short) and macro_bull_ok:
+            if bull_fortress and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short) and macro_bull_ok and meta_gate_ok:
                 entry_size = long_size * 0.5 if self.timeframe_arg == "15m" else long_size
                 signals.append(Signal(symbol, entry_size))
                 self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
-            elif bull_soft and (not bear_soft or m15_long >= m15_short):
+            elif bull_soft and (not bear_soft or m15_long >= m15_short) and meta_gate_ok:
                 entry_size = long_size * 0.25 if self.timeframe_arg == "15m" else long_size * 0.5
                 signals.append(Signal(symbol, entry_size))
                 self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
-            elif bear_fortress:
+            elif bear_fortress and meta_gate_ok:
                 entry_size = short_size * 0.5 if self.timeframe_arg == "15m" else short_size
                 signals.append(Signal(symbol, -entry_size))
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
-            elif bear_soft:
+            elif bear_soft and meta_gate_ok:
                 entry_size = short_size * 0.25 if self.timeframe_arg == "15m" else short_size * 0.5
                 signals.append(Signal(symbol, -entry_size))
                 self.trailing_stops[symbol] = bar.high + stop_dist
