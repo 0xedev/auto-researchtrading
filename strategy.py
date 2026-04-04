@@ -262,26 +262,32 @@ class Strategy:
             m1h = row["meta_1h"]
             m4h = row["meta_4h"]
 
-            active_meta = [m for m in (max(m15_long, m15_short), m1h) if m > 0]
+            active_meta = [m for m in (max(m15_long, m15_short), m1h, m4h) if m > 0]
             meta_score = float(np.mean(active_meta)) if active_meta else 0.0
             supportive_regime = (m1h <= 0 or m1h > 0.45)
-            stop_dist = 3.0 * row["atr_val"] if row["atr_val"] > 0 else max(bar.close * 0.02, 1e-6)
+            supportive_regime_4h = (m4h <= 0 or m4h > 0.45)
+            stop_dist = 4.5 * row["atr_val"] if row["atr_val"] > 0 else max(bar.close * 0.02, 1e-6)
             bull_signal = row["bull_15m"] > 0.32
             bear_signal = row["bear_15m"] > 0.55
             bull_fortress = bull_signal and m15_long > 0.28 and rsi_8 < 68
-            bear_fortress = bear_signal and m15_short > 0.28 and rsi_8 > 32
-            bull_soft = bull_signal and supportive_regime and m15_long > 0.50
-            bear_soft = bear_signal and supportive_regime and m15_short > 0.50
+            raw_bear_fortress = (
+                row["bear_15m"] > 0.62
+                and row["bear_15m"] > row["bull_15m"] + 0.12
+                and rsi_8 > 48
+            )
+            bear_fortress = (bear_signal and m15_short > 0.28 and rsi_8 > 32) or raw_bear_fortress
+            bull_soft = bull_signal and supportive_regime and supportive_regime_4h and m15_long > 0.50
+            bear_soft = bear_signal and supportive_regime and supportive_regime_4h and m15_short > 0.50
 
             # meta_score-based continuous sizing with regime gating
             if meta_score > 0.65 and supportive_regime:
-                risk_per_trade = equity * 0.0900; long_size = (risk_per_trade * bar.close) / stop_dist
+                risk_per_trade = equity * 0.1900; long_size = (risk_per_trade * bar.close) / stop_dist
                 short_size = (risk_per_trade * bar.close) / stop_dist
             elif meta_score > 0.50 and supportive_regime:
-                risk_per_trade = equity * 0.0450; long_size = (risk_per_trade * bar.close) / stop_dist
+                risk_per_trade = equity * 0.0950; long_size = (risk_per_trade * bar.close) / stop_dist
                 short_size = (risk_per_trade * bar.close) / stop_dist
             elif supportive_regime:
-                risk_per_trade = equity * 0.0300; long_size = (risk_per_trade * bar.close) / stop_dist
+                risk_per_trade = equity * 0.0750; long_size = (risk_per_trade * bar.close) / stop_dist
                 short_size = (risk_per_trade * bar.close) / stop_dist
             else:
                 long_size = equity * 0.08
@@ -289,6 +295,7 @@ class Strategy:
             # Regime-throttled risk: keep flow, but cut weak-regime exposure hard.
             if not supportive_regime:
                 long_size *= 0.05
+            short_size *= 0.20
 
             if pos != 0:
                 age = self.position_ages.get(symbol, 0) + 1
@@ -296,7 +303,12 @@ class Strategy:
                 max_hold_bars = 3 if self.timeframe_arg == "15m" else 6
 
                 if pos > 0:
-                    should_exit = age >= max_hold_bars or bar.close < self.trailing_stops.get(symbol, 0)
+                    signal_decay_exit = age >= 3 and (not bull_signal) and m15_long < 0.40
+                    should_exit = (
+                        age >= max_hold_bars
+                        or bar.close < self.trailing_stops.get(symbol, 0)
+                        or signal_decay_exit
+                    )
                     if should_exit:
                         signals.append(Signal(symbol, 0.0))
                         self.position_ages[symbol] = 0
@@ -311,7 +323,12 @@ class Strategy:
                             signals.append(Signal(symbol, desired))
                         self.trailing_stops[symbol] = max(self.trailing_stops.get(symbol, 0), bar.high - stop_dist)
                 else:
-                    should_exit = age >= max_hold_bars or bar.close > self.trailing_stops.get(symbol, 9e18)
+                    signal_decay_exit = age >= 3 and (not bear_signal) and m15_short < 0.40 and not raw_bear_fortress
+                    should_exit = (
+                        age >= max_hold_bars
+                        or bar.close > self.trailing_stops.get(symbol, 9e18)
+                        or signal_decay_exit
+                    )
                     if should_exit:
                         signals.append(Signal(symbol, 0.0))
                         self.position_ages[symbol] = 0
@@ -328,7 +345,7 @@ class Strategy:
                 continue
 
             self.position_ages[symbol] = 0
-            if bull_fortress and (not bear_fortress or m15_long >= m15_short):
+            if bull_fortress and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short):
                 entry_size = long_size * 0.5 if self.timeframe_arg == "15m" else long_size
                 signals.append(Signal(symbol, entry_size))
                 self.trailing_stops[symbol] = bar.low - stop_dist
