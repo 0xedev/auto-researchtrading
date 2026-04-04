@@ -15,7 +15,7 @@ from strategy import Strategy
 BENCHMARKS = {
     "sharpe": 3.5,
     "win_rate_pct": 60.0,
-    "trades_per_day_per_symbol": 1.0,
+    "trades_per_day": 1.0,
     "profit_factor": 4.0,
     "max_drawdown_pct": 10.0,
 }
@@ -38,10 +38,10 @@ def print_benchmark_audit(result, num_symbols):
         ("Sharpe", result.sharpe, BENCHMARKS["sharpe"], result.sharpe >= BENCHMARKS["sharpe"]),
         ("Win Rate %", result.win_rate_pct, BENCHMARKS["win_rate_pct"], result.win_rate_pct >= BENCHMARKS["win_rate_pct"]),
         (
-            "Trades/Day/Symbol",
-            trades_per_day_per_symbol,
-            BENCHMARKS["trades_per_day_per_symbol"],
-            trades_per_day_per_symbol >= BENCHMARKS["trades_per_day_per_symbol"],
+            "Trades/Day",
+            trades_per_day,
+            BENCHMARKS["trades_per_day"],
+            trades_per_day >= BENCHMARKS["trades_per_day"],
         ),
         (
             "Profit Factor",

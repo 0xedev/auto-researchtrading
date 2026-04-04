@@ -48,3 +48,20 @@ exp45	-0.826	-0.826	5.13	REVERT	exp47b: relative strength features with aligned 
 exp46	-999.000	-26.322	99.00	REVERT	exp48: dense relative-strength labels with ranked entries
 exp47	-999.000	-27.556	99.00	REVERT	exp49: medium relative-strength models with ranker
 exp48	-999.000	-9.109	93.73	REVERT	exp50: tighten ranker with cooldown and top-1 picks
+exp49	2.304	2.304	5.84	REVERT	Auto-research iteration
+exp50	2.304	2.304	5.84	REVERT	Auto-research iteration
+exp51	1.824	1.824	7.66	REVERT	Auto-research iteration
+exp52	1.804	1.804	7.67	REVERT	Auto-research iteration
+exp53	2.304	2.304	5.84	REVERT	Auto-research iteration
+exp54	-999.000	1.943	12.08	REVERT	Auto-research iteration
+exp55	-999.000	0.958	55.72	REVERT	Auto-research iteration
+exp56	-0.113	0.368	24.63	REVERT	Auto-research iteration
+exp57	2.304	2.304	5.84	REVERT	Auto-research iteration
+exp58	2.322	2.322	4.33	REVERT	Auto-research iteration
+exp59	2.086	2.086	5.84	REVERT	Auto-research iteration
+exp60	2.304	2.304	5.84	REVERT	Auto-research iteration
+exp61	2.204	2.204	7.55	REVERT	Auto-research iteration
+exp62	1.951	1.951	5.86	REVERT	Auto-research iteration
+exp63	2.309	2.309	5.83	REVERT	Auto-research iteration
+exp64	1.886	1.886	13.16	REVERT	Auto-research iteration
+exp65	2.309	2.309	5.83	REVERT	Auto-research iteration

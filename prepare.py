@@ -356,7 +356,7 @@ def get_n_trees_depth(timeframe):
 
 def prepare_dataset(timeframe, split_name):
     # This logic is now shared by the trainer
-    data_dict = load_data(split=split_name)
+    data_dict = load_data(split=split_name, resample_4h=(timeframe == "4h"))
     all_features, all_y, all_y_meta = [], [], []
     
     # Pre-calculate Market Regime (Systemic Beta)
