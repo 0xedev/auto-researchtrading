@@ -181,3 +181,6 @@ exp179	2.313	2.313	4.33	REVERT	reduced 1h soft-entry size had no measurable effe
 exp205	1.520	1.520	5.49	KEEP	XGB directional models + entry gate + risk tiers 22/11/9%
 exp237	1.787	1.787	4.45	KEEP	asymmetric meta gates + RSI<65 + continuous 25x crush + 7x/3x stops
 exp256	1.863	1.863	3.15	KEEP	continuous sizing 3-30% + 9x/4x ATR + macro_bear -0.015 + 45x crush + TF-portable
+funding_raw_p1	-1.357	-0.804	26.05	REVERT	raw funding_rate feature + NaN masking + lagged 1h->15m funding, retrain all models, unchanged exp256 shell
+funding_raw_p2	-0.709	-0.707	15.04	REVERT	raw funding_rate retrain + percentile-threshold translation against exp256_active
+temporal_stat_p1	-1.792	-0.760	35.64	REVERT	old-branch temporal/session + statistical-regime features ported into Fortress stack; retrained all models; val/OOS failed hard
