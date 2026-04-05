@@ -2,6 +2,92 @@
 
 Every experiment we ran, what worked, what didn't, and why. The "keeps" are strategies that beat the previous best and were retained. The "discards" were reverted.
 
+## Apr 5 2026 Temporal / Statistical Feature Port — Rejected
+
+### What Was Tested
+
+- Ported the safest causal features from the abandoned Desktop research branch into the current Fortress XGBoost stack.
+- Added temporal/session context:
+  - hour-of-day sin/cos
+  - day-of-week sin/cos
+  - weekend flag
+  - US / EU / Asia session flags
+- Added statistical regime context:
+  - realized volatility over 6/24/48 bars
+  - return autocorrelation (lag 1 and 2 over 24 bars)
+  - 20-bar skew
+  - short-vs-long volatility regime (`12 / 48`)
+- Kept architecture, tree counts, and `exp256` shell unchanged.
+- Retrained all active models on the remote source-of-truth server.
+
+### Results
+
+- 1h validation: Sharpe **-0.760**, WR **52.3%**, PF **0.951**, DD **35.6%**, **4.17 tpd**
+- 2025 OOS: Sharpe **-2.174**, PF **0.533**, DD **26.9%**, **3.90 tpd**
+- 4h robustness: Sharpe **1.709**, PF **2.586**, DD **8.0%**, **0.47 tpd**
+
+### Verdict
+
+- Hard reject.
+- The feature wave increased activity sharply but destroyed trade quality.
+- This was not a subtle miss; it failed validation, OOS, and the practical 4h bar.
+- The branch was rolled back immediately to `exp256`.
+
+### Takeaways
+
+- Old-branch temporal/statistical ideas do not transfer cleanly into the current Fortress shell as a bundled feature wave.
+- More context features can easily become more churn features if they do not improve selectivity.
+- Future feature work should stay narrower than this:
+  - test one small family at a time,
+  - prefer slower meta/regime models over the full stack,
+  - and do not assume that causal safety implies usefulness.
+
+## Apr 5 2026 Funding-Aware Retrain (Raw Funding Only) — Rejected
+
+### Ground Truth
+
+- The remote server cache, not the local laptop cache, is the source of truth for funding research.
+- Remote 1h coverage is real: **597,405 / 2,977,788** rows have nonzero funding.
+- BTC, ETH, and SOL have full funding coverage; most other crypto assets have partial coverage beginning around perp launch; XAU/SP500 remain no-funding assets by design.
+
+### Phase 1 — Raw `funding_rate` + Unchanged `exp256` Shell
+
+- Added `funding_rate` as a single model feature, with missing coverage masked as `NaN`.
+- Lagged 1h funding into 15m features to avoid lookahead.
+- Retrained all 10 active XGBoost models without changing tree counts or shell thresholds.
+
+**Results**
+- 1h validation: Sharpe **-0.804**, WR **53.9%**, PF **0.853**, DD **26.1%**, **2.92 tpd**
+- 2025 OOS: Sharpe **0.760**, PF **1.497**, DD **3.62%**
+- 4h robustness: Sharpe **1.017**, PF **2.989**, DD **3.51%**, **0.305 tpd**
+
+**Verdict**
+- Hard fail. The retrained models broke the `exp256` shell catastrophically.
+
+### Phase 2 — Percentile Threshold Translation
+
+- Translated the old `exp256` raw gates onto the new model output percentiles using `exp256_active` as the reference distribution.
+- This was meant to test whether the failure was mostly threshold drift rather than model degradation.
+
+**Results**
+- 1h validation: Sharpe **-0.707**, WR **54.1%**, PF **0.750**, DD **15.0%**, **1.41 tpd**
+- 2025 OOS: Sharpe **0.069**, PF **1.269**, DD **1.62%**
+- 4h robustness: Sharpe **0.773**, PF **3.936**, DD **2.41%**, **0.144 tpd**
+
+**Verdict**
+- Partial mechanical repair only. Trade count and drawdown improved versus Phase 1, but alpha did not recover.
+
+### Takeaways
+
+- Raw `funding_rate` as a standalone feature is rejected for the current XGBoost Fortress architecture.
+- The failure is **not** just threshold drift. Even percentile-aligned gates could not recover edge.
+- Future funding work should **not** retry raw `funding_rate` alone.
+- If funding is revisited, it should be via:
+  - derived funding features,
+  - a perp-only branch,
+  - or a different model architecture.
+- Restore `exp256` immediately after failed structural experiments instead of stacking more tweaks on top.
+
 ## Apr 4 2026 Research Lessons (exp150-exp163) — Architecture Ceiling Analysis
 
 ### Current Best: Sharpe 2.31, WR 54.1%, PF 3.59, DD 5.83%, 4.89 tpd (exp162)
@@ -25,10 +111,10 @@ Architecture: XGBoost Quantum Fortress — 15m directional models gate entries, 
 - Was checking `trades_per_day_per_symbol >= 1.0` (needed 17 tpd)
 - Fixed to `trades_per_day >= 1.0` (need 1 tpd total) — already passing at 4.89
 
-**4. Funding rate data is all zeros:**
-- The cached parquet files have `funding_rate = 0.0` for all symbols and all dates
-- This means the download pipeline for funding rates is broken/never ran
-- Funding rate is a known alpha source for perps that's completely untapped
+**4. Funding rate data looked unavailable in the local cache, but remote truth differed:**
+- The local laptop cache showed `funding_rate = 0.0`, which initially suggested the download path was broken.
+- Later validation on the remote server showed real 1h funding coverage on crypto perps.
+- Raw funding as a single feature was still tested and rejected on Apr 5 2026.
 
 ### What Failed (Do Not Repeat)
 
