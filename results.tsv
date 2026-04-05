@@ -1,6 +1,5 @@
 commit	score	sharpe	max_dd	status	description
 exp0	-999.000	0.000	0.00	BASELINE	clean audited branch, no trades before 1h fallback
-exp1	1.079	1.079	8.74	KEEP	1h fallback + stop_dist fix (first live audited baseline)
 exp2	-999.000	0.715	4.17	REVERT	tighten meta and lead thresholds (too restrictive)
 exp3	0.680	0.680	4.39	REVERT	require market-ret alignment for entries (worse Sharpe)
 exp4	1.136	1.136	9.15	KEEP	raise meta threshold to 0.45 (new best audited baseline)
@@ -70,7 +69,6 @@ exp67	2.244	2.244	5.83	REVERT	Auto-research iteration
 exp68	2.276	2.276	5.83	REVERT	Auto-research iteration
 exp69	1.302	1.302	7.35	REVERT	Auto-research iteration
 exp70	2.312	2.312	5.83	REVERT	Auto-research iteration
-
 exp71	0.011	0.011	1.79	REVERT	recovered from run_exp71_1h.log
 exp72	0.593	0.593	1.50	REVERT	recovered from run_exp72_1h.log
 exp73	0.685	0.685	1.56	REVERT	recovered from run_exp73_1h.log
@@ -167,92 +165,19 @@ exp163	1.886	1.886	13.16	REVERT	recovered from run_exp163_1h.log
 exp164	2.244	2.244	5.83	REVERT	recovered from run_exp164_1h.log
 exp165	-999.000	0.000	0.00	NO_BACKTEST	tighter funding filter — FR>0.05%/FR<-0.05% (top 2.3%) [no run log]
 exp166	-999.000	0.000	0.00	NO_BACKTEST	add funding_rate to FEATURE_COLS — model can now learn from funding dynamics [no run log]exp167	2.312	2.312	5.83	REVERT	Auto-research iteration
-exp1	2.312	2.312	5.83	REVERT	Auto-research iteration
-exp1	2.312	2.312	5.83	REVERT	Auto-research iteration
 exp167	2.312	2.312	5.83	REVERT	tighter short fortress + smaller short sizing (no effect)
-exp1	2.312	2.312	5.83	REVERT	Auto-research iteration
 exp168	2.312	2.312	5.83	REVERT	lower bearish gates + half-size shorts (still no short entries)
-exp1	2.266	2.266	6.58	REVERT	Auto-research iteration
 exp169	2.266	2.266	6.58	REVERT	raw-bear fallback created 832 short opens but hurt PF/DD
-exp1	2.338	2.338	5.72	REVERT	Auto-research iteration
-
 exp170	2.338	2.338	5.72	KEEP	stricter raw-bear fallback + 35% short sizing (284 short opens)exp1	2.330	2.330	5.73	REVERT	Auto-research iteration
-
 exp171	2.330	2.330	5.73	KEEP	tighter raw-bear override + 25% short sizingexp1	2.319	2.319	5.69	REVERT	Auto-research iteration
-
 exp172	2.319	2.319	5.69	KEEP	very selective raw-bear override + 20% short sizing (54 short opens)exp1	1.314	1.314	5.24	REVERT	Auto-research iteration
-
 exp173	1.314	1.314	5.24	REVERT	strong raw bull dominance gate cut too many core long tradesexp1	2.319	2.319	5.69	REVERT	Auto-research iteration
-
 exp174	2.319	2.319	5.69	REVERT	tightened soft longs had no effectexp1	2.341	2.341	4.19	REVERT	Auto-research iteration
-
 exp175	2.341	2.341	4.19	KEEP	widen ATR stop 3.0x->4.5x on short-capable base (better score and DD)
-exp1	2.348	2.348	4.19	REVERT	Auto-research iteration
-
 exp176	2.348	2.348	4.19	KEEP	4h-aware soft entries + include 4h in sizing meta (small PF/score gain)
-exp1	2.313	2.313	4.33	REVERT	Auto-research iteration
-
 exp177	2.313	2.313	4.33	KEEP	signal-decay exits improved win rate and PF but slightly reduced score
-exp1	1.782	1.782	4.82	REVERT	Auto-research iteration
-
 exp178	1.782	1.782	4.82	REVERT	mild bull-dominance gate over-pruned long flow
-exp1	2.313	2.313	4.33	REVERT	Auto-research iteration
-
 exp179	2.313	2.313	4.33	REVERT	reduced 1h soft-entry size had no measurable effect
-exp1	2.313	2.313	4.33	REVERT	Auto-research iteration
-exp1	2.176	2.176	5.26	REVERT	Auto-research iteration
-exp1	1.212	1.212	3.97	REVERT	Auto-research iteration
-exp1	2.313	2.313	4.33	REVERT	Auto-research iteration
-exp1	-0.449	-0.449	8.31	REVERT	Auto-research iteration
-exp1	2.263	2.263	4.67	REVERT	Auto-research iteration
-exp1	2.346	2.346	5.46	REVERT	Auto-research iteration
-exp1	2.368	2.368	6.60	REVERT	Auto-research iteration
-exp1	2.383	2.383	7.74	REVERT	Auto-research iteration
-exp1	2.393	2.393	8.88	REVERT	Auto-research iteration
-exp1	2.401	2.401	10.02	REVERT	Auto-research iteration
-exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
-exp1	0.390	0.390	5.34	REVERT	Auto-research iteration
-exp1	0.366	0.366	5.41	REVERT	Auto-research iteration
-exp1	2.373	2.373	9.85	REVERT	Auto-research iteration
-exp1	2.398	2.398	9.44	REVERT	Auto-research iteration
-exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
-exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
-exp1	-999.000	2.512	0.14	REVERT	Auto-research iteration
-exp1	-999.000	-1.479	74.81	REVERT	Auto-research iteration
-exp1	-1.061	-0.523	25.75	REVERT	Auto-research iteration
-exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
-exp1	-999.000	2.512	0.14	REVERT	Auto-research iteration
-exp1	-999.000	2.512	0.14	REVERT	Auto-research iteration
-exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
-exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
-exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
-exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
-exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
-exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
-exp1	2.311	2.311	9.46	REVERT	Auto-research iteration
-exp1	-1.094	-0.526	26.36	REVERT	Auto-research iteration
-exp1	1.825	1.825	4.51	REVERT	Auto-research iteration
-exp1	0.288	0.288	9.83	REVERT	Auto-research iteration
-exp1	2.179	2.179	4.67	REVERT	Auto-research iteration
-exp1	-0.041	-0.041	13.18	REVERT	Auto-research iteration
-exp1	-999.000	-0.477	0.00	REVERT	Auto-research iteration
-exp1	-1.270	-0.988	20.64	REVERT	Auto-research iteration
-exp1	1.758	1.758	4.53	REVERT	Auto-research iteration
-exp1	0.233	0.233	7.72	REVERT	Auto-research iteration
-exp1	1.966	1.966	4.51	REVERT	Auto-research iteration
-exp1	0.063	0.063	9.59	REVERT	Auto-research iteration
-exp1	2.049	2.049	4.59	REVERT	Auto-research iteration
-exp1	0.113	0.113	11.49	REVERT	Auto-research iteration
-exp1	2.389	2.389	9.48	REVERT	Auto-research iteration
-exp1	-1.079	-0.530	25.97	REVERT	Auto-research iteration
-exp1	1.825	1.825	4.51	REVERT	Auto-research iteration
-exp1	0.288	0.288	9.83	REVERT	Auto-research iteration
-exp1	1.890	1.890	4.51	REVERT	Auto-research iteration
-exp1	0.101	0.101	10.20	REVERT	Auto-research iteration
-exp1	1.848	1.848	4.51	REVERT	Auto-research iteration
-exp1	-0.000	-0.000	11.39	REVERT	Auto-research iteration
-exp1	1.848	1.848	4.51	REVERT	Auto-research iteration
-exp1	-0.000	-0.000	11.39	REVERT	Auto-research iteration
-exp1	2.104	2.104	4.51	REVERT	Auto-research iteration
-exp1	0.077	0.077	10.58	REVERT	Auto-research iteration
-exp1	2.398	2.398	9.45	REVERT	Auto-research iteration
+exp205	1.520	1.520	5.49	KEEP	XGB directional models + entry gate + risk tiers 22/11/9%
+exp237	1.787	1.787	4.45	KEEP	asymmetric meta gates + RSI<65 + continuous 25x crush + 7x/3x stops
+exp256	1.863	1.863	3.15	KEEP	continuous sizing 3-30% + 9x/4x ATR + macro_bear -0.015 + 45x crush + TF-portable
