@@ -280,7 +280,7 @@ class Strategy:
                 self._market_ret_buf.append(mret)
                 if len(self._market_ret_buf) > self._regime_window:
                     self._market_ret_buf.pop(0)
-                self._macro_bear = sum(self._market_ret_buf) < -0.02
+                self._macro_bear = sum(self._market_ret_buf) < -0.015
 
         for symbol, bar in bar_data.items():
             pos = portfolio.positions.get(symbol, 0.0)
@@ -307,7 +307,7 @@ class Strategy:
             meta_score = float(np.mean(active_meta)) if active_meta else 0.0
             supportive_regime = (m1h <= 0 or m1h > 0.45)
             supportive_regime_4h = (m4h <= 0 or m4h > 0.45)
-            atr_mult = (3.0 if self._macro_bear else 7.0) * self._atr_scale
+            atr_mult = (4.0 if self._macro_bear else 9.0) * self._atr_scale
             stop_dist = atr_mult * row["atr_val"] if row["atr_val"] > 0 else max(bar.close * 0.02, 1e-6)
             bull_signal = row["bull_15m"] > 0.32
             bear_signal = row["bear_15m"] > 0.55
@@ -321,15 +321,12 @@ class Strategy:
             bull_soft = bull_signal and supportive_regime and supportive_regime_4h and m15_long > 0.50
             bear_soft = bear_signal and supportive_regime and supportive_regime_4h and m15_short > 0.50
 
-            # meta_score-based continuous sizing with regime gating
-            if meta_score > 0.65 and supportive_regime:
-                risk_per_trade = equity * 0.2200; long_size = (risk_per_trade * bar.close) / stop_dist
-                short_size = (risk_per_trade * bar.close) / stop_dist
-            elif meta_score > 0.50 and supportive_regime:
-                risk_per_trade = equity * 0.1100; long_size = (risk_per_trade * bar.close) / stop_dist
-                short_size = (risk_per_trade * bar.close) / stop_dist
-            elif supportive_regime:
-                risk_per_trade = equity * 0.0900; long_size = (risk_per_trade * bar.close) / stop_dist
+            # Continuous meta-proportional sizing (exp239)
+            if supportive_regime:
+                meta_factor = max(0.0, min(1.0, (meta_score - 0.30) / 0.50))  # 0→1 over [0.30, 0.80]
+                risk_pct = 0.03 + 0.27 * meta_factor  # 3% at meta=0.30, 30% at meta≥0.80
+                risk_per_trade = equity * risk_pct
+                long_size = (risk_per_trade * bar.close) / stop_dist
                 short_size = (risk_per_trade * bar.close) / stop_dist
             else:
                 long_size = equity * 0.08
@@ -339,8 +336,8 @@ class Strategy:
                 long_size *= 0.05
             # Continuous regime scaling (25x) — smooth crush based on macro intensity
             mret_sum = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
-            long_factor = max(0.20, min(1.0, 1.0 + 25.0 * mret_sum))
-            short_factor = max(0.20, min(1.0, 1.0 - 25.0 * mret_sum))
+            long_factor = max(0.20, min(1.0, 1.0 + 45.0 * mret_sum))
+            short_factor = max(0.20, min(1.0, 1.0 - 45.0 * mret_sum))
             long_size *= long_factor
             short_size *= short_factor
 
@@ -361,11 +358,8 @@ class Strategy:
                         self.position_ages[symbol] = 0
                     else:
                         desired = pos
-                        half_size = long_size * 0.5
                         if bull_signal and m15_long > 0.65 and abs(pos) + 1.0 < long_size:
                             desired = long_size
-                        elif False and (not bull_soft) and abs(pos) - 1.0 > half_size:
-                            desired = half_size
                         if abs(desired - pos) > 1.0:
                             signals.append(Signal(symbol, desired))
                         self.trailing_stops[symbol] = max(self.trailing_stops.get(symbol, 0), bar.high - stop_dist)
@@ -381,11 +375,8 @@ class Strategy:
                         self.position_ages[symbol] = 0
                     else:
                         desired = pos
-                        half_size = short_size * 0.5
                         if bear_signal and m15_short > 0.65 and abs(pos) + 1.0 < short_size:
                             desired = -short_size
-                        elif False and (not bear_soft) and abs(pos) - 1.0 > half_size:
-                            desired = -half_size
                         if abs(desired - pos) > 1.0:
                             signals.append(Signal(symbol, desired))
                         self.trailing_stops[symbol] = min(self.trailing_stops.get(symbol, 9e18), bar.low + stop_dist)
