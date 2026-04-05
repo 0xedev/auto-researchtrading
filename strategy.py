@@ -15,9 +15,19 @@ class Signal:
 
 
 class Strategy:
-    def __init__(self, timeframe: str):
+    def __init__(self, timeframe: str = "1h"):
         self.timeframe_arg = timeframe
         self.interval_sec = self._parse_timeframe(timeframe)
+
+        # Timeframe-derived constants (all calibrated at 1h, scaled automatically)
+        _bph = 3600 / self.interval_sec  # bars per hour
+        _tf_ratio = self.interval_sec / 3600  # 0.25 for 15m, 1.0 for 1h, 4.0 for 4h
+        self._regime_window = max(18, int(72 * _bph))       # 72h regime lookback
+        self._max_hold = max(2, round(6 * _tf_ratio ** 0.5))  # sqrt-scaled hold
+        self._decay_age = max(2, round(3 * _tf_ratio ** 0.5)) # sqrt-scaled signal decay
+        self._atr_scale = _tf_ratio ** 0.25                    # ATR mult: constant stop/range ratio
+        self._entry_scale = min(1.0, _tf_ratio ** 0.5)         # entry size scaling
+        self._thresh_scale = max(1.0, (1.0 / _tf_ratio) ** 0.25)  # meta gate quality: higher for shorter tf
 
         self.models = {}
         self.meta_models = {}
@@ -174,6 +184,24 @@ class Strategy:
                 print(f"Loaded {len(aux_4h_data)} 4h symbols for alignment.")
                 aux_4h_tables = self._build_prediction_tables(aux_4h_data, "4h")
 
+        elif self.timeframe_arg == "4h":
+            if "15m" in self.long_models or "15m" in self.short_models:
+                split_15m = {
+                    "robustness": "val_15m",
+                    "val": "val_15m",
+                    "oos": "oos_15m",
+                    "train": "train_15m",
+                }.get(base_split)
+                if split_15m:
+                    aux_15m_data = load_data(split=split_15m)
+                    print(f"Loaded {len(aux_15m_data)} 15m symbols for 4h alignment.")
+                    aux_15m_tables = self._build_prediction_tables(aux_15m_data, "15m")
+
+            if "1h" in self.models or "1h" in self.meta_models:
+                aux_1h_data = load_data(split=base_split)
+                print(f"Loaded {len(aux_1h_data)} 1h symbols for 4h alignment.")
+                aux_1h_tables = self._build_prediction_tables(aux_1h_data, "1h")
+
         for symbol in data_dict:
             if symbol not in main_tables:
                 continue
@@ -250,7 +278,7 @@ class Strategy:
             if idx < len(self.symbol_caches[any_sym]):
                 mret = self.symbol_caches[any_sym][idx].get("market_ret", 0.0)
                 self._market_ret_buf.append(mret)
-                if len(self._market_ret_buf) > 72:
+                if len(self._market_ret_buf) > self._regime_window:
                     self._market_ret_buf.pop(0)
                 self._macro_bear = sum(self._market_ret_buf) < -0.02
 
@@ -279,7 +307,7 @@ class Strategy:
             meta_score = float(np.mean(active_meta)) if active_meta else 0.0
             supportive_regime = (m1h <= 0 or m1h > 0.45)
             supportive_regime_4h = (m4h <= 0 or m4h > 0.45)
-            atr_mult = 3.0 if self._macro_bear else 7.0
+            atr_mult = (3.0 if self._macro_bear else 7.0) * self._atr_scale
             stop_dist = atr_mult * row["atr_val"] if row["atr_val"] > 0 else max(bar.close * 0.02, 1e-6)
             bull_signal = row["bull_15m"] > 0.32
             bear_signal = row["bear_15m"] > 0.55
@@ -319,10 +347,10 @@ class Strategy:
             if pos != 0:
                 age = self.position_ages.get(symbol, 0) + 1
                 self.position_ages[symbol] = age
-                max_hold_bars = 3 if self.timeframe_arg == "15m" else 6
+                max_hold_bars = self._max_hold
 
                 if pos > 0:
-                    signal_decay_exit = age >= 3 and (not bull_signal) and m15_long < 0.40
+                    signal_decay_exit = age >= self._decay_age and (not bull_signal) and m15_long < 0.40
                     should_exit = (
                         age >= max_hold_bars
                         or bar.close < self.trailing_stops.get(symbol, 0)
@@ -342,7 +370,7 @@ class Strategy:
                             signals.append(Signal(symbol, desired))
                         self.trailing_stops[symbol] = max(self.trailing_stops.get(symbol, 0), bar.high - stop_dist)
                 else:
-                    signal_decay_exit = age >= 3 and (not bear_signal) and m15_short < 0.40 and not raw_bear_fortress
+                    signal_decay_exit = age >= self._decay_age and (not bear_signal) and m15_short < 0.40 and not raw_bear_fortress
                     should_exit = (
                         age >= max_hold_bars
                         or bar.close > self.trailing_stops.get(symbol, 9e18)
@@ -364,30 +392,29 @@ class Strategy:
                 continue
 
             self.position_ages[symbol] = 0
-            long_gate_ok = meta_score > 0.36
-            short_gate_ok = meta_score > 0.25
-            macro_bull_ok = not self._macro_bear or meta_score > 0.40
+            ts = self._thresh_scale  # meta gate scaling: 1.0 for 1h, 1.414 for 15m
+            long_gate_ok = meta_score > 0.36 * ts
+            short_gate_ok = meta_score > 0.25 * ts
+            macro_bull_ok = not self._macro_bear or meta_score > 0.40 * ts
             if bull_fortress and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short) and macro_bull_ok and long_gate_ok:
-                entry_size = long_size * 0.5 if self.timeframe_arg == "15m" else long_size
+                entry_size = long_size * self._entry_scale
                 signals.append(Signal(symbol, entry_size))
                 self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
             elif bull_soft and (not bear_soft or m15_long >= m15_short) and long_gate_ok:
-                entry_size = long_size * 0.25 if self.timeframe_arg == "15m" else long_size * 0.5
+                entry_size = long_size * 0.5 * self._entry_scale
                 signals.append(Signal(symbol, entry_size))
                 self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
             elif bear_fortress and short_gate_ok:
-                entry_size = short_size * 0.5 if self.timeframe_arg == "15m" else short_size
+                entry_size = short_size * self._entry_scale
                 signals.append(Signal(symbol, -entry_size))
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
             elif bear_soft and short_gate_ok:
-                entry_size = short_size * 0.25 if self.timeframe_arg == "15m" else short_size * 0.5
+                entry_size = short_size * 0.5 * self._entry_scale
                 signals.append(Signal(symbol, -entry_size))
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
-            # exp149: 15m Front-run logic (increase frequency without fee-bleed)
-            if self.timeframe_arg == '1h' and bull_fortress and m15_long > 0.65: entry_size = long_size
 
         return signals

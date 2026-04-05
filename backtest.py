@@ -12,6 +12,8 @@ import prepare
 from prepare import load_data, run_backtest, compute_score, TIME_BUDGET
 from strategy import Strategy
 
+TIMEFRAME_SECS = {"15m": 900, "1h": 3600, "4h": 14400}
+
 BENCHMARKS = {
     "sharpe": 3.5,
     "win_rate_pct": 60.0,
@@ -155,7 +157,7 @@ def print_regimes(result, data):
             continue
 
         regime_strategy = Strategy(timeframe="4h")
-        regime_result = run_backtest(regime_strategy, regime_data)
+        regime_result = run_backtest(regime_strategy, regime_data, bar_interval_sec=14400)
 
         start_str = pd.Timestamp(t_start, unit='ms', tz='UTC').strftime('%Y-%m-%d')
         end_str   = pd.Timestamp(t_end,   unit='ms', tz='UTC').strftime('%Y-%m-%d')
@@ -184,7 +186,7 @@ def run_stress_fees(data, timeframe, split_name):
         strat = Strategy(timeframe=timeframe)
         if hasattr(strat, "pre_calculate_signals"):
             strat.pre_calculate_signals(data, split_name=split_name)
-        res = run_backtest(strat, data)
+        res = run_backtest(strat, data, bar_interval_sec=TIMEFRAME_SECS[timeframe])
         print(f"  Sharpe: {res.sharpe:.3f} | Return: {res.total_return_pct:.2f}% | "
               f"Trades: {res.num_trades} | Profit Factor: {res.profit_factor:.2f}")
               
@@ -211,7 +213,7 @@ def run_capacity(data, timeframe, split_name):
         strat = Strategy(timeframe=timeframe)
         if hasattr(strat, "pre_calculate_signals"):
             strat.pre_calculate_signals(data, split_name=split_name)
-        res = run_backtest(strat, data)
+        res = run_backtest(strat, data, bar_interval_sec=TIMEFRAME_SECS[timeframe])
         print(f"  Sharpe: {res.sharpe:.3f} | Return: {res.total_return_pct:.2f}% | "
               f"DD: {res.max_drawdown_pct:.1f}%")
               
@@ -259,7 +261,8 @@ if __name__ == "__main__":
     if hasattr(strategy, 'pre_calculate_signals'):
         strategy.pre_calculate_signals(data, split_name=split_name)
         
-    result = run_backtest(strategy, data)
+    bar_sec = TIMEFRAME_SECS[args.timeframe]
+    result = run_backtest(strategy, data, bar_interval_sec=bar_sec)
     score = compute_score(result)
     t_end = time.time()
     
