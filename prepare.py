@@ -810,7 +810,7 @@ def load_data(split: str = "val", resample_4h: bool = False, resample_15m: bool 
 # Backtesting engine (DO NOT CHANGE)
 # ---------------------------------------------------------------------------
 
-def run_backtest(strategy, data: dict) -> BacktestResult:
+def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> BacktestResult:
     """
     Run strategy over data. Returns BacktestResult with full metrics.
     Enforces TIME_BUDGET.
@@ -840,8 +840,10 @@ def run_backtest(strategy, data: dict) -> BacktestResult:
         timestamp=0,
     )
 
+    bars_per_year = 365.25 * 24 * 3600 / bar_interval_sec
+    bars_per_funding = 8 * 3600 / bar_interval_sec  # bars in 8h funding period
     equity_curve = [INITIAL_CAPITAL]
-    hourly_returns = []
+    bar_returns = []
     trade_log = []
     total_volume = 0.0
     prev_equity = INITIAL_CAPITAL
@@ -914,7 +916,7 @@ def run_backtest(strategy, data: dict) -> BacktestResult:
                 fr = bar_data[sym].funding_rate
                 # Funding: longs pay when positive, shorts receive
                 # Applied every 8h, but we have hourly bars so scale by 1/8
-                funding_payment = pos_notional * fr / 8.0
+                funding_payment = pos_notional * fr / bars_per_funding
                 portfolio.cash -= funding_payment
 
         # Get signals from strategy
@@ -1010,7 +1012,7 @@ def run_backtest(strategy, data: dict) -> BacktestResult:
 
         # Hourly return
         if prev_equity > 0:
-            hourly_returns.append((current_equity - prev_equity) / prev_equity)
+            bar_returns.append((current_equity - prev_equity) / prev_equity)
         prev_equity = current_equity
 
         # Liquidation check
@@ -1024,12 +1026,12 @@ def run_backtest(strategy, data: dict) -> BacktestResult:
         duration_days = (timestamps[-1] - timestamps[0]) / (1000 * 60 * 60 * 24)
 
     # Compute metrics
-    returns = np.array(hourly_returns) if hourly_returns else np.array([0.0])
+    returns = np.array(bar_returns) if bar_returns else np.array([0.0])
     eq = np.array(equity_curve)
 
     # Sharpe ratio (annualized from hourly)
     if returns.std() > 0:
-        sharpe = (returns.mean() / returns.std()) * np.sqrt(HOURS_PER_YEAR)
+        sharpe = (returns.mean() / returns.std()) * np.sqrt(bars_per_year)
     else:
         sharpe = 0.0
 
@@ -1057,9 +1059,9 @@ def run_backtest(strategy, data: dict) -> BacktestResult:
         profit_factor = 0.0
 
     # Annual turnover
-    data_hours = len(timestamps)
-    if data_hours > 0:
-        annual_turnover = total_volume * (HOURS_PER_YEAR / data_hours)
+    num_bars = len(timestamps)
+    if num_bars > 0:
+        annual_turnover = total_volume * (bars_per_year / num_bars)
     else:
         annual_turnover = 0.0
 
