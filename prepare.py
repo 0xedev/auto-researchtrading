@@ -13,12 +13,14 @@ import time
 import math
 import signal
 import argparse
+import joblib
 from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
 import requests
 import pyarrow.parquet as pq
+from hmmlearn import hmm
 
 # ---------------------------------------------------------------------------
 # Constants (fixed, do not modify)
@@ -237,7 +239,11 @@ def calculate_features(df, timeframe="1h"):
     # d=0.4 is the industry sweet spot for crypto ADF stationarity
     df['frac_diff_close'] = apply_frac_diff(close, d=0.4)
 
-    # 14. Sanitization
+    # 14. Macro Regime (HMM Slot)
+    # This will be populated by the strategy/backtester using the saved HMM model
+    df['macro_state'] = 0 
+
+    # 15. Sanitization
     df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
     
     return df
@@ -357,7 +363,7 @@ def get_n_trees_depth(timeframe):
 def prepare_dataset(timeframe, split_name):
     # This logic is now shared by the trainer
     data_dict = load_data(split=split_name, resample_4h=(timeframe == "4h"))
-    all_features, all_y, all_y_meta = [], [], []
+    all_features, all_y, all_y_meta, all_states = [], [], [], []
     
     # Pre-calculate Market Regime (Systemic Beta)
     print("Pre-calculating Market Regime Context...")
@@ -392,13 +398,15 @@ def prepare_dataset(timeframe, split_name):
         sliced_X = df_feat[FEATURE_COLS][valid_mask].values[50:-100]
         sliced_y = labels[valid_mask][50:-100]
         sliced_meta = meta[valid_mask][50:-100]
-        
+        sliced_states = df_feat['macro_state'][valid_mask][50:-100].values
+
         all_features.append(pd.DataFrame(sliced_X, columns=FEATURE_COLS))
         all_y.append(sliced_y)
         all_y_meta.append(sliced_meta)
+        all_states.append(sliced_states)
 
     if not all_features: return None, None, None, None, None
-    return pd.concat(all_features), np.concatenate(all_y), np.concatenate(all_y_meta), None, FEATURE_COLS
+    return pd.concat(all_features), np.concatenate(all_y), np.concatenate(all_y_meta), np.concatenate(all_states), FEATURE_COLS
 
 # Binance symbol mapping
 BINANCE_SYMBOL_MAP = {
@@ -817,19 +825,25 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
     """
     t_start = time.time()
 
-    # Build unified timeline
+    # Build unified timeline with integer second precision
     all_timestamps = set()
     for symbol, df in data.items():
-        all_timestamps.update(df["timestamp"].tolist())
+        ts_raw = df["timestamp"].astype(np.int64).values
+        # Auto-detect milliseconds and convert to seconds
+        ts_norm = np.where(ts_raw > 1e11, ts_raw // 1000, ts_raw)
+        all_timestamps.update(ts_norm.tolist())
     timestamps = sorted(all_timestamps)
 
     if not timestamps:
         return BacktestResult()
 
-    # Index data by (symbol, timestamp) for fast lookup
+    # Index data by (symbol, timestamp) with integer second precision
     indexed = {}
     for symbol, df in data.items():
-        indexed[symbol] = df.set_index("timestamp")
+        df_int = df.copy()
+        ts_raw = df_int["timestamp"].astype(np.int64).values
+        df_int["timestamp"] = np.where(ts_raw > 1e11, ts_raw // 1000, ts_raw)
+        indexed[symbol] = df_int.set_index("timestamp")
 
     # Portfolio state
     portfolio = PortfolioState(
@@ -883,9 +897,13 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
 
             hist_df = pd.DataFrame(history_buffers[symbol])
 
+            # Standardize BarData timestamp to seconds
+            bar_ts = ts
+            if bar_ts > 1e11: bar_ts //= 1000
+
             bar_data[symbol] = BarData(
                 symbol=symbol,
-                timestamp=ts,
+                timestamp=int(bar_ts),
                 open=row["open"],
                 high=row["high"],
                 low=row["low"],
@@ -920,10 +938,7 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
                 portfolio.cash -= funding_payment
 
         # Get signals from strategy
-        try:
-            signals = strategy.on_bar(bar_data, portfolio)
-        except Exception:
-            signals = []
+        signals = strategy.on_bar(bar_data, portfolio)
 
         # Execute signals
         for sig in (signals or []):
