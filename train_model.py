@@ -7,7 +7,9 @@ import time
 import xgboost as xgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score
+from sklearn.utils.class_weight import compute_sample_weight
 from joblib import Parallel, delayed
+from hmmlearn import hmm
 
 from prepare import (
     calculate_features, load_data, prepare_dataset, 
@@ -49,27 +51,104 @@ def validate_directional_models(long_model, short_model, long_meta_model, short_
     return base_wr, sniper_wr
 
 
-def train(timeframe):
+def train_macro_hmm():
+    """Trains a 4-state Multivariate HMM on BTC, ETH, XAU, and SP500.
+    Identifies hidden macro regimes for the strategy to adapt to.
+    """
+    print("Training Multivariate Macro HMM (Medallion Regime Engine)...")
+    
+    macro_assets = ["BTC", "ETH", "XAU", "SP500"]
+    data_frames = {}
+    
+    for symbol in macro_assets:
+        try:
+            path = os.path.join(os.path.expanduser("~"), ".cache", "autotrader", "data", f"{symbol}_1h.parquet")
+            df = pd.read_parquet(path)
+            df['log_ret'] = np.log(df['close'] / df['close'].shift(1))
+            df['volatility'] = df['log_ret'].rolling(24).std()
+            data_frames[symbol] = df[['timestamp', 'log_ret', 'volatility']].dropna()
+        except Exception as e:
+            print(f"Warning: Could not load macro asset {symbol}: {e}")
+            
+    if len(data_frames) < 3:
+        print("Error: Insufficient macro data for HMM training.")
+        return
+
+    # Join on timestamp
+    merged = None
+    for symbol, df in data_frames.items():
+        df = df.rename(columns={'log_ret': f'{symbol}_ret', 'volatility': f'{symbol}_vol'})
+        if merged is None:
+            merged = df
+        else:
+            merged = pd.merge(merged, df, on='timestamp', how='inner')
+            
+    # Features for the HMM: [BTC_Ret, BTC_Vol, ETH/BTC_Ret, XAU_Ret, SP500_Ret]
+    merged['ETH_BTC_ret'] = merged['ETH_ret'] - merged['BTC_ret']
+    
+    features = ['BTC_ret', 'BTC_vol', 'ETH_BTC_ret', 'XAU_ret', 'SP500_ret']
+    X_raw = merged[features].values
+    
+    from sklearn.preprocessing import StandardScaler
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X_raw)
+    
+    # Gaussian HMM with 4 regimes
+    model = hmm.GaussianHMM(
+        n_components=4, 
+        covariance_type="full", 
+        n_iter=1000, 
+        random_state=42
+    )
+    model.fit(X_scaled)
+    
+    os.makedirs("models", exist_ok=True)
+    joblib.dump(model, "models/macro_hmm.joblib")
+    joblib.dump(scaler, "models/macro_scaler.joblib")
+    print(f"Successfully saved HMM and Scaler ({X_scaled.shape}) to models/")
+
+
+def train(timeframe, specialists=True):
     print(f"Training Cross-Sectional Sniper (Classifier) for {timeframe} bars...")
-    X, y, y_meta, _, features = prepare_dataset(timeframe, "train")
+    X, y, y_meta, states, features = prepare_dataset(timeframe, "train")
     
     if X is None or len(X) < 1000:
         print("Insufficient data for training.")
         return
         
-    X_train, X_val, y_train, y_val, y_meta_train, y_meta_val = train_test_split(
-        X, y, y_meta, test_size=0.2, shuffle=False
+    X_train, X_val, y_train, y_val, y_meta_train, y_meta_val, s_train, s_val = train_test_split(
+        X, y, y_meta, states, test_size=0.2, shuffle=False
     )
 
-    unique_labels, label_counts = np.unique(y_train, return_counts=True)
-    print(
-        "Lead label distribution:",
-        {int(k): int(v) for k, v in zip(unique_labels.tolist(), label_counts.tolist())}
-    )
-    
     n_trees = args.n_trees if args.n_trees else 100
     depth = args.depth if args.depth else {"1h": 12, "4h": 14, "15m": 12}.get(timeframe, 12)
     os.makedirs("models", exist_ok=True)
+
+    if specialists:
+        print("Training Regime-Specific Specialists (Medallion Strategy)...")
+        for state in range(4):
+            mask = (s_train == state)
+            if mask.sum() < 200: # Lowered threshold
+                print(f"Skipping State {state}: Insufficient data ({mask.sum()} samples)")
+                continue
+            
+            print(f"--- Training Specialist: State {state} ---")
+            X_s = X_train[mask]
+            y_s = y_train[mask]
+            ym_s = y_meta_train[mask]
+            
+            model = build_model(n_trees, depth, 0.05)
+            w_s = compute_sample_weight(class_weight="balanced", y=y_s)
+            model.fit(X_s, y_s, sample_weight=w_s)
+            model.save_model(f"models/lead_{timeframe}_s{state}.json")
+            
+            meta_target = (ym_s == 1).astype(int)
+            w_meta = compute_sample_weight(class_weight="balanced", y=meta_target)
+            meta_model = build_model(n_trees, depth - 2, 0.03)
+            meta_model.fit(X_s, meta_target, sample_weight=w_meta)
+            meta_model.save_model(f"models/meta_{timeframe}_s{state}.json")
+    
+    # Also train a "Global" fallback model
 
     if timeframe == "15m":
         print(f"Training Directional Split Models (n={n_trees}, d={depth})...")
@@ -125,9 +204,10 @@ def train(timeframe):
         meta_model = build_model(n_trees, depth - 2, 0.03)
         meta_model.fit(X_train, meta_target)
 
-        model.save_model(f"models/lead_{timeframe}.xgb")
-        meta_model.save_model(f"models/meta_{timeframe}.xgb")
+        model.save_model(f"models/lead_{timeframe}.json")
+        meta_model.save_model(f"models/meta_{timeframe}.json")
 
+        # Validation / Meta-Diagnostics
         val_preds = model.predict(X_val[FEATURE_COLS])
         val_meta_probs = meta_model.predict_proba(X_val[FEATURE_COLS])[:, 1]
 
@@ -137,9 +217,8 @@ def train(timeframe):
         sniper_mask = is_trend_pred & (val_meta_probs > 0.65)
         sniper_wr = accuracy_score(y_val[sniper_mask], val_preds[sniper_mask]) if any(sniper_mask) else 0.0
 
-        os.makedirs(os.path.expanduser("~/.cache/autotrader"), exist_ok=True)
-        model.save_model(os.path.expanduser(f"~/.cache/autotrader/model_{timeframe}.xgb"))
-        meta_model.save_model(os.path.expanduser(f"~/.cache/autotrader/meta_model_{timeframe}.xgb"))
+        model.save_model(os.path.expanduser(f"~/.cache/autotrader/model_{timeframe}.json"))
+        meta_model.save_model(os.path.expanduser(f"~/.cache/autotrader/meta_model_{timeframe}.json"))
     
     print("\n" + "="*60)
     print(f"  VALIDATION RESULTS: {timeframe.upper()} SNIPER")
@@ -155,5 +234,10 @@ if __name__ == "__main__":
     parser.add_argument("--timeframe", type=str, default="1h", choices=["15m", "1h", "4h"])
     parser.add_argument("--n_trees", type=int, default=100)
     parser.add_argument("--depth", type=int, default=12)
+    parser.add_argument("--train_hmm", action="store_true", help="Also retrain the macro HMM")
     args = parser.parse_args()
+    
+    if args.train_hmm:
+        train_macro_hmm()
+        
     train(args.timeframe)
