@@ -1,104 +1,186 @@
-commit	score	sharpe	max_dd	status	description
-d779d69	2.724	2.724	7.6	keep	baseline momentum
-cc95520	2.962	2.962	3.9	keep	multi-TF momentum + vol sizing + ATR stops
-38a1a82	3.292	3.292	4.3	keep	EMA crossover + funding carry + wider ATR
-77cbf5a	3.671	3.671	6.1	keep	cross-asset lead-lag + dynamic threshold
-621e4d0	5.209	5.209	5.0	keep	ensemble voting + correlation regime + pyramiding
-exp5	3.495	3.495	9.3	discard	remove take-profit, multi-pyramid, volume confirm
-exp6	4.662	4.662	7.1	discard	inverse vol + partial TP + momentum accel
-exp7	5.101	5.617	8.4	discard	higher pos + 4-signal + relaxed BTC
-2f14601	5.533	5.533	5.6	keep	exp7 signals + exp4 risk + DD-adaptive
-exp9	3.485	3.485	8.6	discard	linreg trend + adaptive TP + fading stop
-c66d497	6.479	7.395	3.3	keep	RSI tuning + larger pyramid + MR exit
-6219fc9	6.783	8.208	3.6	keep	tighter RSI 70/30 + pyramid 0.7
-exp12	4.749	6.688	2.9	discard	RSI 65/35 too tight, turnover penalty
-ec691dc	7.758	10.553	2.6	keep	MACD 5th signal + higher pos + tighter TP
-exp14	3.222	10.797	3.4	discard	high pos killed by turnover penalty
-edabd44	8.393	8.823	3.1	keep	4/5 votes + cooldown + wider TP
-exp16	3.904	3.969	5.5	discard	5/5 unanimous too restrictive
-exp17	-2.125	-1.885	19.8	discard	tighter ATR 3.0 + no flip destroyed perf
-exp18	8.024	8.750	3.6	discard	vol regime filter slightly worse
-exp19	7.993	8.787	3.1	discard	shorter cooldown = more turnover
-exp20	8.290	8.709	2.9	discard	OBV roughly same as vshort
-exp21	6.269	6.592	3.8	discard	regime switching hurt by ranging ATR 3.0
-d0b00e0	8.096	8.506	3.1	discard	ADX trend filter too restrictive
-fb2842d	8.393	8.823	3.1	discard	TP 0.10 no effect - same score
-1396d0c	8.238	8.835	3.5	discard	cooldown 5 + pos 0.17 more turnover
-beef54e	9.012	9.502	3.0	keep	ATR 4.0 stop - hold winners longer
-fab1f2c	9.317	9.868	3.0	keep	ATR 4.5 - even better
-fea268e	9.341	9.898	3.0	keep	ATR 5.0 marginal gain
-be866ca	9.382	9.944	3.0	keep	ATR 5.5
-9a4a8cb	9.382	9.944	3.0	discard	ATR 6.0 same as 5.5
-e2d08d9	8.877	9.401	4.6	discard	RSI 75/25 too wide, DD up
-bc98e72	9.308	9.889	3.0	discard	RSI 72/28 slightly worse
-7175bfa	9.737	10.433	3.0	keep	BB width compression 6th signal - big improvement
-1699245	9.599	10.264	3.0	discard	BB 30 too strict
-9a56cc6	9.780	10.488	3.0	keep	BB 50 slightly better
-edf9673	9.910	10.649	3.0	keep	BB 60 even better
-56c8c9a	10.192	10.977	3.0	keep	BB 70 broke past 10\!
-ed0e42f	10.305	11.125	2.3	keep	BB 80 - DD down to 2.3%\!
-d3e877a	10.105	10.932	2.5	discard	BB 90 too loose
-d5bff38	9.032	9.423	3.3	discard	MIN_VOTES 5/6 too selective
-exp40	8.987	10.123	2.0	discard	MIN_VOTES 3/6 too many trades
-6504d89	10.615	11.290	1.6	keep	no pyramiding - DD halved\!
-97fff87	11.302	11.886	1.4	keep	no funding boost - another big gain\!
-5403f15	11.662	12.287	1.3	keep	no BTC filter - simplification wins again
-7daa894	11.804	12.551	1.4	keep	no corr filter
-21f3c35	11.804	12.551	1.4	keep	DD sizing never triggered - keep simpler
-31600ce	13.480	14.015	1.4	keep	no strength scaling - HUGE gain\!
-1b4feaf	13.487	13.487	0.8	keep	no vol scaling - DD 0.79%\!
-5d24840	13.355	13.355	0.8	discard	fixed threshold slightly worse
-1a59908	13.485	13.485	0.7	discard	position 0.14 same score
-1146ec4	13.488	13.488	0.9	discard	position 0.18 same
-c52ae0d	13.491	13.491	0.8	keep	no TP slightly better
-dcbfe13	13.519	13.519	0.8	keep	equal weights marginal gain
-7813652	13.470	13.470	0.9	discard	EMA 8/21 slightly worse
-abca754	12.991	12.991	1.0	discard	cooldown 8 too much
-db82713	13.632	13.639	1.2	keep	cooldown 4 best yet
-b69a8b4	14.592	14.666	0.7	keep	cooldown 3 huge gain\!
-9238a20	14.562	14.760	1.1	discard	cooldown 2 turnover penalty
-0fd068a	14.514	14.583	0.7	discard	SHORT 4 slightly worse
-93d8d43	14.453	14.515	1.1	discard	threshold 0.015 worse
-0761856	7.618	7.618	1.5	discard	no flip destroyed score
-71498db	14.722	14.813	0.7	keep	BB 15 new best
-ea6bb99	14.745	14.837	0.8	keep	BB 12 slightly better
-9994998	14.790	14.885	0.8	keep	BB 10
-8be0534	14.722	14.817	0.8	discard	BB 8 slightly worse
-85f16b2	14.908	15.004	0.7	keep	no ret_long filter - Sharpe 15\!
-1fa81b8	15.718	15.849	0.7	keep	simplified momentum HUGE gain
-3da2134	15.491	15.638	0.7	discard	vshort 0.3x worse
-dadc489	15.432	15.584	0.9	discard	MED 8 more turnover
-exp69	14.940	15.083	0.8	discard	MED 16 worse
-exp70	13.826	14.112	0.9	discard	no vshort 3/5 too many trades
-bf0a065	17.032	17.341	1.4	keep	RSI 10 HUGE gain\!
-61d4b77	19.697	20.099	0.7	keep	RSI 8 - Sharpe 20\!
-38cb4b7	18.199	18.629	1.1	discard	RSI 6 too many trades
-7b6a939	18.058	18.483	1.0	discard	RSI 7 worse
-34173b3	17.985	18.336	0.9	discard	RSI 9 worse
-3b7e31f	19.565	19.950	0.7	discard	RSI 55/45 slightly worse
-1beefbb	19.718	20.138	0.7	keep	RSI 51/49 marginal gain
-b80ce87	17.627	18.009	0.5	discard	RSI exit 65/35 too many exits
-b8df823	18.743	19.092	0.7	discard	RSI exit 75/25 worse
-exp80	19.418	19.833	0.6	discard	faster MACD slightly worse
-0ce4375	17.547	17.886	0.8	discard	ROC worse than MACD
-6e63fb7	19.060	19.582	0.7	discard	vol confirm 4/7 worse
-fb8a4f6	16.894	17.102	0.9	discard	vol confirm 5/7 worse
-exp84	18.913	19.990	1.1	discard	no cooldown turnover penalty
-00a1d0b	18.913	19.990	1.1	discard	cooldown 1 same as 0
-5e856a8	19.859	20.498	0.6	keep	cooldown 2 new best\!
-96ac0f8	19.758	20.426	0.6	discard	threshold 0.010 slightly worse
-96df0d9	19.629	20.314	0.6	discard	threshold 0.008 worse
-54615cc	19.393	19.991	0.6	discard	threshold 0.015 worse
-5aa2358	5.991	6.099	3.1	discard	RSI oversold 10 destroyed shorts
-9d976d2	18.810	19.624	0.5	discard	no EMA worse
-b58428d	19.032	19.831	0.6	discard	SMA48 4/7 worse
-a4d2ede	17.328	17.751	1.1	discard	SMA48 5/7 worse
-a4c4b00	20.270	20.497	0.5	keep	position 0.12 new best\!
-cb1b567	20.437	20.497	0.4	keep	position 0.10 new best
-e048bc1	20.497	20.497	0.3	keep	position 0.08
-77020e3	20.496	20.496	0.2	discard	position 0.06 same
-549416e	20.329	20.329	0.3	discard	BB 6 slightly worse
-cb78572	19.750	19.750	0.4	discard	Stochastic worse than RSI
-9de759c	20.581	20.581	0.3	keep	BB 85 new best
-cc00ed3	20.464	20.464	0.3	discard	BB 90 worse
-7245f22	20.634	20.634	0.3	keep	RSI 50/50 marginal gain
+commit          	 score   	 sharpe 	 max_dd	 status     	 description
+exp0            	 -999.000	 0.000  	   0.00	 BASELINE   	 clean audited branch, no trades before 1h fallback
+exp2            	 -999.000	 0.715  	   4.17	 REVERT     	 tighten meta and lead thresholds (too restrictive)
+exp3            	 0.680   	 0.680  	   4.39	 REVERT     	 require market-ret alignment for entries (worse Sharpe)
+exp4            	 1.136   	 1.136  	   9.15	 KEEP       	 raise meta threshold to 0.45 (new best audited baseline)
+exp5            	 -999.000	 0.934  	   6.24	 REVERT     	 raise lead threshold to 0.40 (lower Sharpe)
+exp6            	 -999.000	 0.797  	  10.02	 REVERT     	 widen ATR stop to 4.5x (worse)
+exp7            	 1.100   	 1.100  	   5.14	 REVERT     	 confidence-scaled position sizing (close but below exp4)
+exp8            	 -999.000	 1.120  	   9.28	 REVERT     	 require stronger short threshold (close but below exp4)
+exp9            	 -999.000	 1.075  	   9.28	 REVERT     	 Auto-research iteration
+exp10           	 -999.000	 0.048  	  14.17	 REVERT     	 exp10: first true mtf fortress
+exp11           	 0.472   	 0.472  	   6.32	 REVERT     	 exp11: first 15m mtf baseline
+exp12           	 -999.000	 0.256  	   1.17	 REVERT     	 exp12: sniper gate 15m meta and lead thresholds
+exp13           	 -999.000	 0.606  	   2.34	 REVERT     	 exp13: relax sniper gate to recover trade count
+exp14           	 -999.000	 0.384  	   0.98	 REVERT     	 exp14: align exits to 4-bar label horizon
+exp15           	 -999.000	 0.446  	   0.95	 REVERT     	 exp15: denser 15m lead labels at 1.0x vol
+exp16           	 -999.000	 0.719  	   3.55	 REVERT     	 exp16: relax 15m sniper gate on denser model
+exp17           	 -999.000	 0.606  	   1.17	 REVERT     	 exp17: 15m-only entry gate with regime-sized positions
+exp18           	 -999.000	 0.663  	   1.17	 REVERT     	 exp18: lower 15m directional threshold to 0.25
+exp19           	 -999.000	 0.640  	   1.16	 REVERT     	 exp19: shorten 15m max hold to 2 bars
+exp20           	 -999.000	 0.618  	   1.37	 REVERT     	 exp20: shorten 15m max hold to 1 bar
+exp21           	 -999.000	 0.545  	   1.18	 REVERT     	 exp21: shorten 15m lead label horizon to 2 bars
+exp22           	 0.559   	 0.559  	   0.95	 REVERT     	 exp22: lower meta gate with tiered confidence sizing
+exp23           	 0.502   	 0.502  	   0.87	 REVERT     	 exp23: widen meta ladder with micro-size weak signals
+exp24           	 -3.632  	 -2.651 	  34.60	 REVERT     	 exp24: balanced lead/meta sample weights
+exp25           	 0.604   	 0.604  	   0.88	 REVERT     	 exp25: staged 15m sizing with adaptive in-position updates
+exp26           	 0.815   	 0.815  	   0.66	 REVERT     	 exp26: require strong continuation before full-size scale-up
+exp27           	 -999.000	 0.580  	   0.42	 REVERT     	 exp27: require market tape agreement for marginal 15m entries
+exp28           	 0.815   	 0.815  	   0.66	 REVERT     	 exp28: refresh 1h and 4h regime models
+exp29           	 0.741   	 0.741  	   0.50	 REVERT     	 exp29: polarize size ladder toward strongest 15m setups
+exp30           	 -999.000	 0.617  	   0.49	 REVERT     	 exp30: tighten staged 15m fortress gate to 0.60
+exp31           	 0.888   	 0.888  	   1.02	 REVERT     	 exp31: 15m model with colsample 0.7
+exp32           	 0.641   	 0.641  	   1.37	 REVERT     	 exp32: relax staged fortress gate to 0.50 on improved 15m model
+exp33           	 -999.000	 0.481  	   0.42	 REVERT     	 exp33: benchmark audit + 15m directional split
+exp34           	 -999.000	 0.562  	   0.53	 REVERT     	 exp34: add soft 15m quarter-size entries
+exp35           	 -999.000	 0.542  	   0.50	 REVERT     	 exp35: tighten soft entry and full-size scale-up
+exp36           	 -999.000	 0.472  	   0.46	 REVERT     	 exp36: shorten 15m max hold to 2 bars
+exp37           	 -999.000	 0.545  	   0.51	 REVERT     	 exp37: shrink soft entry size to preserve PF
+exp38           	 -999.000	 0.493  	   0.49	 REVERT     	 exp38: weaker 15m entries in strong HTF regimes
+exp39           	 -999.000	 0.424  	   0.00	 REVERT     	 exp40: densify 15m directional labels
+exp40           	 -4.287  	 -3.283 	  35.10	 REVERT     	 exp41: calibrate thresholds for dense-label 15m model
+exp41           	 -999.000	 0.006  	   1.39	 REVERT     	 exp42: tighten calibrated dense-model gates
+exp42           	 -0.574  	 -0.574 	   4.61	 REVERT     	 exp44: long-only dense 15m with regime support
+exp43           	 -999.000	 0.000  	   0.00	 REVERT     	 exp45: medium-density 15m labels + exp35 shell
+exp44           	 -0.469  	 -0.469 	   3.65	 REVERT     	 exp46: calibrated medium-density long-only
+exp45           	 -0.826  	 -0.826 	   5.13	 REVERT     	 exp47b: relative strength features with aligned model inputs
+exp46           	 -999.000	 -26.322	  99.00	 REVERT     	 exp48: dense relative-strength labels with ranked entries
+exp47           	 -999.000	 -27.556	  99.00	 REVERT     	 exp49: medium relative-strength models with ranker
+exp48           	 -999.000	 -9.109 	  93.73	 REVERT     	 exp50: tighten ranker with cooldown and top-1 picks
+exp49           	 2.304   	 2.304  	   5.84	 REVERT     	 Auto-research iteration
+exp50           	 2.304   	 2.304  	   5.84	 REVERT     	 Auto-research iteration
+exp51           	 1.824   	 1.824  	   7.66	 REVERT     	 Auto-research iteration
+exp52           	 1.804   	 1.804  	   7.67	 REVERT     	 Auto-research iteration
+exp53           	 2.304   	 2.304  	   5.84	 REVERT     	 Auto-research iteration
+exp54           	 -999.000	 1.943  	  12.08	 REVERT     	 Auto-research iteration
+exp55           	 -999.000	 0.958  	  55.72	 REVERT     	 Auto-research iteration
+exp56           	 -0.113  	 0.368  	  24.63	 REVERT     	 Auto-research iteration
+exp57           	 2.304   	 2.304  	   5.84	 REVERT     	 Auto-research iteration
+exp58           	 2.322   	 2.322  	   4.33	 REVERT     	 Auto-research iteration
+exp59           	 2.086   	 2.086  	   5.84	 REVERT     	 Auto-research iteration
+exp60           	 2.304   	 2.304  	   5.84	 REVERT     	 Auto-research iteration
+exp61           	 2.204   	 2.204  	   7.55	 REVERT     	 Auto-research iteration
+exp62           	 1.951   	 1.951  	   5.86	 REVERT     	 Auto-research iteration
+exp63           	 2.309   	 2.309  	   5.83	 REVERT     	 Auto-research iteration
+exp64           	 1.886   	 1.886  	  13.16	 REVERT     	 Auto-research iteration
+exp65           	 2.309   	 2.309  	   5.83	 REVERT     	 Auto-research iteration
+exp66           	 2.312   	 2.312  	   5.83	 REVERT     	 Auto-research iteration
+exp67           	 2.244   	 2.244  	   5.83	 REVERT     	 Auto-research iteration
+exp68           	 2.276   	 2.276  	   5.83	 REVERT     	 Auto-research iteration
+exp69           	 1.302   	 1.302  	   7.35	 REVERT     	 Auto-research iteration
+exp70           	 2.312   	 2.312  	   5.83	 REVERT     	 Auto-research iteration
+exp71           	 0.011   	 0.011  	   1.79	 REVERT     	 recovered from run_exp71_1h.log
+exp72           	 0.593   	 0.593  	   1.50	 REVERT     	 recovered from run_exp72_1h.log
+exp73           	 0.685   	 0.685  	   1.56	 REVERT     	 recovered from run_exp73_1h.log
+exp74           	 0.686   	 0.686  	   1.56	 REVERT     	 recovered from run_exp74_1h.log
+exp75           	 0.687   	 0.687  	   1.56	 REVERT     	 recovered from run_exp75_1h.log
+exp76           	 0.688   	 0.688  	   1.56	 REVERT     	 recovered from run_exp76_1h.log
+exp77           	 0.688   	 0.688  	   1.56	 REVERT     	 recovered from run_exp77_1h.log
+exp78           	 -999.000	 1.054  	   0.65	 REVERT     	 recovered from run_exp78_1h.log
+exp79           	 -999.000	 0.984  	   0.97	 REVERT     	 recovered from run_exp79_1h.log
+exp80           	 0.904   	 0.904  	   1.00	 REVERT     	 recovered from run_exp80_1h.log
+exp81           	 0.940   	 0.940  	   0.89	 REVERT     	 recovered from run_exp81_1h.log
+exp82           	 0.976   	 0.976  	   0.79	 REVERT     	 recovered from run_exp82_1h.log
+exp83           	 1.008   	 1.008  	   0.69	 REVERT     	 recovered from run_exp83_1h.log
+exp84           	 1.024   	 1.024  	   0.66	 REVERT     	 recovered from run_exp84_1h.log
+exp85           	 0.894   	 0.894  	   0.66	 REVERT     	 recovered from run_exp85_1h.log
+exp86           	 -999.000	 0.565  	   0.43	 REVERT     	 recovered from run_exp86_1h.log
+exp87           	 0.713   	 0.713  	   0.44	 REVERT     	 recovered from run_exp87_1h.log
+exp88           	 0.619   	 0.619  	   0.44	 REVERT     	 recovered from run_exp88_1h.log
+exp89           	 -999.000	 0.360  	   0.21	 REVERT     	 recovered from run_exp89_1h.log
+exp90           	 1.039   	 1.039  	   0.65	 REVERT     	 recovered from run_exp90_1h.log
+exp91           	 0.954   	 0.954  	   0.65	 REVERT     	 recovered from run_exp91_1h.log
+exp92           	 0.686   	 0.686  	   0.63	 REVERT     	 recovered from run_exp92_1h.log
+exp93           	 -999.000	 0.448  	   0.98	 REVERT     	 recovered from run_exp93_1h.log
+exp94           	 1.010   	 1.010  	   0.33	 REVERT     	 recovered from run_exp94_1h.log
+exp95           	 0.092   	 0.092  	   3.30	 REVERT     	 recovered from run_exp95_1h.log
+exp96           	 0.870   	 0.870  	   0.91	 REVERT     	 recovered from run_exp96_1h.log
+exp97           	 1.039   	 1.039  	   0.65	 REVERT     	 recovered from run_exp97_1h.log
+exp98           	 -999.000	 0.468  	   0.55	 REVERT     	 recovered from run_exp98_1h.log
+exp99           	 1.031   	 1.031  	   0.65	 REVERT     	 recovered from run_exp99_1h.log
+exp100          	 0.840   	 0.840  	   0.65	 REVERT     	 recovered from run_exp100_1h.log
+exp101          	 -999.000	 0.000  	   0.00	 MISSING    	 no run artifact found
+exp102          	 0.810   	 0.810  	   0.70	 REVERT     	 recovered from run_exp102_1h.log
+exp103          	 1.039   	 1.039  	   0.65	 REVERT     	 recovered from run_exp103_1h.log
+exp104          	 -999.000	 0.000  	   0.00	 MISSING    	 no run artifact found
+exp105          	 0.727   	 0.727  	   1.39	 REVERT     	 recovered from run_exp105_1h.log
+exp106          	 -999.000	 0.000  	   0.00	 MISSING    	 no run artifact found
+exp107          	 -999.000	 0.000  	   0.00	 MISSING    	 no run artifact found
+exp108          	 -999.000	 0.000  	   0.00	 MISSING    	 no run artifact found
+exp109          	 -999.000	 0.536  	   0.53	 REVERT     	 recovered from run_exp109_1h.log
+exp110          	 0.959   	 0.959  	   0.84	 REVERT     	 recovered from run_exp110_1h.log
+exp111          	 -999.000	 0.941  	   1.17	 REVERT     	 recovered from run_exp111_1h.log
+exp112          	 0.748   	 0.748  	   7.94	 REVERT     	 recovered from run_exp112_1h.log
+exp113          	 0.785   	 0.785  	   0.49	 REVERT     	 recovered from run_exp113_1h.log
+exp114          	 0.998   	 0.998  	   0.74	 REVERT     	 recovered from run_exp114_1h.log
+exp115          	 0.993   	 0.993  	   0.74	 REVERT     	 recovered from run_exp115_1h.log
+exp116          	 0.826   	 0.826  	   0.75	 REVERT     	 recovered from run_exp116_1h.log
+exp117          	 -999.000	 1.056  	   0.64	 REVERT     	 recovered from run_exp117_1h.log
+exp118          	 1.039   	 1.039  	   0.65	 REVERT     	 recovered from run_exp118_1h.log
+exp119          	 1.146   	 1.146  	   0.80	 REVERT     	 recovered from run_exp119_1h.log
+exp120          	 1.141   	 1.141  	   0.80	 REVERT     	 recovered from run_exp120_1h.log
+exp121          	 1.168   	 1.168  	   2.39	 REVERT     	 recovered from run_exp121_1h.log
+exp122          	 1.200   	 1.200  	   5.91	 REVERT     	 recovered from run_exp122_1h.log
+exp123          	 1.215   	 1.215  	   7.85	 REVERT     	 recovered from run_exp123_1h.log
+exp124          	 1.028   	 1.199  	  18.42	 REVERT     	 recovered from run_exp124_1h.log
+exp125          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 RSI entry filter 67/33 — push toward 52-56 trades [no run log]
+exp126          	 1.237   	 1.237  	   0.83	 REVERT     	 recovered from run_exp126_1h.log
+exp127          	 1.253   	 1.253  	   0.83	 REVERT     	 recovered from run_exp127_1h.log
+exp128          	 -999.000	 0.216  	   0.09	 REVERT     	 recovered from run_exp128_1h.log
+exp129          	 -999.000	 0.501  	   0.38	 REVERT     	 recovered from run_exp129_1h.log
+exp130          	 -999.000	 1.180  	   0.62	 REVERT     	 recovered from run_exp130_1h.log
+exp131          	 -999.000	 1.125  	   5.03	 REVERT     	 recovered from run_exp131_1h.log
+exp132          	 0.264   	 0.264  	   9.25	 REVERT     	 recovered from run_exp132_1h.log
+exp133          	 1.585   	 1.585  	   4.93	 REVERT     	 recovered from run_exp133_1h.log
+exp134          	 0.995   	 1.361  	  20.00	 REVERT     	 recovered from run_exp134_1h.log
+exp135          	 1.794   	 1.794  	   4.12	 REVERT     	 recovered from run_exp135_1h.log
+exp136          	 1.794   	 1.794  	   4.12	 REVERT     	 recovered from run_exp136_1h.log
+exp137          	 1.164   	 1.164  	   1.17	 REVERT     	 recovered from run_exp137_1h.log
+exp138          	 1.037   	 1.037  	   9.32	 REVERT     	 recovered from run_exp138_1h.log
+exp139          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 vol scaling 0.4+0.6*vol [no run log]
+exp140          	 1.120   	 1.120  	   1.25	 REVERT     	 recovered from run_exp140_1h.log
+exp141          	 1.906   	 1.906  	   4.21	 REVERT     	 recovered from run_exp141_1h.log
+exp142          	 1.896   	 1.896  	   4.21	 REVERT     	 recovered from run_exp142_1h.log
+exp143          	 -1.348  	 -0.560 	  30.76	 REVERT     	 recovered from run_exp143_1h.log
+exp144          	 0.388   	 0.388  	   4.40	 REVERT     	 recovered from run_exp144_1h.log
+exp145          	 2.304   	 2.304  	   5.84	 REVERT     	 recovered from run_exp145_1h.log
+exp146          	 0.719   	 0.719  	   8.38	 REVERT     	 recovered from run_exp146_1h.log
+exp147          	 2.304   	 2.304  	   5.84	 REVERT     	 recovered from run_exp147_1h.log
+exp148          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 EMA_FAST 9 EMA_SLOW 22 [no run log]
+exp149          	 2.304   	 2.304  	   5.84	 REVERT     	 recovered from run_exp149_1h.log
+exp150          	 1.824   	 1.824  	   7.66	 REVERT     	 recovered from run_exp150_1h.log
+exp151          	 1.804   	 1.804  	   7.67	 REVERT     	 recovered from run_exp151_1h.log
+exp152          	 2.304   	 2.304  	   5.84	 REVERT     	 recovered from run_exp152_1h.log
+exp153          	 -999.000	 1.943  	  12.08	 REVERT     	 recovered from run_exp153_1h.log
+exp154          	 -999.000	 0.958  	  55.72	 REVERT     	 recovered from run_exp154_1h.log
+exp155          	 -0.113  	 0.368  	  24.63	 REVERT     	 recovered from run_exp155_1h.log
+exp156          	 2.304   	 2.304  	   5.84	 REVERT     	 recovered from run_exp156_1h.log
+exp157          	 2.322   	 2.322  	   4.33	 REVERT     	 recovered from run_exp157_1h.log
+exp158          	 2.086   	 2.086  	   5.84	 REVERT     	 recovered from run_exp158_1h.log
+exp159          	 2.304   	 2.304  	   5.84	 REVERT     	 recovered from run_exp159_1h.log
+exp160          	 2.204   	 2.204  	   7.55	 REVERT     	 recovered from run_exp160_1h.log
+exp161          	 1.951   	 1.951  	   5.86	 REVERT     	 recovered from run_exp161_1h.log
+exp162          	 2.309   	 2.309  	   5.83	 REVERT     	 recovered from run_exp162_1h.log
+exp163          	 1.886   	 1.886  	  13.16	 REVERT     	 recovered from run_exp163_1h.log
+exp164          	 2.244   	 2.244  	   5.83	 REVERT     	 recovered from run_exp164_1h.log
+exp165          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 tighter funding filter — FR>0.05%/FR<-0.05% (top 2.3%) [no run log]
+exp166          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 add funding_rate to FEATURE_COLS — model can now learn from funding dynamics [no run log]exp167                                	 2.312	 2.312	 5.83	 REVERT	 Auto-research iteration
+exp167          	 2.312   	 2.312  	   5.83	 REVERT     	 tighter short fortress + smaller short sizing (no effect)
+exp168          	 2.312   	 2.312  	   5.83	 REVERT     	 lower bearish gates + half-size shorts (still no short entries)
+exp169          	 2.266   	 2.266  	   6.58	 REVERT     	 raw-bear fallback created 832 short opens but hurt PF/DD
+exp170          	 2.338   	 2.338  	   5.72	 KEEP       	 stricter raw-bear fallback + 35% short sizing (284 short opens)exp1                                                            	 2.330	 2.330	 5.73	 REVERT	 Auto-research iteration
+exp171          	 2.330   	 2.330  	   5.73	 KEEP       	 tighter raw-bear override + 25% short sizingexp1                                                                               	 2.319	 2.319	 5.69	 REVERT	 Auto-research iteration
+exp172          	 2.319   	 2.319  	   5.69	 KEEP       	 very selective raw-bear override + 20% short sizing (54 short opens)exp1                                                       	 1.314	 1.314	 5.24	 REVERT	 Auto-research iteration
+exp173          	 1.314   	 1.314  	   5.24	 REVERT     	 strong raw bull dominance gate cut too many core long tradesexp1                                                               	 2.319	 2.319	 5.69	 REVERT	 Auto-research iteration
+exp174          	 2.319   	 2.319  	   5.69	 REVERT     	 tightened soft longs had no effectexp1                                                                                         	 2.341	 2.341	 4.19	 REVERT	 Auto-research iteration
+exp175          	 2.341   	 2.341  	   4.19	 KEEP       	 widen ATR stop 3.0x->4.5x on short-capable base (better score and DD)
+exp176          	 2.348   	 2.348  	   4.19	 KEEP       	 4h-aware soft entries + include 4h in sizing meta (small PF/score gain)
+exp177          	 2.313   	 2.313  	   4.33	 KEEP       	 signal-decay exits improved win rate and PF but slightly reduced score
+exp178          	 1.782   	 1.782  	   4.82	 REVERT     	 mild bull-dominance gate over-pruned long flow
+exp179          	 2.313   	 2.313  	   4.33	 REVERT     	 reduced 1h soft-entry size had no measurable effect
+exp205          	 1.520   	 1.520  	   5.49	 KEEP       	 XGB directional models + entry gate + risk tiers 22/11/9%
+exp237          	 1.787   	 1.787  	   4.45	 KEEP       	 asymmetric meta gates + RSI<65 + continuous 25x crush + 7x/3x stops
+exp256          	 1.863   	 1.863  	   3.15	 KEEP       	 continuous sizing 3-30% + 9x/4x ATR + macro_bear -0.015 + 45x crush + TF-portable
+funding_raw_p1  	 -1.357  	 -0.804 	  26.05	 REVERT     	 raw funding_rate feature + NaN masking + lagged 1h->15m funding, retrain all models, unchanged exp256 shell
+funding_raw_p2  	 -0.709  	 -0.707 	  15.04	 REVERT     	 raw funding_rate retrain + percentile-threshold translation against exp256_active
+temporal_stat_p1	 -1.792  	 -0.760 	  35.64	 REVERT     	 old-branch temporal/session + statistical-regime features ported into Fortress stack; retrained all models; val/OOS failed hard

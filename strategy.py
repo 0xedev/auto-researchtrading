@@ -1,315 +1,411 @@
-"""
-Exp32: Add Bollinger Band width as 6th signal for vol compression detection.
-
-Changes from exp28 (ATR 5.5, score 9.382):
-1. Add BB width signal: bullish when BB width is below median (compression = pending breakout)
-2. Keep MIN_VOTES at 4 but out of 6 signals now
-3. BB compression acts as a quality filter for entries
-"""
-
+import os
+import xgboost as xgb
 import numpy as np
-from prepare import Signal, PortfolioState, BarData
+import pandas as pd
+from dataclasses import dataclass
+from typing import List
+from prepare import calculate_features, FEATURE_COLS, load_data
 
-ACTIVE_SYMBOLS = ["BTC", "ETH", "SOL"]
-SYMBOL_WEIGHTS = {"BTC": 0.33, "ETH": 0.33, "SOL": 0.33}
 
-SHORT_WINDOW = 6
-MED_WINDOW = 12
-MED2_WINDOW = 24
-LONG_WINDOW = 36
-EMA_FAST = 7
-EMA_SLOW = 26
-RSI_PERIOD = 8
-RSI_BULL = 50
-RSI_BEAR = 50
-RSI_OVERBOUGHT = 69
-RSI_OVERSOLD = 31
-
-MACD_FAST = 14
-MACD_SLOW = 23
-MACD_SIGNAL = 9
-
-BB_PERIOD = 7
-
-FUNDING_LOOKBACK = 24
-FUNDING_BOOST = 0.0
-BASE_POSITION_PCT = 0.08
-VOL_LOOKBACK = 36
-TARGET_VOL = 0.015
-ATR_LOOKBACK = 24
-ATR_STOP_MULT = 5.5
-TAKE_PROFIT_PCT = 99.0
-BASE_THRESHOLD = 0.012
-BTC_OPPOSE_THRESHOLD = -99.0
-
-PYRAMID_THRESHOLD = 0.015
-PYRAMID_SIZE = 0.0
-CORR_LOOKBACK = 72
-HIGH_CORR_THRESHOLD = 99.0
-
-DD_REDUCE_THRESHOLD = 99.0
-DD_REDUCE_SCALE = 0.5
-
-COOLDOWN_BARS = 2
-MIN_VOTES = 4  # out of 6 now
-
-def ema(values, span):
-    alpha = 2.0 / (span + 1)
-    result = np.empty_like(values, dtype=float)
-    result[0] = values[0]
-    for i in range(1, len(values)):
-        result[i] = alpha * values[i] + (1 - alpha) * result[i - 1]
-    return result
-
-def calc_rsi(closes, period):
-    if len(closes) < period + 1:
-        return 50.0
-    deltas = np.diff(closes[-(period+1):])
-    gains = np.where(deltas > 0, deltas, 0)
-    losses = np.where(deltas < 0, -deltas, 0)
-    avg_gain = np.mean(gains)
-    avg_loss = np.mean(losses)
-    rs = avg_gain / max(avg_loss, 1e-10)
-    return 100 - 100 / (1 + rs)
+@dataclass
+class Signal:
+    symbol: str
+    target_position: float
+    order_type: str = "market"
 
 
 class Strategy:
-    def __init__(self):
-        self.entry_prices = {}
-        self.peak_prices = {}
-        self.atr_at_entry = {}
-        self.btc_momentum = 0.0
-        self.pyramided = {}
-        self.peak_equity = 100000.0
-        self.exit_bar = {}
-        self.bar_count = 0
+    def __init__(self, timeframe: str = "1h"):
+        self.timeframe_arg = timeframe
+        self.interval_sec = self._parse_timeframe(timeframe)
 
-    def _calc_atr(self, history, lookback):
-        if len(history) < lookback + 1:
-            return None
-        highs = history["high"].values[-lookback:]
-        lows = history["low"].values[-lookback:]
-        closes = history["close"].values[-(lookback+1):-1]
-        tr = np.maximum(highs - lows,
-                        np.maximum(np.abs(highs - closes), np.abs(lows - closes)))
-        return np.mean(tr)
+        # Timeframe-derived constants (all calibrated at 1h, scaled automatically)
+        _bph = 3600 / self.interval_sec  # bars per hour
+        _tf_ratio = self.interval_sec / 3600  # 0.25 for 15m, 1.0 for 1h, 4.0 for 4h
+        self._regime_window = max(18, int(72 * _bph))       # 72h regime lookback
+        self._max_hold = max(2, round(6 * _tf_ratio ** 0.5))  # sqrt-scaled hold
+        self._decay_age = max(2, round(3 * _tf_ratio ** 0.5)) # sqrt-scaled signal decay
+        self._atr_scale = _tf_ratio ** 0.25                    # ATR mult: constant stop/range ratio
+        self._entry_scale = min(1.0, _tf_ratio ** 0.5)         # entry size scaling
+        self._thresh_scale = max(1.0, (1.0 / _tf_ratio) ** 0.25)  # meta gate quality: higher for shorter tf
 
-    def _calc_vol(self, closes, lookback):
-        if len(closes) < lookback:
-            return TARGET_VOL
-        log_rets = np.diff(np.log(closes[-lookback:]))
-        return max(np.std(log_rets), 1e-6)
+        self.models = {}
+        self.meta_models = {}
+        self.long_models = {}
+        self.short_models = {}
+        self.long_meta_models = {}
+        self.short_meta_models = {}
+        self.symbol_caches = {}
+        self.bar_counts = {}
+        self.models_loaded = False
+        self.trailing_stops = {}
+        self.position_ages = {}
+        self._market_ret_buf = []
+        self._macro_bear = False
 
-    def _calc_correlation(self, bar_data):
-        if "BTC" not in bar_data or "ETH" not in bar_data:
-            return 0.5
-        btc_h = bar_data["BTC"].history
-        eth_h = bar_data["ETH"].history
-        if len(btc_h) < CORR_LOOKBACK or len(eth_h) < CORR_LOOKBACK:
-            return 0.5
-        btc_rets = np.diff(np.log(btc_h["close"].values[-CORR_LOOKBACK:]))
-        eth_rets = np.diff(np.log(eth_h["close"].values[-CORR_LOOKBACK:]))
-        if len(btc_rets) < 10:
-            return 0.5
-        corr = np.corrcoef(btc_rets, eth_rets)[0, 1]
-        return corr if not np.isnan(corr) else 0.5
+    def _parse_timeframe(self, tf: str) -> int:
+        if tf == "15m":
+            return 15 * 60
+        if tf == "1h":
+            return 3600
+        if tf == "4h":
+            return 14400
+        return 0
 
-    def _calc_macd(self, closes):
-        if len(closes) < MACD_SLOW + MACD_SIGNAL + 5:
-            return 0.0
-        fast_ema = ema(closes[-(MACD_SLOW + MACD_SIGNAL + 5):], MACD_FAST)
-        slow_ema = ema(closes[-(MACD_SLOW + MACD_SIGNAL + 5):], MACD_SLOW)
-        macd_line = fast_ema - slow_ema
-        signal_line = ema(macd_line, MACD_SIGNAL)
-        return macd_line[-1] - signal_line[-1]
+    def _load_models(self):
+        for tf in ["15m", "1h", "4h"]:
+            m_path = f"models/lead_{tf}.xgb"
+            meta_path = f"models/meta_{tf}.xgb"
+            long_path = f"models/lead_long_{tf}.xgb"
+            short_path = f"models/lead_short_{tf}.xgb"
+            long_meta_path = f"models/meta_long_{tf}.xgb"
+            short_meta_path = f"models/meta_short_{tf}.xgb"
 
-    def _calc_bb_width_pctile(self, closes, period):
-        """Calculate current BB width percentile over lookback."""
-        if len(closes) < period * 3:
-            return 50.0
-        # Calculate rolling BB width
-        widths = []
-        for i in range(period * 2, len(closes)):
-            window = closes[i-period:i]
-            sma = np.mean(window)
-            std = np.std(window)
-            width = (2 * std) / sma if sma > 0 else 0
-            widths.append(width)
-        if len(widths) < 2:
-            return 50.0
-        current_width = widths[-1]
-        # Percentile of current width
-        pctile = 100 * np.sum(np.array(widths) <= current_width) / len(widths)
-        return pctile
+            if os.path.exists(m_path):
+                self.models[tf] = xgb.XGBClassifier()
+                self.models[tf].load_model(m_path)
+
+            if os.path.exists(meta_path):
+                self.meta_models[tf] = xgb.XGBClassifier()
+                self.meta_models[tf].load_model(meta_path)
+
+            if os.path.exists(long_path):
+                self.long_models[tf] = xgb.XGBClassifier()
+                self.long_models[tf].load_model(long_path)
+
+            if os.path.exists(short_path):
+                self.short_models[tf] = xgb.XGBClassifier()
+                self.short_models[tf].load_model(short_path)
+
+            if os.path.exists(long_meta_path):
+                self.long_meta_models[tf] = xgb.XGBClassifier()
+                self.long_meta_models[tf].load_model(long_meta_path)
+
+            if os.path.exists(short_meta_path):
+                self.short_meta_models[tf] = xgb.XGBClassifier()
+                self.short_meta_models[tf].load_model(short_meta_path)
+
+        self.models_loaded = True
+        print(f"LOADED QUANTUM FORTRESS: {list(self.models.keys())}")
+
+    def _build_prediction_tables(self, data_dict, timeframe: str, include_state: bool = False):
+        if not data_dict:
+            return {}
+
+        all_vols = {}
+        all_rets = {}
+        for symbol, df in data_dict.items():
+            feat = calculate_features(df, timeframe=timeframe)
+            all_vols[symbol] = feat["bb_width"]
+            all_rets[symbol] = df["close"].pct_change()
+
+        m_vol = pd.DataFrame(all_vols).median(axis=1).fillna(0)
+        m_ret = pd.DataFrame(all_rets).median(axis=1).fillna(0)
+
+        tables = {}
+        for symbol, df in data_dict.items():
+            df_feat = calculate_features(df, timeframe=timeframe)
+            df_feat["market_vol"] = m_vol
+            df_feat["market_ret"] = m_ret
+            market_ret_4h = m_ret.rolling(4, min_periods=1).sum().fillna(0.0)
+            df_feat["rel_ret_1h"] = df_feat["ret_1h"] - df_feat["market_ret"]
+            df_feat["rel_ret_4h"] = df_feat["ret_4h"] - market_ret_4h
+            df_feat["rel_bb_width"] = df_feat["bb_width"] - df_feat["market_vol"]
+            X = df_feat[FEATURE_COLS]
+            use_directional = (
+                timeframe == "15m" and timeframe in self.long_models and timeframe in self.short_models
+            )
+
+            if use_directional:
+                bull = self.long_models[timeframe].predict_proba(X)[:, 1]
+                bear = self.short_models[timeframe].predict_proba(X)[:, 1]
+                meta_long = self.long_meta_models[timeframe].predict_proba(X)[:, 1] if timeframe in self.long_meta_models else np.zeros(len(X))
+                meta_short = self.short_meta_models[timeframe].predict_proba(X)[:, 1] if timeframe in self.short_meta_models else np.zeros(len(X))
+                table = pd.DataFrame({
+                    "timestamp": df["timestamp"].values,
+                    f"bull_{timeframe}": bull,
+                    f"bear_{timeframe}": bear,
+                    f"meta_{timeframe}": np.maximum(meta_long, meta_short),
+                    f"meta_long_{timeframe}": meta_long,
+                    f"meta_short_{timeframe}": meta_short,
+                })
+            else:
+                probs = self.models[timeframe].predict_proba(X) if timeframe in self.models else None
+                meta = self.meta_models[timeframe].predict_proba(X)[:, 1] if timeframe in self.meta_models else np.zeros(len(X))
+                table = pd.DataFrame({
+                    "timestamp": df["timestamp"].values,
+                    f"bull_{timeframe}": probs[:, 1] if probs is not None and probs.shape[1] > 1 else np.zeros(len(X)),
+                    f"bear_{timeframe}": probs[:, 2] if probs is not None and probs.shape[1] > 2 else np.zeros(len(X)),
+                    f"meta_{timeframe}": meta,
+                })
+            if include_state:
+                table["atr_val"] = df_feat["atr_14"].values
+                table["market_ret"] = df_feat["market_ret"].values
+                table["rsi_8"] = df_feat["rsi_8"].values
+            tables[symbol] = table.sort_values("timestamp").reset_index(drop=True)
+        return tables
+
+    def pre_calculate_signals(self, data_dict, split_name: str = "val"):
+        if not self.models_loaded:
+            self._load_models()
+
+        print("Calculating timeframe-aligned model caches...")
+        main_tables = self._build_prediction_tables(data_dict, self.timeframe_arg, include_state=True)
+        aux_15m_tables = {}
+        aux_1h_tables = {}
+        aux_4h_tables = {}
+        base_split = split_name.replace("_15m", "")
+
+        if self.timeframe_arg == "1h":
+            if "15m" in self.models or "15m" in self.meta_models:
+                split_15m = {
+                    "train": "train_15m",
+                    "val": "val_15m",
+                    "oos": "oos_15m",
+                }.get(split_name)
+                if split_15m:
+                    aux_15m_data = load_data(split=split_15m)
+                    print(f"Loaded {len(aux_15m_data)} 15m symbols for alignment.")
+                    aux_15m_tables = self._build_prediction_tables(aux_15m_data, "15m")
+
+            if "4h" in self.models or "4h" in self.meta_models:
+                aux_4h_data = load_data(split=base_split, resample_4h=True)
+                print(f"Loaded {len(aux_4h_data)} 4h symbols for alignment.")
+                aux_4h_tables = self._build_prediction_tables(aux_4h_data, "4h")
+
+        elif self.timeframe_arg == "15m":
+            if "1h" in self.models or "1h" in self.meta_models:
+                aux_1h_data = load_data(split=base_split)
+                print(f"Loaded {len(aux_1h_data)} 1h symbols for alignment.")
+                aux_1h_tables = self._build_prediction_tables(aux_1h_data, "1h")
+
+            if "4h" in self.models or "4h" in self.meta_models:
+                aux_4h_data = load_data(split=base_split, resample_4h=True)
+                print(f"Loaded {len(aux_4h_data)} 4h symbols for alignment.")
+                aux_4h_tables = self._build_prediction_tables(aux_4h_data, "4h")
+
+        elif self.timeframe_arg == "4h":
+            if "15m" in self.long_models or "15m" in self.short_models:
+                split_15m = {
+                    "robustness": "val_15m",
+                    "val": "val_15m",
+                    "oos": "oos_15m",
+                    "train": "train_15m",
+                }.get(base_split)
+                if split_15m:
+                    aux_15m_data = load_data(split=split_15m)
+                    print(f"Loaded {len(aux_15m_data)} 15m symbols for 4h alignment.")
+                    aux_15m_tables = self._build_prediction_tables(aux_15m_data, "15m")
+
+            if "1h" in self.models or "1h" in self.meta_models:
+                aux_1h_data = load_data(split=base_split)
+                print(f"Loaded {len(aux_1h_data)} 1h symbols for 4h alignment.")
+                aux_1h_tables = self._build_prediction_tables(aux_1h_data, "1h")
+
+        for symbol in data_dict:
+            if symbol not in main_tables:
+                continue
+
+            main_df = main_tables[symbol]
+            main_bull_col = f"bull_{self.timeframe_arg}"
+            main_bear_col = f"bear_{self.timeframe_arg}"
+            main_meta_col = f"meta_{self.timeframe_arg}"
+
+            base = main_df[["timestamp", "atr_val", "market_ret", "rsi_8"]].copy()
+            base["bull_15m"] = main_df[main_bull_col].fillna(0).values if main_bull_col in main_df else 0.0
+            base["bear_15m"] = main_df[main_bear_col].fillna(0).values if main_bear_col in main_df else 0.0
+            base["meta_15m"] = main_df[main_meta_col].fillna(0).values if self.timeframe_arg == "15m" and main_meta_col in main_df else 0.0
+            base["meta_long_15m"] = (
+                main_df["meta_long_15m"].fillna(0).values if self.timeframe_arg == "15m" and "meta_long_15m" in main_df
+                else base["meta_15m"].copy()
+            )
+            base["meta_short_15m"] = (
+                main_df["meta_short_15m"].fillna(0).values if self.timeframe_arg == "15m" and "meta_short_15m" in main_df
+                else base["meta_15m"].copy()
+            )
+            base["meta_1h"] = main_df[main_meta_col].fillna(0).values if self.timeframe_arg == "1h" and main_meta_col in main_df else 0.0
+            base["meta_4h"] = main_df[main_meta_col].fillna(0).values if self.timeframe_arg == "4h" and main_meta_col in main_df else 0.0
+
+            if symbol in aux_15m_tables:
+                merged_15m = pd.merge_asof(
+                    base[["timestamp"]].sort_values("timestamp"),
+                    aux_15m_tables[symbol].sort_values("timestamp"),
+                    on="timestamp",
+                    direction="backward",
+                )
+                base["bull_15m"] = merged_15m["bull_15m"].fillna(base["bull_15m"])
+                base["bear_15m"] = merged_15m["bear_15m"].fillna(base["bear_15m"])
+                base["meta_15m"] = merged_15m["meta_15m"].fillna(base["meta_15m"])
+                if "meta_long_15m" in merged_15m:
+                    base["meta_long_15m"] = merged_15m["meta_long_15m"].fillna(base["meta_long_15m"])
+                if "meta_short_15m" in merged_15m:
+                    base["meta_short_15m"] = merged_15m["meta_short_15m"].fillna(base["meta_short_15m"])
+
+            if symbol in aux_1h_tables:
+                merged_1h = pd.merge_asof(
+                    base[["timestamp"]].sort_values("timestamp"),
+                    aux_1h_tables[symbol][["timestamp", "meta_1h"]].sort_values("timestamp"),
+                    on="timestamp",
+                    direction="backward",
+                )
+                base["meta_1h"] = merged_1h["meta_1h"].fillna(base["meta_1h"])
+
+            if symbol in aux_4h_tables:
+                merged_4h = pd.merge_asof(
+                    base[["timestamp"]].sort_values("timestamp"),
+                    aux_4h_tables[symbol][["timestamp", "meta_4h"]].sort_values("timestamp"),
+                    on="timestamp",
+                    direction="backward",
+                )
+                base["meta_4h"] = merged_4h["meta_4h"].fillna(base["meta_4h"])
+
+            self.symbol_caches[symbol] = base.fillna(0.0).to_dict("records")
+            self.bar_counts[symbol] = 0
+
+        print(f"Market-Aware Fortress cache warmed for {len(self.symbol_caches)} symbols.")
 
     def on_bar(self, bar_data, portfolio):
-        signals = []
-        equity = portfolio.equity if portfolio.equity > 0 else portfolio.cash
-        self.bar_count += 1
+        if not self.models_loaded:
+            self._load_models()
 
-        self.peak_equity = max(self.peak_equity, equity)
-        current_dd = (self.peak_equity - equity) / self.peak_equity
-        dd_scale = 1.0
-        if current_dd > DD_REDUCE_THRESHOLD:
-            dd_scale = max(DD_REDUCE_SCALE, 1.0 - (current_dd - DD_REDUCE_THRESHOLD) * 5)
+        equity = portfolio.equity
+        signals: List[Signal] = []
 
-        if "BTC" in bar_data and len(bar_data["BTC"].history) >= LONG_WINDOW + 1:
-            btc_closes = bar_data["BTC"].history["close"].values
-            self.btc_momentum = (btc_closes[-1] - btc_closes[-MED2_WINDOW]) / btc_closes[-MED2_WINDOW]
+        # Macro regime: rolling 72-bar market return detects sustained bear trends
+        any_sym = next(iter(bar_data), None)
+        if any_sym and any_sym in self.symbol_caches:
+            idx = self.bar_counts.get(any_sym, 0)
+            if idx < len(self.symbol_caches[any_sym]):
+                mret = self.symbol_caches[any_sym][idx].get("market_ret", 0.0)
+                self._market_ret_buf.append(mret)
+                if len(self._market_ret_buf) > self._regime_window:
+                    self._market_ret_buf.pop(0)
+                self._macro_bear = sum(self._market_ret_buf) < -0.015
 
-        btc_eth_corr = self._calc_correlation(bar_data)
-        high_corr = btc_eth_corr > HIGH_CORR_THRESHOLD
+        for symbol, bar in bar_data.items():
+            pos = portfolio.positions.get(symbol, 0.0)
 
-        for symbol in ACTIVE_SYMBOLS:
-            if symbol not in bar_data:
+            if symbol not in self.symbol_caches:
                 continue
-            bd = bar_data[symbol]
-            if len(bd.history) < max(LONG_WINDOW, EMA_SLOW, MACD_SLOW + MACD_SIGNAL + 5, BB_PERIOD * 3) + 1:
+
+            cache = self.symbol_caches[symbol]
+            idx = self.bar_counts.get(symbol, 0)
+            if idx >= len(cache):
                 continue
 
-            closes = bd.history["close"].values
-            mid = bd.close
+            row = cache[idx]
+            self.bar_counts[symbol] += 1
 
-            realized_vol = self._calc_vol(closes, VOL_LOOKBACK)
-            vol_ratio = realized_vol / TARGET_VOL
-            dyn_threshold = BASE_THRESHOLD * (0.3 + vol_ratio * 0.7)
-            dyn_threshold = max(0.005, min(0.020, dyn_threshold))
+            m15 = row["meta_15m"]
+            rsi_8 = row.get("rsi_8", 50.0)
+            m15_long = row.get("meta_long_15m", m15)
+            m15_short = row.get("meta_short_15m", m15)
+            m1h = row["meta_1h"]
+            m4h = row["meta_4h"]
 
-            ret_vshort = (closes[-1] - closes[-SHORT_WINDOW]) / closes[-SHORT_WINDOW]
-            ret_short = (closes[-1] - closes[-MED_WINDOW]) / closes[-MED_WINDOW]
-            ret_med = (closes[-1] - closes[-MED2_WINDOW]) / closes[-MED2_WINDOW]
-            ret_long = (closes[-1] - closes[-LONG_WINDOW]) / closes[-LONG_WINDOW]
+            active_meta = [m for m in (max(m15_long, m15_short), m1h, m4h) if m > 0]
+            meta_score = float(np.mean(active_meta)) if active_meta else 0.0
+            supportive_regime = (m1h <= 0 or m1h > 0.45)
+            supportive_regime_4h = (m4h <= 0 or m4h > 0.45)
+            atr_mult = (4.0 if self._macro_bear else 9.0) * self._atr_scale
+            stop_dist = atr_mult * row["atr_val"] if row["atr_val"] > 0 else max(bar.close * 0.02, 1e-6)
+            bull_signal = row["bull_15m"] > 0.32
+            bear_signal = row["bear_15m"] > 0.55
+            bull_fortress = bull_signal and m15_long > 0.28 and rsi_8 < 65
+            raw_bear_fortress = (
+                row["bear_15m"] > 0.62
+                and row["bear_15m"] > row["bull_15m"] + 0.12
+                and rsi_8 > 48
+            )
+            bear_fortress = (bear_signal and m15_short > 0.28 and rsi_8 > 32) or raw_bear_fortress
+            bull_soft = bull_signal and supportive_regime and supportive_regime_4h and m15_long > 0.50
+            bear_soft = bear_signal and supportive_regime and supportive_regime_4h and m15_short > 0.50
 
-            mom_bull = ret_short > dyn_threshold
-            mom_bear = ret_short < -dyn_threshold
-            vshort_bull = ret_vshort > dyn_threshold * 0.7
-            vshort_bear = ret_vshort < -dyn_threshold * 0.7
-
-            ema_fast_arr = ema(closes[-(EMA_SLOW+10):], EMA_FAST)
-            ema_slow_arr = ema(closes[-(EMA_SLOW+10):], EMA_SLOW)
-            ema_bull = ema_fast_arr[-1] > ema_slow_arr[-1]
-            ema_bear = ema_fast_arr[-1] < ema_slow_arr[-1]
-
-            rsi = calc_rsi(closes, RSI_PERIOD)
-            rsi_bull = rsi > RSI_BULL
-            rsi_bear = rsi < RSI_BEAR
-
-            macd_hist = self._calc_macd(closes)
-            macd_bull = macd_hist > 0
-            macd_bear = macd_hist < 0
-
-            # BB width: low percentile = compression = pending breakout
-            bb_pctile = self._calc_bb_width_pctile(closes, BB_PERIOD)
-            bb_compressed = bb_pctile < 90  # Below 40th percentile = compressed
-
-            bull_votes = sum([mom_bull, vshort_bull, ema_bull, rsi_bull, macd_bull, bb_compressed])
-            bear_votes = sum([mom_bear, vshort_bear, ema_bear, rsi_bear, macd_bear, bb_compressed])
-
-            btc_confirm = True
-            if symbol != "BTC":
-                if bull_votes >= MIN_VOTES and self.btc_momentum < BTC_OPPOSE_THRESHOLD:
-                    btc_confirm = False
-                if bear_votes >= MIN_VOTES and self.btc_momentum > -BTC_OPPOSE_THRESHOLD:
-                    btc_confirm = False
-
-            bullish = bull_votes >= MIN_VOTES and btc_confirm
-            bearish = bear_votes >= MIN_VOTES and btc_confirm
-
-            in_cooldown = (self.bar_count - self.exit_bar.get(symbol, -999)) < COOLDOWN_BARS
-
-            vol_scale = 1.0
-            weight = SYMBOL_WEIGHTS.get(symbol, 0.33)
-            if high_corr and symbol == "SOL":
-                weight *= 0.5
-            mom_strength = abs(ret_short) / dyn_threshold
-            strength_scale = 1.0
-            size = equity * BASE_POSITION_PCT * weight * vol_scale * strength_scale * dd_scale
-
-            funding_rates = bd.history["funding_rate"].values[-FUNDING_LOOKBACK:]
-            avg_funding = np.mean(funding_rates) if len(funding_rates) >= FUNDING_LOOKBACK else 0.0
-
-            current_pos = portfolio.positions.get(symbol, 0.0)
-            target = current_pos
-
-            if current_pos == 0:
-                if not in_cooldown:
-                    funding_mult = 1.0
-                    if bullish:
-                        if avg_funding < 0:
-                            funding_mult = 1.0 + FUNDING_BOOST
-                        target = size * funding_mult
-                        self.pyramided[symbol] = False
-                    elif bearish:
-                        if avg_funding > 0:
-                            funding_mult = 1.0 + FUNDING_BOOST
-                        target = -size * funding_mult
-                        self.pyramided[symbol] = False
+            # Continuous meta-proportional sizing (exp239)
+            if supportive_regime:
+                meta_factor = max(0.0, min(1.0, (meta_score - 0.30) / 0.50))  # 0→1 over [0.30, 0.80]
+                risk_pct = 0.03 + 0.27 * meta_factor  # 3% at meta=0.30, 30% at meta≥0.80
+                risk_per_trade = equity * risk_pct
+                long_size = (risk_per_trade * bar.close) / stop_dist
+                short_size = (risk_per_trade * bar.close) / stop_dist
             else:
-                if symbol in self.entry_prices and not self.pyramided.get(symbol, True):
-                    entry = self.entry_prices[symbol]
-                    pnl = (mid - entry) / entry
-                    if current_pos < 0:
-                        pnl = -pnl
-                    if pnl > PYRAMID_THRESHOLD:
-                        if current_pos > 0 and bullish:
-                            target = current_pos + size * PYRAMID_SIZE
-                            self.pyramided[symbol] = True
-                        elif current_pos < 0 and bearish:
-                            target = current_pos - size * PYRAMID_SIZE
-                            self.pyramided[symbol] = True
+                long_size = equity * 0.08
+                short_size = equity * 0.08
+            # Regime-throttled risk: keep flow, but cut weak-regime exposure hard.
+            if not supportive_regime:
+                long_size *= 0.05
+            # Continuous regime scaling (25x) — smooth crush based on macro intensity
+            mret_sum = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
+            long_factor = max(0.20, min(1.0, 1.0 + 45.0 * mret_sum))
+            short_factor = max(0.20, min(1.0, 1.0 - 45.0 * mret_sum))
+            long_size *= long_factor
+            short_size *= short_factor
 
-                atr = self._calc_atr(bd.history, ATR_LOOKBACK)
-                if atr is None:
-                    atr = self.atr_at_entry.get(symbol, mid * 0.02)
+            if pos != 0:
+                age = self.position_ages.get(symbol, 0) + 1
+                self.position_ages[symbol] = age
+                max_hold_bars = self._max_hold
 
-                if symbol not in self.peak_prices:
-                    self.peak_prices[symbol] = mid
-
-                if current_pos > 0:
-                    self.peak_prices[symbol] = max(self.peak_prices[symbol], mid)
-                    stop = self.peak_prices[symbol] - ATR_STOP_MULT * atr
-                    if mid < stop:
-                        target = 0.0
+                if pos > 0:
+                    signal_decay_exit = age >= self._decay_age and (not bull_signal) and m15_long < 0.40
+                    should_exit = (
+                        age >= max_hold_bars
+                        or bar.close < self.trailing_stops.get(symbol, 0)
+                        or signal_decay_exit
+                    )
+                    if should_exit:
+                        signals.append(Signal(symbol, 0.0))
+                        self.position_ages[symbol] = 0
+                    else:
+                        desired = pos
+                        if bull_signal and m15_long > 0.65 and abs(pos) + 1.0 < long_size:
+                            desired = long_size
+                        if abs(desired - pos) > 1.0:
+                            signals.append(Signal(symbol, desired))
+                        self.trailing_stops[symbol] = max(self.trailing_stops.get(symbol, 0), bar.high - stop_dist)
                 else:
-                    self.peak_prices[symbol] = min(self.peak_prices[symbol], mid)
-                    stop = self.peak_prices[symbol] + ATR_STOP_MULT * atr
-                    if mid > stop:
-                        target = 0.0
+                    signal_decay_exit = age >= self._decay_age and (not bear_signal) and m15_short < 0.40 and not raw_bear_fortress
+                    should_exit = (
+                        age >= max_hold_bars
+                        or bar.close > self.trailing_stops.get(symbol, 9e18)
+                        or signal_decay_exit
+                    )
+                    if should_exit:
+                        signals.append(Signal(symbol, 0.0))
+                        self.position_ages[symbol] = 0
+                    else:
+                        desired = pos
+                        if bear_signal and m15_short > 0.65 and abs(pos) + 1.0 < short_size:
+                            desired = -short_size
+                        if abs(desired - pos) > 1.0:
+                            signals.append(Signal(symbol, desired))
+                        self.trailing_stops[symbol] = min(self.trailing_stops.get(symbol, 9e18), bar.low + stop_dist)
+                continue
 
-                if symbol in self.entry_prices:
-                    entry = self.entry_prices[symbol]
-                    pnl = (mid - entry) / entry
-                    if current_pos < 0:
-                        pnl = -pnl
-                    if pnl > TAKE_PROFIT_PCT:
-                        target = 0.0
-
-                if current_pos > 0 and rsi > RSI_OVERBOUGHT:
-                    target = 0.0
-                elif current_pos < 0 and rsi < RSI_OVERSOLD:
-                    target = 0.0
-
-                if current_pos > 0 and bearish and not in_cooldown:
-                    target = -size
-                elif current_pos < 0 and bullish and not in_cooldown:
-                    target = size
-
-            if abs(target - current_pos) > 1.0:
-                signals.append(Signal(symbol=symbol, target_position=target))
-                if target != 0 and current_pos == 0:
-                    self.entry_prices[symbol] = mid
-                    self.peak_prices[symbol] = mid
-                    self.atr_at_entry[symbol] = self._calc_atr(bd.history, ATR_LOOKBACK) or mid * 0.02
-                elif target == 0:
-                    self.entry_prices.pop(symbol, None)
-                    self.peak_prices.pop(symbol, None)
-                    self.atr_at_entry.pop(symbol, None)
-                    self.pyramided.pop(symbol, None)
-                    self.exit_bar[symbol] = self.bar_count
-                elif (target > 0 and current_pos < 0) or (target < 0 and current_pos > 0):
-                    self.entry_prices[symbol] = mid
-                    self.peak_prices[symbol] = mid
-                    self.atr_at_entry[symbol] = self._calc_atr(bd.history, ATR_LOOKBACK) or mid * 0.02
-                    self.pyramided[symbol] = False
+            self.position_ages[symbol] = 0
+            ts = self._thresh_scale  # meta gate scaling: 1.0 for 1h, 1.414 for 15m
+            long_gate_ok = meta_score > 0.36 * ts
+            short_gate_ok = meta_score > 0.25 * ts
+            macro_bull_ok = not self._macro_bear or meta_score > 0.40 * ts
+            if bull_fortress and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short) and macro_bull_ok and long_gate_ok:
+                entry_size = long_size * self._entry_scale
+                signals.append(Signal(symbol, entry_size))
+                self.trailing_stops[symbol] = bar.low - stop_dist
+                self.position_ages[symbol] = 0
+            elif bull_soft and (not bear_soft or m15_long >= m15_short) and long_gate_ok:
+                entry_size = long_size * 0.5 * self._entry_scale
+                signals.append(Signal(symbol, entry_size))
+                self.trailing_stops[symbol] = bar.low - stop_dist
+                self.position_ages[symbol] = 0
+            elif bear_fortress and short_gate_ok:
+                entry_size = short_size * self._entry_scale
+                signals.append(Signal(symbol, -entry_size))
+                self.trailing_stops[symbol] = bar.high + stop_dist
+                self.position_ages[symbol] = 0
+            elif bear_soft and short_gate_ok:
+                entry_size = short_size * 0.5 * self._entry_scale
+                signals.append(Signal(symbol, -entry_size))
+                self.trailing_stops[symbol] = bar.high + stop_dist
+                self.position_ages[symbol] = 0
 
         return signals
