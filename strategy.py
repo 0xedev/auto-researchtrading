@@ -59,6 +59,7 @@ class Strategy:
         self._macro_hmm = None
         self._current_hmm_state = 0
         self._bars_since_calibration = 0
+        self._entry_confidence = {} # exp351: Track confidence for spectrum exits
 
         # Load Marco HMM if exists
         hmm_path = "models/exp256_active/macro_hmm.joblib"
@@ -543,11 +544,9 @@ class Strategy:
                     if bar.close < (entry_price - atr * 1.0 * bar.close):
                         self.trailing_stops[symbol] = min(self.trailing_stops[symbol], entry_price)
 
-                    # exp343: Trailing Take-Profit (Elite Mode)
-                    peak_profit = self.profit_targets.get(symbol, entry_price)
-                    self.profit_targets[symbol] = min(peak_profit, bar.close)
-                    
-                    ttp_armed = self.profit_targets[symbol] < (entry_price - atr * 3.0 * bar.close)
+                    # exp351: Confidence-Adaptive TTP arming
+                    ttp_mult = {3: 4.0, 2: 3.0, 1: 1.8}.get(self._entry_confidence.get(symbol, 2), 3.0)
+                    ttp_armed = self.profit_targets[symbol] < (entry_price - atr * ttp_mult * bar.close)
                     ttp_hit   = ttp_armed and (bar.close > self.profit_targets[symbol] + atr * 0.5 * bar.close)
 
                     trail_hit = bar.close > self.trailing_stops.get(symbol, 1e18)
@@ -582,14 +581,15 @@ class Strategy:
             m_ret_4h = sum(self._market_ret_buf[-4:]) if len(self._market_ret_buf) >= 4 else 0.0
             
             # Momentum Alignment (exp337) + Funding (exp340) + Spike Filter (exp347)
-            # exp350: The Sentinel Triple-Lock (Consensus + Hard Macro)
+            # exp351: The Adaptive Confidence Spectrum
             votes = sum([1 for m in (max(m_l, m_s), m1h, m4h) if m > 0.38])
-            consensus_ok = (votes >= 2)
+            dynamic_thresh = {3: 0.38, 2: 0.43, 1: 0.52}.get(votes, 1.0)
+            
             macro_ok_long  = (macro_state == 1)
             macro_ok_short = (macro_state == 2)
 
-            is_entry_long  = (p1_long or p2_long or p3_long) and consensus_ok and macro_ok_long and vol_ok and rsi_8 < 65 and m_ret_4h > -0.002 and funding < 0.0003 and not vol_spike
-            is_entry_short = (p1_short or p2_short or p3_short) and consensus_ok and macro_ok_short and vol_ok and rsi_8 > 35 and m_ret_4h < 0.002 and funding > -0.0003 and not vol_spike
+            is_entry_long  = (p1_long or p2_long or p3_long) and (meta_score > dynamic_thresh) and macro_ok_long and vol_ok and rsi_8 < 65 and m_ret_4h > -0.002 and funding < 0.0003 and not vol_spike
+            is_entry_short = (p1_short or p2_short or p3_short) and (meta_score > dynamic_thresh) and macro_ok_short and vol_ok and rsi_8 > 35 and m_ret_4h < 0.002 and funding > -0.0003 and not vol_spike
 
             # === CONTINUOUS SIZING (exp256 baseline) ===
             mret_sum  = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
@@ -605,8 +605,10 @@ class Strategy:
 
             # Collect candidates for ranker
             if is_entry_long:
+                self._entry_confidence[symbol] = votes # exp351: persist confidence
                 entry_candidates.append((meta_score, Signal(symbol, long_size), symbol, "long"))
             elif is_entry_short:
+                self._entry_confidence[symbol] = votes # exp351: persist confidence
                 entry_candidates.append((meta_score, Signal(symbol, -short_size), symbol, "short"))
 
         # === TOP-10 RANKER: quality-ranked entries, max 10 positions (exp333) ===
