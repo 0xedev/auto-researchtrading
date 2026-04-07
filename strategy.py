@@ -575,8 +575,13 @@ class Strategy:
             long_factor  = max(0.30, min(1.5, 1.0 + self._market_crush * mret_sum))
             short_factor = max(0.30, min(1.5, 1.0 - self._market_crush * mret_sum))
 
-            long_size  = equity * alloc_pct * long_factor  * hmm_size
-            short_size = equity * alloc_pct * short_factor * hmm_size
+            # === SPECIALIST CONFLUENCE BOOST (exp342) ===
+            # If 2+ timeframes agree on high quality, boost alpha exposure
+            votes = sum([1 for m in (meta_1h_qual, meta_4h_qual, meta_score) if m > 0.40])
+            confluence_mult = 1.25 if votes >= 2 else 1.0
+
+            long_size  = equity * alloc_pct * long_factor  * hmm_size * confluence_mult
+            short_size = equity * alloc_pct * short_factor * hmm_size * confluence_mult
 
             # Collect candidates for ranker
             if is_entry_long:
