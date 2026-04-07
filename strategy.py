@@ -61,8 +61,8 @@ class Strategy:
         self._bars_since_calibration = 0
 
         # Load Marco HMM if exists
-        hmm_path = "models/exp256_active/macro_hmm.joblib"
-        scaler_path = "models/exp256_active/macro_scaler.joblib"
+        hmm_path = "models/macro_hmm.joblib"
+        scaler_path = "models/macro_scaler.joblib"
         if os.path.exists(hmm_path):
             try:
                 self._macro_hmm = joblib.load(hmm_path)
@@ -138,8 +138,8 @@ class Strategy:
         m_ret = pd.DataFrame(all_rets).median(axis=1).fillna(0)
 
         # Pre-calculate Macro HMM for the entire batch
-        # Pre-calculate Macro HMM for the entire batch (exp256_active restoration)
-        hmm_path = "models/exp256_active/macro_hmm.joblib"
+        # Pre-calculate Macro HMM for the entire batch (ROOT path fix)
+        hmm_path = "models/macro_hmm.joblib"
         hmm_model = joblib.load(hmm_path) if os.path.exists(hmm_path) else None
 
         macro_refs = {}
@@ -544,27 +544,27 @@ class Strategy:
             bear_signal = bear_raw > (0.55 + state_adjust["short_gate"])
 
             # 3. Fortress Logic (RSI-filtered conviction)
-            bull_fortress = bull_signal and meta_score > 0.28 and rsi_8 < 65
-            bear_fortress = bear_signal and meta_score > 0.28 and rsi_8 > 32
+            bull_fortress = bull_signal and meta_score > 0.25 and rsi_8 < 65
+            bear_fortress = bear_signal and meta_score > 0.25 and rsi_8 > 32
             
             # 4. Soft Signal Path
-            bull_soft = bull_signal and meta_score > 0.50
-            bear_soft = bear_signal and meta_score > 0.50
+            bull_soft = bull_signal and meta_score > 0.45
+            bear_soft = bear_signal and meta_score > 0.45
 
-            # 5. Continuous Probability Sizing
-            # risk_pct = 3% at meta=0.30, 30% at meta>=0.80
+            # 5. Continuous Probability Sizing (Tamed for 2024 vol)
+            # risk_pct = 3% at meta=0.30, 15% at meta>=0.80
             meta_factor = max(0.0, min(1.0, (meta_score - 0.30) / 0.50))
-            risk_pct = 0.03 + 0.27 * meta_factor
+            risk_pct = 0.03 + 0.12 * meta_factor
             risk_per_trade = equity * risk_pct
             
             # Sizing multiplier from regime-adaptive ATR
             long_size = (risk_per_trade * bar.close) / stop_dist if stop_dist > 0 else equity * 0.05
             short_size = (risk_per_trade * bar.close) / stop_dist if stop_dist > 0 else equity * 0.05
             
-            # 6. Smooth Regime Crush (45x multiplier)
+            # 6. Calibrated Regime Crush (8x multiplier)
             mret_sum = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
-            long_factor = max(0.20, min(1.0, 1.0 + 45.0 * mret_sum))
-            short_factor = max(0.20, min(1.0, 1.0 - 45.0 * mret_sum))
+            long_factor = max(0.20, min(1.0, 1.0 + 8.0 * mret_sum))
+            short_factor = max(0.20, min(1.0, 1.0 - 8.0 * mret_sum))
             long_size *= (long_factor * state_adjust["size"])
             short_size *= (short_factor * state_adjust["size"])
 
