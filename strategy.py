@@ -520,11 +520,10 @@ class Strategy:
                     if bar.close > (entry_price + atr * 1.0 * bar.close):
                         self.trailing_stops[symbol] = max(self.trailing_stops[symbol], entry_price)
 
-                    # exp343: Trailing Take-Profit (Elite Mode)
-                    peak_profit = self.profit_targets.get(symbol, entry_price)
-                    self.profit_targets[symbol] = max(peak_profit, bar.close)
-                    
-                    ttp_armed = self.profit_targets[symbol] > (entry_price + atr * 3.0 * bar.close)
+                    # exp352: Micro-TTP Lock (1.5x ATR)
+                    self.profit_targets[symbol] = max(self.profit_targets.get(symbol, entry_price), bar.close)
+                    ttp_mult = 1.5
+                    ttp_armed = self.profit_targets[symbol] > (entry_price + atr * ttp_mult * bar.close)
                     ttp_hit   = ttp_armed and (bar.close < self.profit_targets[symbol] - atr * 0.5 * bar.close)
 
                     trail_hit = bar.close < self.trailing_stops.get(symbol, 0)
@@ -544,8 +543,9 @@ class Strategy:
                     if bar.close < (entry_price - atr * 1.0 * bar.close):
                         self.trailing_stops[symbol] = min(self.trailing_stops[symbol], entry_price)
 
-                    # exp351: Confidence-Adaptive TTP arming
-                    ttp_mult = {3: 4.0, 2: 3.0, 1: 1.8}.get(self._entry_confidence.get(symbol, 2), 3.0)
+                    # exp352: Micro-TTP Lock (1.5x ATR)
+                    self.profit_targets[symbol] = min(self.profit_targets.get(symbol, entry_price), bar.close)
+                    ttp_mult = 1.5
                     ttp_armed = self.profit_targets[symbol] < (entry_price - atr * ttp_mult * bar.close)
                     ttp_hit   = ttp_armed and (bar.close > self.profit_targets[symbol] + atr * 0.5 * bar.close)
 
@@ -581,15 +581,16 @@ class Strategy:
             m_ret_4h = sum(self._market_ret_buf[-4:]) if len(self._market_ret_buf) >= 4 else 0.0
             
             # Momentum Alignment (exp337) + Funding (exp340) + Spike Filter (exp347)
-            # exp351: The Adaptive Confidence Spectrum
+            # exp352: The Alpha Dilution (Relaxed Gating + Soft Macro)
             votes = sum([1 for m in (max(m_l, m_s), m1h, m4h) if m > 0.38])
-            dynamic_thresh = {3: 0.38, 2: 0.43, 1: 0.52}.get(votes, 1.0)
+            votes = max(1, votes) # Ensure at least 1 vote weight
+            dynamic_thresh = {3: 0.35, 2: 0.40, 1: 0.46}.get(votes, 1.0)
             
-            macro_ok_long  = (macro_state == 1)
-            macro_ok_short = (macro_state == 2)
+            macro_mult_long  = 1.0 if macro_state == 1 else 0.25
+            macro_mult_short = 1.0 if macro_state == 2 else 0.25
 
-            is_entry_long  = (p1_long or p2_long or p3_long) and (meta_score > dynamic_thresh) and macro_ok_long and vol_ok and rsi_8 < 65 and m_ret_4h > -0.002 and funding < 0.0003 and not vol_spike
-            is_entry_short = (p1_short or p2_short or p3_short) and (meta_score > dynamic_thresh) and macro_ok_short and vol_ok and rsi_8 > 35 and m_ret_4h < 0.002 and funding > -0.0003 and not vol_spike
+            is_entry_long  = (p1_long or p2_long or p3_long) and (meta_score > dynamic_thresh) and vol_ok and rsi_8 < 65 and m_ret_4h > -0.002 and funding < 0.0003 and not vol_spike
+            is_entry_short = (p1_short or p2_short or p3_short) and (meta_score > dynamic_thresh) and vol_ok and rsi_8 > 35 and m_ret_4h < 0.002 and funding > -0.0003 and not vol_spike
 
             # === CONTINUOUS SIZING (exp256 baseline) ===
             mret_sum  = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
@@ -600,8 +601,10 @@ class Strategy:
             long_factor  = max(0.30, min(1.5, 1.0 + self._market_crush * mret_sum))
             short_factor = max(0.30, min(1.5, 1.0 - self._market_crush * mret_sum))
 
-            long_size  = equity * alloc_pct * long_factor  * hmm_size
-            short_size = equity * alloc_pct * short_factor * hmm_size
+            # exp352: Vote-Weighted Sizing + Soft Macro Penalty
+            vote_mult = votes / 3.0
+            long_size  = equity * alloc_pct * long_factor  * hmm_size * vote_mult * macro_mult_long
+            short_size = equity * alloc_pct * short_factor * hmm_size * vote_mult * macro_mult_short
 
             # Collect candidates for ranker
             if is_entry_long:
