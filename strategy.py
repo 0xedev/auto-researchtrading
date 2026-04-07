@@ -449,6 +449,14 @@ class Strategy:
 
             tf = self.timeframe_arg
             atr = row.get("atr_pct", 0.015)
+            # exp347: ATR Spike Filter (Re-stabilizing Alpha Density)
+            if "_atr_buf" not in self.__dict__: self._atr_buf = {}
+            if symbol not in self._atr_buf: self._atr_buf[symbol] = []
+            self._atr_buf[symbol].append(atr)
+            if len(self._atr_buf[symbol]) > 24: self._atr_buf[symbol].pop(0)
+            avg_atr = np.mean(self._atr_buf[symbol]) if self._atr_buf[symbol] else 0.015
+            vol_spike = atr > (1.8 * avg_atr)
+            
             rsi_8 = row.get("rsi_8", 50.0)
 
             # === SINGLE META SCORE (exp269 style) ===
@@ -557,25 +565,25 @@ class Strategy:
             meta_1h_qual = row.get("meta_1h", 0.0)
             meta_4h_qual = row.get("meta_4h", 0.0)
 
-            # Path 1: Pure 1h Spike (Classic Golden Gate) - exp344: Loosened for Frequency
-            p1_long  = (meta_1h_qual > 0.35 and meta_score > 0.38 and bull_1h > 0.12)
-            p1_short = (meta_1h_qual > 0.35 and meta_score > 0.36 and bear_1h > 0.12)
+            # Path 1: Pure 1h Spike (Classic Golden Gate) - exp347: Tight/Precise
+            p1_long  = (meta_1h_qual > 0.40 and meta_score > 0.43 and bull_1h > 0.12)
+            p1_short = (meta_1h_qual > 0.40 and meta_score > 0.43 and bear_1h > 0.12)
 
-            # Path 2: 1h + 4h Resonance (Strong 4h Trend) - exp344: Loosened for Frequency
-            p2_long  = (meta_4h_qual > 0.45 and meta_1h_qual > 0.38 and bull_1h > 0.10)
-            p2_short = (meta_4h_qual > 0.45 and meta_1h_qual > 0.36 and bear_1h > 0.10)
+            # Path 2: 1h + 4h Resonance (Strong 4h Trend) - exp347: Tight/Precise
+            p2_long  = (meta_4h_qual > 0.50 and meta_1h_qual > 0.43 and bull_1h > 0.10)
+            p2_short = (meta_4h_qual > 0.50 and meta_1h_qual > 0.43 and bear_1h > 0.10)
 
-            # Path 3: 4h Extremity (Regime Dominance) - exp344: Loosened for Frequency
-            p3_long  = (meta_4h_qual > 0.53 and meta_1h_qual > 0.33 and bull_1h > 0.08)
-            p3_short = (meta_4h_qual > 0.53 and meta_1h_qual > 0.31 and bear_1h > 0.08)
+            # Path 3: 4h Extremity (Regime Dominance) - exp347: Tight/Precise
+            p3_long  = (meta_4h_qual > 0.58 and meta_1h_qual > 0.38 and bull_1h > 0.08)
+            p3_short = (meta_4h_qual > 0.58 and meta_1h_qual > 0.38 and bear_1h > 0.08)
 
             vol_ok = atr > 0.005 # Exp336 Volatility Filter
             funding = row.get("funding_rate", 0.0)
             m_ret_4h = sum(self._market_ret_buf[-4:]) if len(self._market_ret_buf) >= 4 else 0.0
             
-            # Momentum Alignment (exp337) + Funding Contrarianism (exp340)
-            is_entry_long  = (p1_long or p2_long or p3_long) and not self._macro_bear and vol_ok and rsi_8 < 65 and m_ret_4h > -0.002 and funding < 0.0003
-            is_entry_short = (p1_short or p2_short or p3_short) and vol_ok and rsi_8 > 35 and m_ret_4h < 0.002 and funding > -0.0003
+            # Momentum Alignment (exp337) + Funding (exp340) + Spike Filter (exp347)
+            is_entry_long  = (p1_long or p2_long or p3_long) and not self._macro_bear and vol_ok and rsi_8 < 65 and m_ret_4h > -0.002 and funding < 0.0003 and not vol_spike
+            is_entry_short = (p1_short or p2_short or p3_short) and vol_ok and rsi_8 > 35 and m_ret_4h < 0.002 and funding > -0.0003 and not vol_spike
 
             # === CONTINUOUS SIZING (exp256 baseline) ===
             mret_sum  = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
