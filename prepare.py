@@ -299,20 +299,21 @@ CRYPTOCOMPARE_URL = "https://min-api.cryptocompare.com/data/v2/histohour"
 BINANCE_FUNDING_URL = "https://fapi.binance.com/fapi/v1/fundingRate"
 
 def get_triple_barrier_labels(df, timeframe):
-    """De Prado's Triple Barrier Method for conviction labeling.
-    1 = Hit PT, 2 = Hit SL, 0 = Vertical/Breath exit.
+    """Conviction labeling via Triple Barrier Method (Symmetric 1:1 Scalping).
+    1 = Hit PT (Profit), 2 = Hit SL or Vertical Exit (Loss).
+    We treat flat/timed-out trades as losses to force the Sniper to find clean moves.
     """
     close = df['close']
     vol = close.pct_change().rolling(24).std().fillna(0.01)
+    # 48h for 1h bars, 64h for 15m.
     lookahead = {"1h": 48, "4h": 24, "15m": 64}.get(timeframe, 24)
     
     labels = np.zeros(len(df))
     for i in range(len(df) - lookahead):
         price_now = close.iloc[i]
-        pt = price_now * (1 + 2.0 * vol.iloc[i])
-        sl = price_now * (1 - 1.0 * vol.iloc[i])
+        pt = price_now * (1 + 1.5 * vol.iloc[i]) # 1:1 R:R for high-frequency alpha
+        sl = price_now * (1 - 1.5 * vol.iloc[i])
         
-        # Check future path
         future_path = close.iloc[i+1 : i+lookahead]
         hit_pt = future_path[future_path >= pt].index
         hit_sl = future_path[future_path <= sl].index
@@ -322,30 +323,22 @@ def get_triple_barrier_labels(df, timeframe):
         
         if first_pt < first_sl and first_pt != 9e18:
             labels[i] = 1 # Profit
-        elif first_sl < first_pt and first_sl != 9e18:
-            labels[i] = 2 # Loss
         else:
-            labels[i] = 0 # Vertical
+            labels[i] = 2 # Loss / Vertical / SL
             
     return labels
 
 
 def get_directional_labels(df, timeframe):
-    """Volatility-normalized directional labels.
-
-    The 15m system was previously labeled only on extreme 4-bar outliers, which
-    produced very sparse action. For intraday alpha discovery we use a slightly
-    longer horizon and normalized forward returns so the lead model sees more
-    tradable opportunities without discarding volatility context.
-    """
+    """Volatility-normalized directional labels with standard scalping momentum."""
     close = df["close"]
     vol = close.pct_change().rolling(24).std().replace(0, np.nan)
 
     horizon_map = {"15m": 8, "1h": 4, "4h": 4}
-    threshold_map = {"15m": 0.50, "1h": 1.50, "4h": 1.50}
+    threshold_map = {"15m": 0.50, "1h": 1.00, "4h": 1.00} # Scalping thresholds
 
     horizon = horizon_map.get(timeframe, 4)
-    threshold = threshold_map.get(timeframe, 1.50)
+    threshold = threshold_map.get(timeframe, 1.00)
 
     forward_ret = close.shift(-horizon) / close - 1
     scaled_ret = forward_ret / (vol * np.sqrt(horizon))
@@ -377,9 +370,53 @@ def prepare_dataset(timeframe, split_name):
     m_vol = pd.concat(market_vols, axis=1).median(axis=1).fillna(0)
     m_ret = pd.concat(market_rets, axis=1).median(axis=1).fillna(0)
 
+    try:
+        import joblib
+        hmm_model = joblib.load("models/macro_hmm.joblib")
+        hmm_scaler = joblib.load("models/macro_scaler.joblib")
+        
+        # Calculate HMM Features
+        macro_df = pd.DataFrame()
+        for m_sym in ["BTC", "ETH", "XAU", "SP500"]:
+            if m_sym in data_dict:
+                df_raw = data_dict[m_sym]
+                log_ret = np.log(df_raw['close'] / df_raw['close'].shift(1))
+                macro_df[f"{m_sym}_ret"] = log_ret
+                macro_df[f"{m_sym}_vol"] = log_ret.rolling(24).std()
+        
+        def calc_rsi_simple(series, period=14):
+            delta = series.diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+            rs = gain / loss.replace(0, 1e-10)
+            return 100 - (100 / (1 + rs))
+
+        macro_df['BTC_RSI'] = calc_rsi_simple(macro_df['BTC_ret'], 14)
+        macro_df['BTC_vol_24h'] = macro_df['BTC_ret'].rolling(24).std()
+        macro_df['BTC_vol_ratio'] = macro_df['BTC_vol'] / macro_df['BTC_vol_24h'].replace(0, 1e-10)
+        macro_df['ETH_BTC_ratio'] = macro_df['ETH_ret'] - macro_df['BTC_ret']
+        macro_df['ETH_BTC_RSI'] = calc_rsi_simple(macro_df['ETH_BTC_ratio'], 14)
+        macro_df['BTC_mom'] = macro_df['BTC_ret'].rolling(24).sum()
+
+        req_cols = ['BTC_RSI', 'BTC_vol_ratio', 'ETH_BTC_RSI', 'BTC_mom', 'BTC_vol']
+        macro_df = macro_df.replace([np.inf, -np.inf], 0).ffill().fillna(0)
+        
+        X_scaled = hmm_scaler.transform(macro_df[req_cols].values)
+        global_states = hmm_model.predict(X_scaled)
+        global_states = hmm_model.predict(X_scaled)
+        print(f"HMM states mapped. State counts: {np.bincount(global_states)}")
+    except Exception as e:
+        print(f"HMM not applied in prepare_dataset (fallback to 0): {e}")
+        global_states = None
+
     for symbol, df in data_dict.items():
         df_feat = calculate_features(df, timeframe=timeframe)
         if len(df_feat) < 300: continue
+        
+        if global_states is not None and len(global_states) == len(df_feat):
+            df_feat['macro_state'] = global_states
+        else:
+            df_feat['macro_state'] = 0
         
         # Inject Market Context
         df_feat['market_vol'] = m_vol
@@ -1038,7 +1075,7 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
 
     duration_days = 0.0
     if len(timestamps) > 1:
-        duration_days = (timestamps[-1] - timestamps[0]) / (1000 * 60 * 60 * 24)
+        duration_days = (timestamps[-1] - timestamps[0]) / (60 * 60 * 24)
 
     # Compute metrics
     returns = np.array(bar_returns) if bar_returns else np.array([0.0])
