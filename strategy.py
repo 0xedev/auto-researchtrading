@@ -540,24 +540,25 @@ class Strategy:
             meta_1h_qual = row.get("meta_1h", 0.0)
             meta_4h_qual = row.get("meta_4h", 0.0)
 
-            # Path 1: Pure 1h Spike (Classic Golden Gate) - exp336 lowered
+            # Path 1: Pure 1h Spike (Classic Golden Gate) - exp340: short relaxed
             p1_long  = (meta_1h_qual > 0.40 and meta_score > 0.43 and bull_1h > 0.12)
-            p1_short = (meta_1h_qual > 0.40 and meta_score > 0.43 and bear_1h > 0.12)
+            p1_short = (meta_1h_qual > 0.40 and meta_score > 0.41 and bear_1h > 0.12)
 
-            # Path 2: 1h + 4h Resonance (Strong 4h Trend) - exp336 lowered
+            # Path 2: 1h + 4h Resonance (Strong 4h Trend) - exp340: short relaxed
             p2_long  = (meta_4h_qual > 0.50 and meta_1h_qual > 0.43 and bull_1h > 0.10)
-            p2_short = (meta_4h_qual > 0.50 and meta_1h_qual > 0.43 and bear_1h > 0.10)
+            p2_short = (meta_4h_qual > 0.50 and meta_1h_qual > 0.41 and bear_1h > 0.10)
 
-            # Path 3: 4h Extremity (Regime Dominance) - exp336 lowered
+            # Path 3: 4h Extremity (Regime Dominance) - exp340: short relaxed
             p3_long  = (meta_4h_qual > 0.58 and meta_1h_qual > 0.38 and bull_1h > 0.08)
-            p3_short = (meta_4h_qual > 0.58 and meta_1h_qual > 0.38 and bear_1h > 0.08)
+            p3_short = (meta_4h_qual > 0.58 and meta_1h_qual > 0.36 and bear_1h > 0.08)
 
             vol_ok = atr > 0.005 # Exp336 Volatility Filter
+            funding = row.get("funding_rate", 0.0)
             m_ret_4h = sum(self._market_ret_buf[-4:]) if len(self._market_ret_buf) >= 4 else 0.0
             
-            # Momentum Alignment (exp337)
-            is_entry_long  = (p1_long or p2_long or p3_long) and not self._macro_bear and vol_ok and rsi_8 < 65 and m_ret_4h > -0.002
-            is_entry_short = (p1_short or p2_short or p3_short) and vol_ok and rsi_8 > 35 and m_ret_4h < 0.002
+            # Momentum Alignment (exp337) + Funding Contrarianism (exp340)
+            is_entry_long  = (p1_long or p2_long or p3_long) and not self._macro_bear and vol_ok and rsi_8 < 65 and m_ret_4h > -0.002 and funding < 0.0003
+            is_entry_short = (p1_short or p2_short or p3_short) and vol_ok and rsi_8 > 35 and m_ret_4h < 0.002 and funding > -0.0003
 
             # === CONTINUOUS SIZING (exp256 baseline) ===
             mret_sum  = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
