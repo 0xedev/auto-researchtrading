@@ -500,22 +500,30 @@ class Strategy:
                 entry_price = self.entry_prices.get(symbol, bar.close)
 
                 if pos > 0:
-                    self.trailing_stops[symbol] = max(
-                        self.trailing_stops.get(symbol, 0),
-                        bar.close - (atr * 1.5 * bar.close)
-                    )
+                    # Ratchet 1: Standard trailing stop (non-retreating)
+                    new_trail = bar.close - (atr * 1.5 * bar.close)
+                    self.trailing_stops[symbol] = max(self.trailing_stops.get(symbol, 0), new_trail)
+                    
+                    # Ratchet 2: Profit Lock (at 1.0x ATR profit, lock stop at entry)
+                    if bar.close > (entry_price + atr * 1.0 * bar.close):
+                        self.trailing_stops[symbol] = max(self.trailing_stops[symbol], entry_price)
+
                     # Exit conditions: TP hit, trail hit, OR 8-bar time limit if profitable
                     tp_hit    = bar.close > entry_price + atr * 3.0 * bar.close
                     trail_hit = bar.close < self.trailing_stops.get(symbol, 0)
-                    time_exit = (age >= 8 and bar.close > entry_price)  # exit profitable if held 8+ bars
+                    time_exit = (age >= 8 and bar.close > entry_price)
                     if tp_hit or trail_hit or time_exit:
                         final_signals.append(Signal(symbol, 0.0))
 
                 elif pos < 0:
-                    self.trailing_stops[symbol] = min(
-                        self.trailing_stops.get(symbol, 1e18),
-                        bar.close + (atr * 1.5 * bar.close)
-                    )
+                    # Ratchet 1: Standard trailing stop (non-retreating)
+                    new_trail = bar.close + (atr * 1.5 * bar.close)
+                    self.trailing_stops[symbol] = min(self.trailing_stops.get(symbol, 1e18), new_trail)
+                    
+                    # Ratchet 2: Profit Lock (at 1.0x ATR profit, lock stop at entry)
+                    if bar.close < (entry_price - atr * 1.0 * bar.close):
+                        self.trailing_stops[symbol] = min(self.trailing_stops[symbol], entry_price)
+
                     tp_hit    = bar.close < entry_price - atr * 3.0 * bar.close
                     trail_hit = bar.close > self.trailing_stops.get(symbol, 1e18)
                     time_exit = (age >= 8 and bar.close < entry_price)
