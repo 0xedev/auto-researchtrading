@@ -500,8 +500,8 @@ class Strategy:
                 entry_price = self.entry_prices.get(symbol, bar.close)
 
                 if pos > 0:
-                    # exp341: Adaptive Stop Multiplier
-                    stop_mult = 2.5 if macro_state == 2 else 1.8
+                    # exp344: Tightened Ratchet Stop (Alpha Density)
+                    stop_mult = 1.5
                     
                     # Ratchet 1: Standard trailing stop (non-retreating)
                     new_trail = bar.close - (atr * stop_mult * bar.close)
@@ -524,8 +524,8 @@ class Strategy:
                         final_signals.append(Signal(symbol, 0.0))
 
                 elif pos < 0:
-                    # exp341: Adaptive Stop Multiplier
-                    stop_mult = 2.5 if macro_state == 2 else 1.8
+                    # exp344: Tightened Ratchet Stop (Alpha Density)
+                    stop_mult = 1.5
                     
                     # Ratchet 1: Standard trailing stop (non-retreating)
                     new_trail = bar.close + (atr * stop_mult * bar.close)
@@ -557,17 +557,17 @@ class Strategy:
             meta_1h_qual = row.get("meta_1h", 0.0)
             meta_4h_qual = row.get("meta_4h", 0.0)
 
-            # Path 1: Pure 1h Spike (Classic Golden Gate) - exp340: short relaxed
-            p1_long  = (meta_1h_qual > 0.40 and meta_score > 0.43 and bull_1h > 0.12)
-            p1_short = (meta_1h_qual > 0.40 and meta_score > 0.41 and bear_1h > 0.12)
+            # Path 1: Pure 1h Spike (Classic Golden Gate) - exp344: Loosened for Frequency
+            p1_long  = (meta_1h_qual > 0.35 and meta_score > 0.38 and bull_1h > 0.12)
+            p1_short = (meta_1h_qual > 0.35 and meta_score > 0.36 and bear_1h > 0.12)
 
-            # Path 2: 1h + 4h Resonance (Strong 4h Trend) - exp340: short relaxed
-            p2_long  = (meta_4h_qual > 0.50 and meta_1h_qual > 0.43 and bull_1h > 0.10)
-            p2_short = (meta_4h_qual > 0.50 and meta_1h_qual > 0.41 and bear_1h > 0.10)
+            # Path 2: 1h + 4h Resonance (Strong 4h Trend) - exp344: Loosened for Frequency
+            p2_long  = (meta_4h_qual > 0.45 and meta_1h_qual > 0.38 and bull_1h > 0.10)
+            p2_short = (meta_4h_qual > 0.45 and meta_1h_qual > 0.36 and bear_1h > 0.10)
 
-            # Path 3: 4h Extremity (Regime Dominance) - exp340: short relaxed
-            p3_long  = (meta_4h_qual > 0.58 and meta_1h_qual > 0.38 and bull_1h > 0.08)
-            p3_short = (meta_4h_qual > 0.58 and meta_1h_qual > 0.36 and bear_1h > 0.08)
+            # Path 3: 4h Extremity (Regime Dominance) - exp344: Loosened for Frequency
+            p3_long  = (meta_4h_qual > 0.53 and meta_1h_qual > 0.33 and bull_1h > 0.08)
+            p3_short = (meta_4h_qual > 0.53 and meta_1h_qual > 0.31 and bear_1h > 0.08)
 
             vol_ok = atr > 0.005 # Exp336 Volatility Filter
             funding = row.get("funding_rate", 0.0)
@@ -586,9 +586,9 @@ class Strategy:
             long_factor  = max(0.30, min(1.5, 1.0 + self._market_crush * mret_sum))
             short_factor = max(0.30, min(1.5, 1.0 - self._market_crush * mret_sum))
 
-            # === SPECIALIST CONFLUENCE BOOST (exp342) ===
+            # === SPECIALIST CONFLUENCE BOOST (exp344 tuned) ===
             # If 2+ timeframes agree on high quality, boost alpha exposure
-            votes = sum([1 for m in (meta_1h_qual, meta_4h_qual, meta_score) if m > 0.40])
+            votes = sum([1 for m in (meta_1h_qual, meta_4h_qual, meta_score) if m > 0.35])
             confluence_mult = 1.25 if votes >= 2 else 1.0
 
             long_size  = equity * alloc_pct * long_factor  * hmm_size * confluence_mult
@@ -611,9 +611,8 @@ class Strategy:
                 if lookup_ts > 1e11: lookup_ts //= 1000
                 row = self.symbol_caches[symbol].get(lookup_ts, {})
                 atr  = row.get("atr_pct", 0.015)
-                # exp341: Adaptive Initial Stop
-                ms_init = row.get("macro_state", 1)
-                s_mult = 2.5 if ms_init == 2 else 1.8
+                # exp344: Tightened Initial stop
+                s_mult = 1.5
                 if side == "long":
                     self.trailing_stops[symbol] = bar_data[symbol].close - (atr * s_mult * bar_data[symbol].close)
                 else:
