@@ -511,11 +511,16 @@ class Strategy:
                     if bar.close > (entry_price + atr * 1.0 * bar.close):
                         self.trailing_stops[symbol] = max(self.trailing_stops[symbol], entry_price)
 
-                    # Exit conditions: TP hit, trail hit, OR 8-bar time limit if profitable
-                    tp_hit    = bar.close > entry_price + atr * 3.0 * bar.close
+                    # exp343: Trailing Take-Profit (Elite Mode)
+                    peak_profit = self.profit_targets.get(symbol, entry_price)
+                    self.profit_targets[symbol] = max(peak_profit, bar.close)
+                    
+                    ttp_armed = self.profit_targets[symbol] > (entry_price + atr * 3.0 * bar.close)
+                    ttp_hit   = ttp_armed and (bar.close < self.profit_targets[symbol] - atr * 0.5 * bar.close)
+
                     trail_hit = bar.close < self.trailing_stops.get(symbol, 0)
                     time_exit = (age >= 8 and bar.close > entry_price)
-                    if tp_hit or trail_hit or time_exit:
+                    if ttp_hit or trail_hit or time_exit:
                         final_signals.append(Signal(symbol, 0.0))
 
                 elif pos < 0:
@@ -530,10 +535,16 @@ class Strategy:
                     if bar.close < (entry_price - atr * 1.0 * bar.close):
                         self.trailing_stops[symbol] = min(self.trailing_stops[symbol], entry_price)
 
-                    tp_hit    = bar.close < entry_price - atr * 3.0 * bar.close
+                    # exp343: Trailing Take-Profit (Elite Mode)
+                    peak_profit = self.profit_targets.get(symbol, entry_price)
+                    self.profit_targets[symbol] = min(peak_profit, bar.close)
+                    
+                    ttp_armed = self.profit_targets[symbol] < (entry_price - atr * 3.0 * bar.close)
+                    ttp_hit   = ttp_armed and (bar.close > self.profit_targets[symbol] + atr * 0.5 * bar.close)
+
                     trail_hit = bar.close > self.trailing_stops.get(symbol, 1e18)
                     time_exit = (age >= 8 and bar.close < entry_price)
-                    if tp_hit or trail_hit or time_exit:
+                    if ttp_hit or trail_hit or time_exit:
                         final_signals.append(Signal(symbol, 0.0))
                 continue
 
@@ -608,6 +619,7 @@ class Strategy:
                 else:
                     self.trailing_stops[symbol] = bar_data[symbol].close + (atr * s_mult * bar_data[symbol].close)
                 self.entry_prices[symbol]  = bar_data[symbol].close
+                self.profit_targets[symbol] = bar_data[symbol].close # Initialize peak
                 self.position_ages[symbol] = 0
                 current_pos_count += 1
 
