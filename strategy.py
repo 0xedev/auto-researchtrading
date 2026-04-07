@@ -532,18 +532,19 @@ class Strategy:
             meta_1h_qual = row.get("meta_1h", 0.0)
             meta_4h_qual = row.get("meta_4h", 0.0)
 
-            # Path 1: Pure 1h Spike (Classic Golden Gate)
-            p1_long  = (meta_1h_qual > 0.47 and meta_score > 0.43 and bull_1h > 0.12)
-            p1_short = (meta_1h_qual > 0.47 and meta_score > 0.43 and bear_1h > 0.12)
+            # Path 1: Pure 1h Spike (Classic Golden Gate) - exp336 lowered
+            p1_long  = (meta_1h_qual > 0.40 and meta_score > 0.43 and bull_1h > 0.12)
+            p1_short = (meta_1h_qual > 0.40 and meta_score > 0.43 and bear_1h > 0.12)
 
-            # Path 2: 1h + 4h Resonance (Strong 4h Trend)
-            p2_long  = (meta_4h_qual > 0.55 and meta_1h_qual > 0.43 and bull_1h > 0.10)
-            p2_short = (meta_4h_qual > 0.55 and meta_1h_qual > 0.43 and bear_1h > 0.10)
+            # Path 2: 1h + 4h Resonance (Strong 4h Trend) - exp336 lowered
+            p2_long  = (meta_4h_qual > 0.50 and meta_1h_qual > 0.43 and bull_1h > 0.10)
+            p2_short = (meta_4h_qual > 0.50 and meta_1h_qual > 0.43 and bear_1h > 0.10)
 
-            # Path 3: 4h Extremity (Regime Dominance)
-            p3_long  = (meta_4h_qual > 0.62 and meta_1h_qual > 0.38 and bull_1h > 0.08)
-            p3_short = (meta_4h_qual > 0.62 and meta_1h_qual > 0.38 and bear_1h > 0.08)
+            # Path 3: 4h Extremity (Regime Dominance) - exp336 lowered
+            p3_long  = (meta_4h_qual > 0.58 and meta_1h_qual > 0.38 and bull_1h > 0.08)
+            p3_short = (meta_4h_qual > 0.58 and meta_1h_qual > 0.38 and bear_1h > 0.08)
 
+            vol_ok = atr > 0.005 # Exp336 Volatility Filter
             is_entry_long  = (p1_long or p2_long or p3_long) and not self._macro_bear and vol_ok and rsi_8 < 65
             is_entry_short = (p1_short or p2_short or p3_short) and vol_ok and rsi_8 > 35
 
@@ -567,7 +568,7 @@ class Strategy:
         if entry_candidates:
             entry_candidates.sort(key=lambda x: x[0], reverse=True)
             for score, sig, symbol, side in entry_candidates:
-                if current_pos_count >= 10:
+                if current_pos_count >= 12:
                     break
                 final_signals.append(sig)
                 lookup_ts = int(bar_data[symbol].timestamp)
