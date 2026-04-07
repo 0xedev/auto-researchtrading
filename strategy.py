@@ -71,7 +71,7 @@ class Strategy:
                 print(f"Warning: Failed to load HMM: {e}")
         if os.path.exists(scaler_path):
             try:
-                self._macro_scaler = joblib.load(scaler_path)
+                self._macro_hmm_scaler = joblib.load(scaler_path)
                 print(f"LOADED MEDALLION SCALER")
             except Exception as e:
                 print(f"Warning: Failed to load HMM Scaler: {e}")
@@ -554,7 +554,9 @@ class Strategy:
             # === CONTINUOUS SIZING (exp256 baseline) ===
             mret_sum  = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
             meta_factor  = max(0.0, min(1.0, (meta_score - 0.35) / 0.50))
-            alloc_pct    = self._min_alloc + (self._max_alloc - self._min_alloc) * meta_factor
+            # Risk Scaling: 3% bottom, 15% cap (Tamed Medallion)
+            risk_pct = 0.03 + 0.12 * meta_factor
+            alloc_pct = risk_pct
             long_factor  = max(0.30, min(1.5, 1.0 + self._market_crush * mret_sum))
             short_factor = max(0.30, min(1.5, 1.0 - self._market_crush * mret_sum))
 
