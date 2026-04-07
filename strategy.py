@@ -61,8 +61,8 @@ class Strategy:
         self._bars_since_calibration = 0
 
         # Load Marco HMM if exists
-        hmm_path = "models/macro_hmm.joblib"
-        scaler_path = "models/macro_scaler.joblib"
+        hmm_path = "models/exp256_active/macro_hmm.joblib"
+        scaler_path = "models/exp256_active/macro_scaler.joblib"
         if os.path.exists(hmm_path):
             try:
                 self._macro_hmm = joblib.load(hmm_path)
@@ -138,7 +138,6 @@ class Strategy:
         m_ret = pd.DataFrame(all_rets).median(axis=1).fillna(0)
 
         # Pre-calculate Macro HMM for the entire batch
-        # Pre-calculate Macro HMM for the entire batch (ROOT path fix)
         hmm_path = "models/macro_hmm.joblib"
         hmm_model = joblib.load(hmm_path) if os.path.exists(hmm_path) else None
 
@@ -450,7 +449,6 @@ class Strategy:
 
             tf = self.timeframe_arg
             atr = row.get("atr_pct", 0.015)
-            stop_dist = bar.close * (atr * 1.5)
             rsi_8 = row.get("rsi_8", 50.0)
 
             # === SINGLE META SCORE (exp269 style) ===
@@ -525,53 +523,39 @@ class Strategy:
                         final_signals.append(Signal(symbol, 0.0))
                 continue
 
-            # === EXP269 ALPHA RESTORATION (exp334) ===
-            # Medallion Council v1.39 Breakthrough logic
-            # Uses Fortress Gates + Prob-Proportional Sizing
-            
-            # 1. State-Adaptive Thresholds
-            state_adjust = {
-                0: {"long_gate": -0.05, "short_gate": +0.05, "size": 1.1}, # Bullish: loosen longs
-                1: {"long_gate": +0.05, "short_gate": -0.05, "size": 1.1}, # Bearish: loosen shorts
-                2: {"long_gate": +0.02, "short_gate": +0.02, "size": 0.5}, # Volatile: tighten gates, cut size
-                3: {"long_gate": +0.10, "short_gate": +0.10, "size": 0.1}  # Choppy: test with small size
-            }.get(row.get("macro_state", 1), {"long_gate": 0.0, "short_gate": 0.0, "size": 1.0})
+            # === RESONANCE CASCADE ENTRY (exp333) ===
+            # Aim: 1.0+ trades/day + 60% WR
+            # Stacking multiple confluence paths:
+            # 1. T1: Proven 1h Spike (71% WR)
+            # 2. T2: 4h Trend Resonance (using strong 4h signal)
+            # 3. T3: 4h Extreme Regime Dominance
+            meta_1h_qual = row.get("meta_1h", 0.0)
+            meta_4h_qual = row.get("meta_4h", 0.0)
 
-            # 2. Specialist Confluence
-            bull_raw = bull_1h
-            bear_raw = bear_1h
-            bull_signal = bull_raw > (0.32 + state_adjust["long_gate"])
-            bear_signal = bear_raw > (0.55 + state_adjust["short_gate"])
+            # Path 1: Pure 1h Spike (Classic Golden Gate)
+            p1_long  = (meta_1h_qual > 0.47 and meta_score > 0.43 and bull_1h > 0.12)
+            p1_short = (meta_1h_qual > 0.47 and meta_score > 0.43 and bear_1h > 0.12)
 
-            # 3. Fortress Logic (RSI-filtered conviction)
-            bull_fortress = bull_signal and meta_score > 0.25 and rsi_8 < 65
-            bear_fortress = bear_signal and meta_score > 0.25 and rsi_8 > 32
-            
-            # 4. Soft Signal Path
-            bull_soft = bull_signal and meta_score > 0.45
-            bear_soft = bear_signal and meta_score > 0.45
+            # Path 2: 1h + 4h Resonance (Strong 4h Trend)
+            p2_long  = (meta_4h_qual > 0.55 and meta_1h_qual > 0.43 and bull_1h > 0.10)
+            p2_short = (meta_4h_qual > 0.55 and meta_1h_qual > 0.43 and bear_1h > 0.10)
 
-            # 5. Continuous Probability Sizing (Tamed for 2024 vol)
-            # risk_pct = 3% at meta=0.30, 15% at meta>=0.80
-            meta_factor = max(0.0, min(1.0, (meta_score - 0.30) / 0.50))
-            risk_pct = 0.03 + 0.12 * meta_factor
-            risk_per_trade = equity * risk_pct
-            
-            # Sizing multiplier from regime-adaptive ATR
-            long_size = (risk_per_trade * bar.close) / stop_dist if stop_dist > 0 else equity * 0.05
-            short_size = (risk_per_trade * bar.close) / stop_dist if stop_dist > 0 else equity * 0.05
-            
-            # 6. Calibrated Regime Crush (8x multiplier)
-            mret_sum = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
-            long_factor = max(0.20, min(1.0, 1.0 + 8.0 * mret_sum))
-            short_factor = max(0.20, min(1.0, 1.0 - 8.0 * mret_sum))
-            long_size *= (long_factor * state_adjust["size"])
-            short_size *= (short_factor * state_adjust["size"])
+            # Path 3: 4h Extremity (Regime Dominance)
+            p3_long  = (meta_4h_qual > 0.62 and meta_1h_qual > 0.38 and bull_1h > 0.08)
+            p3_short = (meta_4h_qual > 0.62 and meta_1h_qual > 0.38 and bear_1h > 0.08)
 
-            is_entry_long  = bull_fortress or bull_soft
-            is_entry_short = bear_fortress or bear_soft
+            is_entry_long  = (p1_long or p2_long or p3_long) and not self._macro_bear and vol_ok and rsi_8 < 65
+            is_entry_short = (p1_short or p2_short or p3_short) and vol_ok and rsi_8 > 35
 
-            # Sizing values are already calculated in long_size / short_size above
+            # === CONTINUOUS SIZING (exp256 baseline) ===
+            mret_sum  = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
+            meta_factor  = max(0.0, min(1.0, (meta_score - 0.35) / 0.50))
+            alloc_pct    = self._min_alloc + (self._max_alloc - self._min_alloc) * meta_factor
+            long_factor  = max(0.30, min(1.5, 1.0 + self._market_crush * mret_sum))
+            short_factor = max(0.30, min(1.5, 1.0 - self._market_crush * mret_sum))
+
+            long_size  = equity * alloc_pct * long_factor  * hmm_size
+            short_size = equity * alloc_pct * short_factor * hmm_size
 
             # Collect candidates for ranker
             if is_entry_long:
