@@ -500,8 +500,11 @@ class Strategy:
                 entry_price = self.entry_prices.get(symbol, bar.close)
 
                 if pos > 0:
+                    # exp341: Adaptive Stop Multiplier
+                    stop_mult = 2.5 if macro_state == 2 else 1.8
+                    
                     # Ratchet 1: Standard trailing stop (non-retreating)
-                    new_trail = bar.close - (atr * 1.5 * bar.close)
+                    new_trail = bar.close - (atr * stop_mult * bar.close)
                     self.trailing_stops[symbol] = max(self.trailing_stops.get(symbol, 0), new_trail)
                     
                     # Ratchet 2: Profit Lock (at 1.0x ATR profit, lock stop at entry)
@@ -516,8 +519,11 @@ class Strategy:
                         final_signals.append(Signal(symbol, 0.0))
 
                 elif pos < 0:
+                    # exp341: Adaptive Stop Multiplier
+                    stop_mult = 2.5 if macro_state == 2 else 1.8
+                    
                     # Ratchet 1: Standard trailing stop (non-retreating)
-                    new_trail = bar.close + (atr * 1.5 * bar.close)
+                    new_trail = bar.close + (atr * stop_mult * bar.close)
                     self.trailing_stops[symbol] = min(self.trailing_stops.get(symbol, 1e18), new_trail)
                     
                     # Ratchet 2: Profit Lock (at 1.0x ATR profit, lock stop at entry)
@@ -589,10 +595,13 @@ class Strategy:
                 if lookup_ts > 1e11: lookup_ts //= 1000
                 row = self.symbol_caches[symbol].get(lookup_ts, {})
                 atr  = row.get("atr_pct", 0.015)
+                # exp341: Adaptive Initial Stop
+                ms_init = row.get("macro_state", 1)
+                s_mult = 2.5 if ms_init == 2 else 1.8
                 if side == "long":
-                    self.trailing_stops[symbol] = bar_data[symbol].close - (atr * 2.0 * bar_data[symbol].close)
+                    self.trailing_stops[symbol] = bar_data[symbol].close - (atr * s_mult * bar_data[symbol].close)
                 else:
-                    self.trailing_stops[symbol] = bar_data[symbol].close + (atr * 2.0 * bar_data[symbol].close)
+                    self.trailing_stops[symbol] = bar_data[symbol].close + (atr * s_mult * bar_data[symbol].close)
                 self.entry_prices[symbol]  = bar_data[symbol].close
                 self.position_ages[symbol] = 0
                 current_pos_count += 1
