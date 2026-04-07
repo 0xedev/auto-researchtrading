@@ -545,8 +545,11 @@ class Strategy:
             p3_short = (meta_4h_qual > 0.58 and meta_1h_qual > 0.38 and bear_1h > 0.08)
 
             vol_ok = atr > 0.005 # Exp336 Volatility Filter
-            is_entry_long  = (p1_long or p2_long or p3_long) and not self._macro_bear and vol_ok and rsi_8 < 65
-            is_entry_short = (p1_short or p2_short or p3_short) and vol_ok and rsi_8 > 35
+            m_ret_4h = sum(self._market_ret_buf[-4:]) if len(self._market_ret_buf) >= 4 else 0.0
+            
+            # Momentum Alignment (exp337)
+            is_entry_long  = (p1_long or p2_long or p3_long) and not self._macro_bear and vol_ok and rsi_8 < 65 and m_ret_4h > -0.002
+            is_entry_short = (p1_short or p2_short or p3_short) and vol_ok and rsi_8 > 35 and m_ret_4h < 0.002
 
             # === CONTINUOUS SIZING (exp256 baseline) ===
             mret_sum  = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
@@ -576,9 +579,9 @@ class Strategy:
                 row = self.symbol_caches[symbol].get(lookup_ts, {})
                 atr  = row.get("atr_pct", 0.015)
                 if side == "long":
-                    self.trailing_stops[symbol] = bar_data[symbol].close - (atr * 1.5 * bar_data[symbol].close)
+                    self.trailing_stops[symbol] = bar_data[symbol].close - (atr * 2.0 * bar_data[symbol].close)
                 else:
-                    self.trailing_stops[symbol] = bar_data[symbol].close + (atr * 1.5 * bar_data[symbol].close)
+                    self.trailing_stops[symbol] = bar_data[symbol].close + (atr * 2.0 * bar_data[symbol].close)
                 self.entry_prices[symbol]  = bar_data[symbol].close
                 self.position_ages[symbol] = 0
                 current_pos_count += 1
