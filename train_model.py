@@ -19,6 +19,7 @@ from prepare import (
 )
 
 def build_model(n_trees, depth, learning_rate):
+    # early_stopping_rounds set in constructor for sklearn wrapper (XGB 1.6+)
     return xgb.XGBClassifier(
         n_estimators=n_trees,
         max_depth=depth,
@@ -26,7 +27,9 @@ def build_model(n_trees, depth, learning_rate):
         n_jobs=-1,
         tree_method='hist',
         colsample_bytree=0.7,
+        subsample=0.8,
         random_state=42,
+        early_stopping_rounds=20 
     )
 
 
@@ -83,10 +86,30 @@ def train_macro_hmm():
         else:
             merged = pd.merge(merged, df, on='timestamp', how='inner')
             
-    # Features for the HMM: [BTC_Ret, BTC_Vol, ETH/BTC_Ret, XAU_Ret, SP500_Ret]
-    merged['ETH_BTC_ret'] = merged['ETH_ret'] - merged['BTC_ret']
+    # Bounded features for the HMM: [BTC_RSI, BTC_Vol_Ratio, ETH_BTC_Spread_RSI, BTC_Mom_Ratio, Global_Vol]
+    merged['ETH_BTC_ratio'] = merged['ETH_ret'] - merged['BTC_ret']
     
-    features = ['BTC_ret', 'BTC_vol', 'ETH_BTC_ret', 'XAU_ret', 'SP500_ret']
+    # 1. BTC RSI (Bounded 0-100)
+    # We'll calculate a simple 14-period RSI here natively
+    def calc_rsi(series, period=14):
+        delta = series.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss.replace(0, 1e-10)
+        return 100 - (100 / (1 + rs))
+
+    merged['BTC_RSI'] = calc_rsi(merged['BTC_ret'], 14)
+    merged['ETH_BTC_RSI'] = calc_rsi(merged['ETH_BTC_ratio'], 14)
+    
+    # 2. Volatility Ratio (Spike detection)
+    merged['BTC_vol_24h'] = merged['BTC_ret'].rolling(24).std()
+    merged['BTC_vol_ratio'] = merged['BTC_vol'] / merged['BTC_vol_24h'].replace(0, 1e-10)
+    
+    # 3. Momentum Ratio (Trend detection)
+    merged['BTC_mom'] = merged['BTC_ret'].rolling(24).sum()
+    
+    features = ['BTC_RSI', 'BTC_vol_ratio', 'ETH_BTC_RSI', 'BTC_mom', 'BTC_vol']
+    merged = merged.replace([np.inf, -np.inf], 0).ffill().fillna(0)
     X_raw = merged[features].values
     
     from sklearn.preprocessing import StandardScaler
@@ -97,8 +120,9 @@ def train_macro_hmm():
     model = hmm.GaussianHMM(
         n_components=4, 
         covariance_type="full", 
-        n_iter=1000, 
-        random_state=42
+        n_iter=2000, 
+        random_state=42,
+        init_params="stmc" 
     )
     model.fit(X_scaled)
     
@@ -120,32 +144,51 @@ def train(timeframe, specialists=True):
         X, y, y_meta, states, test_size=0.2, shuffle=False
     )
 
-    n_trees = args.n_trees if args.n_trees else 100
-    depth = args.depth if args.depth else {"1h": 12, "4h": 14, "15m": 12}.get(timeframe, 12)
+    n_trees = args.n_trees if args.n_trees else 250
+    depth = args.depth if args.depth else {"1h": 14, "4h": 16, "15m": 12}.get(timeframe, 14)
     os.makedirs("models", exist_ok=True)
 
     if specialists:
         print("Training Regime-Specific Specialists (Medallion Strategy)...")
         for state in range(4):
-            mask = (s_train == state)
-            if mask.sum() < 200: # Lowered threshold
-                print(f"Skipping State {state}: Insufficient data ({mask.sum()} samples)")
+            mask_train = (s_train == state)
+            mask_val = (s_val == state)
+            
+            if mask_train.sum() < 200: 
+                print(f"Skipping State {state}: Insufficient data ({mask_train.sum()} samples)")
                 continue
             
             print(f"--- Training Specialist: State {state} ---")
-            X_s = X_train[mask]
-            y_s = y_train[mask]
-            ym_s = y_meta_train[mask]
+            X_s = X_train[mask_train]
+            y_s = y_train[mask_train]
+            ym_s = y_meta_train[mask_train]
             
+            X_v = X_val[mask_val][FEATURE_COLS]
+            y_v = y_val[mask_val]
+            ym_v = y_meta_val[mask_val]
+            
+            # 1. Lead Model
             model = build_model(n_trees, depth, 0.05)
             w_s = compute_sample_weight(class_weight="balanced", y=y_s)
-            model.fit(X_s, y_s, sample_weight=w_s)
+            
+            if len(X_v) > 50:
+                model.fit(X_s, y_s, sample_weight=w_s, eval_set=[(X_v, y_v)], verbose=False)
+            else:
+                model.set_params(early_stopping_rounds=None)
+                model.fit(X_s, y_s, sample_weight=w_s)
             model.save_model(f"models/lead_{timeframe}_s{state}.json")
             
+            # 2. Meta Model
             meta_target = (ym_s == 1).astype(int)
+            meta_val_target = (ym_v == 1).astype(int)
             w_meta = compute_sample_weight(class_weight="balanced", y=meta_target)
+            
             meta_model = build_model(n_trees, depth - 2, 0.03)
-            meta_model.fit(X_s, meta_target, sample_weight=w_meta)
+            if len(X_v) > 50:
+                meta_model.fit(X_s, meta_target, sample_weight=w_meta, eval_set=[(X_v, meta_val_target)], verbose=False)
+            else:
+                meta_model.set_params(early_stopping_rounds=None)
+                meta_model.fit(X_s, meta_target, sample_weight=w_meta)
             meta_model.save_model(f"models/meta_{timeframe}_s{state}.json")
     
     # Also train a "Global" fallback model
@@ -159,19 +202,19 @@ def train(timeframe, specialists=True):
 
         print("Training Stage 1A: Long Lead (15m)...")
         long_model = build_model(n_trees, depth, 0.05)
-        long_model.fit(X_train, long_target)
+        long_model.fit(X_train, long_target, eval_set=[(X_val[FEATURE_COLS], (y_val == 1).astype(int))], verbose=False)
 
         print("Training Stage 1B: Short Lead (15m)...")
         short_model = build_model(n_trees, depth, 0.05)
-        short_model.fit(X_train, short_target)
+        short_model.fit(X_train, short_target, eval_set=[(X_val[FEATURE_COLS], (y_val == 2).astype(int))], verbose=False)
 
         print("Training Stage 2A: Long Meta (15m)...")
         long_meta_model = build_model(n_trees, depth - 2, 0.03)
-        long_meta_model.fit(X_train, long_meta_target)
+        long_meta_model.fit(X_train, long_meta_target, eval_set=[(X_val[FEATURE_COLS], ((y_val == 1) & (y_meta_val == 1)).astype(int))], verbose=False)
 
         print("Training Stage 2B: Short Meta (15m)...")
         short_meta_model = build_model(n_trees, depth - 2, 0.03)
-        short_meta_model.fit(X_train, short_meta_target)
+        short_meta_model.fit(X_train, short_meta_target, eval_set=[(X_val[FEATURE_COLS], ((y_val == 2) & (y_meta_val == 1)).astype(int))], verbose=False)
 
         long_model.save_model("models/lead_long_15m.xgb")
         short_model.save_model("models/lead_short_15m.xgb")
@@ -197,12 +240,14 @@ def train(timeframe, specialists=True):
         print(f"Training Primary XGBClassifier (n={n_trees}, d={depth})...")
         print(f"Training Stage 1: Directional Lead ({timeframe})...")
         model = build_model(n_trees, depth, 0.05)
-        model.fit(X_train, y_train)
+        # Global fallback uses full validation set for early stopping
+        model.fit(X_train, y_train, eval_set=[(X_val[FEATURE_COLS], y_val)], verbose=False)
 
         print(f"Training Stage 2: Meta-Labeling ({timeframe})...")
         meta_target = (y_meta_train == 1).astype(int)
+        meta_val_target = (y_meta_val == 1).astype(int)
         meta_model = build_model(n_trees, depth - 2, 0.03)
-        meta_model.fit(X_train, meta_target)
+        meta_model.fit(X_train, meta_target, eval_set=[(X_val[FEATURE_COLS], meta_val_target)], verbose=False)
 
         model.save_model(f"models/lead_{timeframe}.json")
         meta_model.save_model(f"models/meta_{timeframe}.json")

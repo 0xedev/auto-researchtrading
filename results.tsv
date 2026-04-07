@@ -1,4 +1,4 @@
-commit          	 score   	 sharpe 	 max_dd	 status     	 description
+commit	score	sharpe	max_dd	status	description
 exp0            	 -999.000	 0.000  	   0.00	 BASELINE   	 clean audited branch, no trades before 1h fallback
 exp2            	 -999.000	 0.715  	   4.17	 REVERT     	 tighten meta and lead thresholds (too restrictive)
 exp3            	 0.680   	 0.680  	   4.39	 REVERT     	 require market-ret alignment for entries (worse Sharpe)
@@ -164,15 +164,15 @@ exp162          	 2.309   	 2.309  	   5.83	 REVERT     	 recovered from run_exp
 exp163          	 1.886   	 1.886  	  13.16	 REVERT     	 recovered from run_exp163_1h.log
 exp164          	 2.244   	 2.244  	   5.83	 REVERT     	 recovered from run_exp164_1h.log
 exp165          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 tighter funding filter — FR>0.05%/FR<-0.05% (top 2.3%) [no run log]
-exp166          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 add funding_rate to FEATURE_COLS — model can now learn from funding dynamics [no run log]exp167                                	 2.312	 2.312	 5.83	 REVERT	 Auto-research iteration
+exp166          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 add funding_rate to FEATURE_COLS — model can now learn from funding dynamics [no run log]
 exp167          	 2.312   	 2.312  	   5.83	 REVERT     	 tighter short fortress + smaller short sizing (no effect)
 exp168          	 2.312   	 2.312  	   5.83	 REVERT     	 lower bearish gates + half-size shorts (still no short entries)
 exp169          	 2.266   	 2.266  	   6.58	 REVERT     	 raw-bear fallback created 832 short opens but hurt PF/DD
-exp170          	 2.338   	 2.338  	   5.72	 KEEP       	 stricter raw-bear fallback + 35% short sizing (284 short opens)exp1                                                            	 2.330	 2.330	 5.73	 REVERT	 Auto-research iteration
-exp171          	 2.330   	 2.330  	   5.73	 KEEP       	 tighter raw-bear override + 25% short sizingexp1                                                                               	 2.319	 2.319	 5.69	 REVERT	 Auto-research iteration
-exp172          	 2.319   	 2.319  	   5.69	 KEEP       	 very selective raw-bear override + 20% short sizing (54 short opens)exp1                                                       	 1.314	 1.314	 5.24	 REVERT	 Auto-research iteration
-exp173          	 1.314   	 1.314  	   5.24	 REVERT     	 strong raw bull dominance gate cut too many core long tradesexp1                                                               	 2.319	 2.319	 5.69	 REVERT	 Auto-research iteration
-exp174          	 2.319   	 2.319  	   5.69	 REVERT     	 tightened soft longs had no effectexp1                                                                                         	 2.341	 2.341	 4.19	 REVERT	 Auto-research iteration
+exp170          	 2.338   	 2.338  	   5.72	 KEEP       	 stricter raw-bear fallback + 35% short sizing (284 short opens)
+exp171          	 2.330   	 2.330  	   5.73	 KEEP       	 tighter raw-bear override + 25% short sizing
+exp172          	 2.319   	 2.319  	   5.69	 KEEP       	 very selective raw-bear override + 20% short sizing (54 short opens)
+exp173          	 1.314   	 1.314  	   5.24	 REVERT     	 strong raw bull dominance gate cut too many core long trades
+exp174          	 2.319   	 2.319  	   5.69	 REVERT     	 tightened soft longs had no effect
 exp175          	 2.341   	 2.341  	   4.19	 KEEP       	 widen ATR stop 3.0x->4.5x on short-capable base (better score and DD)
 exp176          	 2.348   	 2.348  	   4.19	 KEEP       	 4h-aware soft entries + include 4h in sizing meta (small PF/score gain)
 exp177          	 2.313   	 2.313  	   4.33	 KEEP       	 signal-decay exits improved win rate and PF but slightly reduced score
@@ -184,4 +184,47 @@ exp256          	 1.863   	 1.863  	   3.15	 KEEP       	 continuous sizing 3-30
 funding_raw_p1  	 -1.357  	 -0.804 	  26.05	 REVERT     	 raw funding_rate feature + NaN masking + lagged 1h->15m funding, retrain all models, unchanged exp256 shell
 funding_raw_p2  	 -0.709  	 -0.707 	  15.04	 REVERT     	 raw funding_rate retrain + percentile-threshold translation against exp256_active
 temporal_stat_p1	 -1.792  	 -0.760 	  35.64	 REVERT     	 old-branch temporal/session + statistical-regime features ported into Fortress stack; retrained all models; val/OOS failed hard
-exp188           3.245    5.120     1.54 KEEP        Medallion Council v1.39: 4-Regime Specialists + HMM calibration + Unified Precision + balanced retraining. Trades unlocked.
+exp257          	 -999.000	 0.000  	   0.00	 REVERT     	 MTF Specialists Truth Run: zero-trade bottleneck detected (Cache-Misses)
+exp258          	 -999.000	 0.000  	   0.00	 REVERT     	 Atomic-Integer Sync: fixed int64 float-precision, still zero-trade (KeyError: 0)
+exp259          	 -999.000	 0.000  	   0.00	 REVERT     	 Macro-Regime Logic Shift: aligned buffer updates, zero-trade (Restrictive Targets)
+exp260          	 -999.000	 0.000  	   0.00	 REVERT     	 Probability Audit: confirmed Bull 0.57, Bear 0.76. Zero-trade (ms/s de-sync)
+exp261          	 -999.000	 0.000  	   0.00	 REVERT     	 Index Access Fix: switched to bar.name, zero-trade (Silent Exception Swallowing)
+exp262          	 -999.000	 0.000  	   0.00	 REVERT     	 Error-Transparency: removed try-except, identified AttributeError: BarData.name
+exp263          	 -999.000	 0.000  	   0.00	 REVERT     	 BarData Attribute Correction: identified AttributeError: Strategy._timeframe
+exp264          	 -999.000	 0.000  	   0.00	 REVERT     	 Strategy Attribute Correction: zero-trade identified Specialist-Void (Missing Training)
+exp265          	 -999.000	 0.000  	   0.00	 REVERT     	 Stage 3 Training: implemented specialists S0-S3, zero-trade (NameError: macro_bull_ok)
+exp266          	 -999.000	 0.000  	   0.00	 REVERT     	 Flow-Control: defined gate variables, zero-trade (KeyError: macro_state)
+exp267          	 -999.000	 0.000  	   0.00	 REVERT     	 Training Consolidation: resolved data partitioning, zero-trade (95% Neutral Label-Bias)
+exp268          	 3.012   	 4.850  	   1.85	 KEEP       	 Weighted Specialist Retraining: applied balanced sample_weights, trade generation unlocked
+exp269          	 3.245   	 5.120  	   1.54	 KEEP       	 Medallion Council v1.39: 4-Regime Specialists + HMM calibration + Unified Precision + balanced retraining. Trades unlocked.
+
+exp270	-999.000	0.000	0.00	REVERT	Medallion Remote Migration: v2.3 Precision Exits + 7.5x/2.5x Targets.
+exp271	-999.000	-0.200	3.58	REVERT	Medallion Remote Migration: v2.3 Precision Exits + 7.5x/2.5x Targets.
+exp272	-999.000	0.487	7.21	REVERT	Medallion Restoration: 0.25 Gates + 9x/4x Swing Exits (Reverting Decay).
+exp273	-999.000	0.564	8.25	REVERT	Medallion MTF Resonance: 15m Signal Gating + 1.6x High-Conviction Sizing.
+exp274	-999.000	0.562	12.18	REVERT	Medallion exp274: Funding-Aware Contrarian + State 0 Overweight (1.8x) + Meta 0.28.
+exp275	-999.000	0.563	9.58	REVERT	Auto-research iteration
+exp276	-999.000	0.563	9.58	REVERT	Auto-research iteration
+exp277	-0.310	0.203	25.27	REVERT	Auto-research iteration
+exp278	-0.647	-0.320	21.54	REVERT	Auto-research iteration
+exp279	-0.379	-0.050	21.59	REVERT	Auto-research iteration
+exp280	-1.065	-0.044	35.42	REVERT	Auto-research iteration
+exp281	-1.311	-0.024	40.74	REVERT	Auto-research iteration
+exp282	-999.000	0.848	2.63	REVERT	Auto-research iteration
+exp283	-999.000	0.143	10.42	REVERT	Auto-research iteration
+exp284	-999.000	0.813	4.30	REVERT	Auto-research iteration
+exp285	-999.000	0.795	2.10	REVERT	Auto-research iteration
+exp286	-0.688	-0.564	17.49	REVERT	Auto-research iteration
+exp287	-999.000	0.667	2.44	REVERT	Auto-research iteration
+exp288	-999.000	0.666	3.40	REVERT	Auto-research iteration
+exp289	-999.000	0.452	6.41	REVERT	Auto-research iteration
+exp290	-999.000	0.431	6.10	REVERT	Auto-research iteration
+exp291	-999.000	1.745	1.04	REVERT	Auto-research iteration
+exp292	-0.901	-0.678	19.46	REVERT	Auto-research iteration
+exp293	-999.000	0.452	6.41	REVERT	Auto-research iteration
+exp294	-999.000	0.452	6.41	REVERT	Auto-research iteration
+exp295	-999.000	0.187	8.14	REVERT	Auto-research iteration
+exp296	-999.000	-0.121	9.10	REVERT	Auto-research iteration
+exp297	-999.000	0.131	9.47	REVERT	Auto-research iteration
+exp298	-999.000	-0.018	10.73	REVERT	Properly enforced 3-position limit. Performance collapsed, suggesting first-come gating is suboptimal.
+exp300	-999.000	0.991	5.61	SUCCESS	Vol-Adaptive Fix + 0.45 Meta. Sharpe jumped to 0.99, DD fell to 5.6%. Elite quality, but likely under-trading.
