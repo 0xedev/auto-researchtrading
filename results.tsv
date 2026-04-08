@@ -289,3 +289,4 @@ exp358	-999.000	0.774	2.44	REVERT	apr08-vast4090 15m campaign ranked p4 control 
 exp359	0.858	0.858	2.85	REVERT	apr08-vast4090 15m campaign ranked p4 push_relax control
 exp360	1.001	1.001	2.44	REVERT	apr08-vast4090 15m campaign ranked p4 push_relax push_bias
 exp361	0.613	0.613	5.08	CANDIDATE	apr08-vast4090 15m infra reset soft slow-tf ranking
+exp362	0.937	0.937	4.36	CANDIDATE	apr08-vast4090 15m soft slow-tf ranked p4 push_relax push_bias
