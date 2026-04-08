@@ -20,15 +20,15 @@ This file is the lightweight guidance layer for the AI researcher. Manual notes 
 
 <!-- BEGIN AUTO SUMMARY -->
 ## Auto Summary
-- Updated: 2026-04-08 23:05 UTC
-- Total logged runs: 290
+- Updated: 2026-04-08 23:19 UTC
+- Total logged runs: 291
 - Best run: `exp269` | score 3.245 | Medallion Council v1.39: 4-Regime Specialists + HMM calibration + Unified Precision + balanced retraining. Trades unlocked.
-- Last run: `exp362` | CANDIDATE | score 0.937 | apr08-vast4090 15m soft slow-tf ranked p4 push_relax push_bias
+- Last run: `exp363` | CANDIDATE | score 0.937 | apr08-vast4090 15m soft slow-tf ranked p3 push_relax push_bias
 - Last KEEP: `exp269` | score 3.245 | Medallion Council v1.39: 4-Regime Specialists + HMM calibration + Unified Precision + balanced retraining. Trades unlocked.
-- Last promising run: `exp362` | score 0.937 | apr08-vast4090 15m soft slow-tf ranked p4 push_relax push_bias
+- Last promising run: `exp363` | score 0.937 | apr08-vast4090 15m soft slow-tf ranked p3 push_relax push_bias
 - Recent keep rate: 0.00% over the last 20 runs
-- Recent progress rate: 40.00% over the last 20 runs
-- Runs since best: 92
+- Recent progress rate: 45.00% over the last 20 runs
+- Runs since best: 93
 - Suggested mode: `exploit`
 - Revert-heavy themes: apr08, vast4090, 15m, campaign, control
 - Keep-heavy themes: apr08, vast4090, 15m, push_relax, campaign
