@@ -228,3 +228,64 @@ exp296	-999.000	-0.121	9.10	REVERT	Auto-research iteration
 exp297	-999.000	0.131	9.47	REVERT	Auto-research iteration
 exp298	-999.000	-0.018	10.73	REVERT	Properly enforced 3-position limit. Performance collapsed, suggesting first-come gating is suboptimal.
 exp300	-999.000	0.991	5.61	SUCCESS	Vol-Adaptive Fix + 0.45 Meta. Sharpe jumped to 0.99, DD fell to 5.6%. Elite quality, but likely under-trading.
+exp301	0.667	0.667	2.69	REVERT	exp338: Quantum Medallion Hybrid (Sizing 0.03-0.15 + 5-D RSI HMM)
+exp302	0.681	0.681	2.60	REVERT	exp339: Ratchet Trailing Stops (Lock-at-Entry 1.0x ATR + Non-Retreating Standard Trail)
+exp303	0.506	0.506	4.17	REVERT	exp340: Short-Side Symmetry + Funding Filter (Relaxed short gates by 0.02 + Contrarian funding < 0.03% abs)
+exp304	0.391	0.391	4.56	REVERT	exp341: Adaptive Vol-Stop Scaling (State 2: 2.5x ATR, State 1: 1.8x ATR)
+exp305	0.392	0.392	5.66	REVERT	exp342: Specialist Council Voting (15m/1h/4h confluence boost 1.25x)
+exp306	-2.108	-1.028	36.61	REVERT	exp344: Alpha Density Push (Loosened gates ~0.05, 1.5x ATR stops, TTP armed 3.0x ATR)
+exp307	0.437	0.437	3.95	REVERT	exp347: Precision Alpha + Vol-Spike Filter (Restore Gates, ATR 1.8x Skip, 1.5x Ratchet)
+exp308	-999.000	0.461	2.06	REVERT	exp348: Macro-Regime Resonance (Longs only in S1, Shorts only in S2)
+exp309	0.238	0.238	3.73	REVERT	exp349: Soft Macro Resonance (0.5x size penalty for counter-trend trades)
+exp310	-999.000	0.461	1.65	REVERT	Auto-research iteration
+exp311	-999.000	0.461	1.65	REVERT	Auto-research iteration
+exp312	0.180	0.180	1.21	REVERT	apr08-vast4090 remote baseline
+exp313	0.180	0.180	1.21	REVERT	apr08-vast4090 restore state routing
+exp314	-999.000	-0.525	24.91	REVERT	apr08-vast4090 restore exp269 logic v3
+exp315	-4.191	-2.950	39.83	REVERT	apr08-vast4090 zero macro fallback
+exp316	0.091	0.091	1.23	REVERT	apr08-vast4090 add XAU 1h anchor v3
+exp317	0.091	0.091	1.23	REVERT	apr08-vast4090 retrain 1h+hmm specialists
+exp318	-999.000	0.000	0.00	REVERT	apr08-vast4090 activate macro+funding cache
+exp319	0.170	0.170	2.58	REVERT	apr08-vast4090 calibrated hmm semantics
+exp320	0.212	0.212	2.39	REVERT	apr08-vast4090 balanced retrain calibrated hmm
+exp321	-999.000	-0.590	2.64	REVERT	apr08-vast4090 exp320 oos retest
+exp322	0.093	0.093	1.26	REVERT	apr08-vast4090 pretrain models live regime wiring
+exp323	-999.000	-0.590	2.64	REVERT	apr08-vast4090 1h retrain old 4h oos
+exp324	-999.000	-0.590	2.64	REVERT	apr08-vast4090 pretrain wiring oos
+exp325	-0.375	-0.375	7.73	REVERT	apr08-vast4090 1h core gate simplification
+exp326	-999.000	0.036	1.44	REVERT	apr08-vast4090 1h core gate tightening
+exp327	-0.145	-0.145	3.74	REVERT	apr08-vast4090 1h budgeted allocator
+exp328	-0.158	-0.158	2.41	REVERT	apr08-vast4090 1h 15m timing filter
+exp329	-0.274	-0.274	4.23	REVERT	apr08-vast4090 restore 15m directional specialists
+exp330	-999.000	-0.279	1.89	REVERT	apr08-vast4090 15m specialist confirmation
+exp331	-999.000	-0.096	1.78	REVERT	apr08-vast4090 asymmetric short gate
+exp332	-999.000	-0.096	1.78	REVERT	apr08-vast4090 long only diagnostic
+exp333	-999.000	-0.519	21.87	REVERT	apr08-vast4090 exp269 architecture retest
+exp334	-999.000	0.000	0.00	REVERT	apr08-vast4090 15m architecture probe
+exp335	0.045	0.045	4.20	REVERT	apr08-vast4090 15m long bias calibration
+exp336	0.242	0.242	5.84	REVERT	apr08-vast4090 15m long bias trim
+exp337	-999.000	0.056	5.46	REVERT	apr08-vast4090 15m long bias trim v2
+exp338	-999.000	0.470	2.85	REVERT	apr08-vast4090 15m flow recovery
+exp339	-999.000	0.470	2.85	REVERT	apr08-vast4090 15m add-on unlock
+exp340	0.672	0.672	2.85	REVERT	apr08-vast4090 15m push unlock
+exp341	0.786	0.786	2.44	REVERT	apr08-vast4090 15m trend push reweight
+exp342	-999.000	0.132	5.46	REVERT	apr08-vast4090 15m longer hold
+exp343	-999.000	0.657	2.85	REVERT	apr08-vast4090 15m scalein clamp
+exp344	-999.000	0.657	2.85	REVERT	apr08-vast4090 15m ranked entry allocator
+exp345	-999.000	0.657	2.85	REVERT	apr08-vast4090 15m push priority allocator
+exp346	-999.000	0.774	2.44	REVERT	apr08-vast4090 15m campaign push_priority p4 control push_bias
+exp347	0.858	0.858	2.85	REVERT	apr08-vast4090 15m campaign push_priority p4 push_relax control
+exp348	1.001	1.001	2.44	REVERT	apr08-vast4090 15m campaign push_priority p4 push_relax push_bias
+exp349	-999.000	1.029	2.45	REVERT	apr08-vast4090 15m campaign push_priority p4 hybrid control
+exp350	-999.000	1.143	2.25	REVERT	apr08-vast4090 15m campaign push_priority p4 hybrid push_bias
+exp351	-999.000	0.657	2.85	REVERT	apr08-vast4090 15m campaign push_priority p3 control control
+exp352	-999.000	0.774	2.44	REVERT	apr08-vast4090 15m campaign push_priority p3 control push_bias
+exp353	0.858	0.858	2.85	REVERT	apr08-vast4090 15m campaign push_priority p3 push_relax control
+exp354	1.002	1.002	2.44	REVERT	apr08-vast4090 15m campaign push_priority p3 push_relax push_bias
+exp355	-999.000	1.029	2.45	REVERT	apr08-vast4090 15m campaign push_priority p3 hybrid control
+exp356	-999.000	1.143	2.25	REVERT	apr08-vast4090 15m campaign push_priority p3 hybrid push_bias
+exp357	-999.000	0.657	2.85	REVERT	apr08-vast4090 15m campaign ranked p4 control control
+exp358	-999.000	0.774	2.44	REVERT	apr08-vast4090 15m campaign ranked p4 control push_bias
+exp359	0.858	0.858	2.85	REVERT	apr08-vast4090 15m campaign ranked p4 push_relax control
+exp360	1.001	1.001	2.44	REVERT	apr08-vast4090 15m campaign ranked p4 push_relax push_bias
+exp361	0.613	0.613	5.08	CANDIDATE	apr08-vast4090 15m infra reset soft slow-tf ranking

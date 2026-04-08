@@ -69,6 +69,7 @@ VAL_START   = "2022-07-01"   # 2-year window: crash → recovery → bull
 VAL_END     = "2024-06-30"
 TEST_START  = "2022-07-01"
 TEST_END    = "2024-06-30"
+DATA_END    = "2025-12-31"   # Download horizon must cover the quarantined OOS year
 ROBUST_START = "2018-01-01"
 ROBUST_END   = "2024-06-30"
 
@@ -287,6 +288,9 @@ class BacktestResult:
     annual_turnover: float = 0.0
     backtest_seconds: float = 0.0
     duration_days: float = 0.0
+    timed_out: bool = False
+    bars_processed: int = 0
+    total_bars: int = 0
     equity_curve: list = field(default_factory=list)
     trade_log: list = field(default_factory=list)
 
@@ -696,33 +700,44 @@ def download_data(symbols=None):
         symbols = SYMBOLS
 
     start_ms = int(pd.Timestamp(TRAIN_START, tz="UTC").timestamp() * 1000)
-    end_ms = int(pd.Timestamp(TEST_END, tz="UTC").timestamp() * 1000)
+    end_ms = int(pd.Timestamp(DATA_END, tz="UTC").timestamp() * 1000)
 
     for symbol in symbols:
         filepath = os.path.join(DATA_DIR, f"{symbol}_1h.parquet")
+        existing = None
+        fetch_start_ms = start_ms
         if os.path.exists(filepath):
             existing = pd.read_parquet(filepath)
-            print(f"  {symbol}: already have {len(existing)} bars")
-            continue
+            existing = existing.drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+            if not existing.empty:
+                last_ts = int(pd.to_numeric(existing["timestamp"], errors="coerce").dropna().max())
+                fetch_start_ms = last_ts + 3600 * 1000
+                if fetch_start_ms >= end_ms:
+                    print(f"  {symbol}: already have {len(existing)} bars through {pd.to_datetime(last_ts, unit='ms', utc=True)}")
+                    continue
+                print(f"  {symbol}: extending from {pd.to_datetime(fetch_start_ms, unit='ms', utc=True)}...")
 
         print(f"  {symbol}: downloading candles from CryptoCompare...")
 
         # Use CryptoCompare for reliable historical OHLCV (no geo-restrictions)
-        df = _download_cryptocompare_candles(symbol, start_ms, end_ms)
+        df = _download_cryptocompare_candles(symbol, fetch_start_ms, end_ms)
         if len(df) < 100:
             print(f"  {symbol}: CryptoCompare insufficient ({len(df)} bars), trying HL...")
-            df = _download_hl_candles(symbol, "1h", start_ms, end_ms)
+            df = _download_hl_candles(symbol, "1h", fetch_start_ms, end_ms)
 
         if df.empty:
-            print(f"  {symbol}: NO DATA AVAILABLE, skipping")
+            if existing is not None and not existing.empty:
+                print(f"  {symbol}: no new data available beyond current cache")
+            else:
+                print(f"  {symbol}: NO DATA AVAILABLE, skipping")
             continue
 
         # Download funding rates (Binance first, fallback to Hyperliquid)
         print(f"  {symbol}: downloading funding rates from Binance...")
-        funding = _download_binance_funding(symbol, start_ms, end_ms)
+        funding = _download_binance_funding(symbol, fetch_start_ms, end_ms)
         if funding.empty:
             print(f"  {symbol}: Binance funding unavailable, trying Hyperliquid...")
-            funding = _download_hl_funding(symbol, start_ms, end_ms)
+            funding = _download_hl_funding(symbol, fetch_start_ms, end_ms)
 
         # Merge
         df = df.drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
@@ -734,6 +749,12 @@ def download_data(symbols=None):
             df["funding_rate"] = 0.0
         df["funding_rate"] = df["funding_rate"].fillna(0.0)
 
+        if existing is not None and not existing.empty:
+            if "funding_rate" not in existing.columns:
+                existing["funding_rate"] = 0.0
+            df = pd.concat([existing, df], ignore_index=True)
+            df = df.drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+
         df.to_parquet(filepath, index=False)
         print(f"  {symbol}: saved {len(df)} bars to {filepath}")
 
@@ -744,29 +765,48 @@ def download_15m_data(symbols=None):
     if symbols is None:
         symbols = SYMBOLS_15M
 
-    end_ms = int(pd.Timestamp(TEST_END, tz="UTC").timestamp() * 1000)
+    end_ms = int(pd.Timestamp(DATA_END, tz="UTC").timestamp() * 1000)
 
     for symbol in symbols:
         filepath = os.path.join(DATA_DIR, f"{symbol}_15m.parquet")
+        existing = None
         if os.path.exists(filepath):
             existing = pd.read_parquet(filepath)
-            print(f"  {symbol}: already have {len(existing)} 15m bars")
-            continue
+            existing = existing.drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+            if not existing.empty:
+                last_ts = int(pd.to_numeric(existing["timestamp"], errors="coerce").dropna().max())
+                next_ts = last_ts + 15 * 60 * 1000
+                if next_ts >= end_ms:
+                    print(f"  {symbol}: already have {len(existing)} 15m bars through {pd.to_datetime(last_ts, unit='ms', utc=True)}")
+                    continue
 
         if symbol == "XAU":
             df = _download_hf_xau_15m()
         else:
             start_date = BINANCE_15M_START.get(symbol, "2020-01-01")
-            start_ms = int(pd.Timestamp(start_date, tz="UTC").timestamp() * 1000)
+            if existing is not None and not existing.empty:
+                start_ms = int(pd.to_numeric(existing["timestamp"], errors="coerce").dropna().max()) + 15 * 60 * 1000
+                print(f"  {symbol}: extending 15m data from {pd.to_datetime(start_ms, unit='ms', utc=True)}...")
+            else:
+                start_ms = int(pd.Timestamp(start_date, tz="UTC").timestamp() * 1000)
             print(f"  {symbol}: downloading 15m candles from Binance (since {start_date})...")
             df = _download_binance_15m(symbol, start_ms, end_ms)
 
         if df is None or df.empty:
-            print(f"  {symbol}: NO 15m DATA AVAILABLE, skipping")
+            if existing is not None and not existing.empty:
+                print(f"  {symbol}: no new 15m data available beyond current cache")
+            else:
+                print(f"  {symbol}: NO 15m DATA AVAILABLE, skipping")
             continue
 
         # No funding rate on 15min source
         df["funding_rate"] = 0.0
+
+        if existing is not None and not existing.empty:
+            if "funding_rate" not in existing.columns:
+                existing["funding_rate"] = 0.0
+            df = pd.concat([existing, df], ignore_index=True)
+            df = df.drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
 
         df.to_parquet(filepath, index=False)
         print(f"  {symbol}: saved {len(df)} 15m bars to {filepath}")
@@ -788,6 +828,9 @@ def _resample_to_4h(df: pd.DataFrame) -> pd.DataFrame:
     })
     resampled = resampled.dropna(subset=['open', 'close'])
     resampled = resampled.reset_index(drop=True)
+    resampled["timestamp"] = pd.to_numeric(resampled["timestamp"], errors="coerce").round().astype("Int64")
+    resampled = resampled.dropna(subset=["timestamp"]).copy()
+    resampled["timestamp"] = resampled["timestamp"].astype("int64")
     return resampled
 
 
@@ -898,6 +941,8 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
     trade_log = []
     total_volume = 0.0
     prev_equity = INITIAL_CAPITAL
+    timed_out = False
+    processed_bars = 0
 
     # History buffers
     history_buffers = {symbol: [] for symbol in data}
@@ -905,6 +950,7 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
     for ts in timestamps:
         elapsed = time.time() - t_start
         if elapsed > TIME_BUDGET:
+            timed_out = True
             break
 
         portfolio.timestamp = ts
@@ -952,6 +998,7 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
 
         if not bar_data:
             continue
+        processed_bars += 1
 
         # Update portfolio equity (mark-to-market)
         unrealized_pnl = 0.0
@@ -1127,6 +1174,9 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
         annual_turnover=annual_turnover,
         backtest_seconds=t_end - t_start,
         duration_days=duration_days,
+        timed_out=timed_out,
+        bars_processed=processed_bars,
+        total_bars=len(timestamps),
         equity_curve=equity_curve,
         trade_log=trade_log,
     )

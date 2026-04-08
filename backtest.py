@@ -23,6 +23,23 @@ BENCHMARKS = {
 }
 
 
+def classify_run_status(result, score, timeframe):
+    duration_days = result.duration_days if result.duration_days > 0 else 0.0
+    trades_per_day = result.num_trades / duration_days if duration_days > 0 else 0.0
+
+    if timeframe == "15m":
+        if (
+            score > 0.0
+            and result.total_return_pct > 0.0
+            and trades_per_day >= 1.0
+            and result.max_drawdown_pct < 10.0
+        ):
+            return "CANDIDATE"
+        return "REVERT"
+
+    return "KEEP" if score > 3.0 else "REVERT"
+
+
 def timeout_handler(signum, frame):
     print("TIMEOUT: backtest exceeded time budget")
     exit(1)
@@ -279,7 +296,13 @@ if __name__ == "__main__":
     print(f"annual_turnover:    {result.annual_turnover:.2f}")
     print(f"backtest_seconds:   {result.backtest_seconds:.1f}")
     print(f"total_seconds:      {t_end - t_start:.1f}")
+    print(f"bars_processed:     {result.bars_processed}/{result.total_bars}")
+    print(f"timed_out:          {result.timed_out}")
     print_benchmark_audit(result, len(data))
+
+    if result.timed_out:
+        print("\nTIMEOUT: prepare.run_backtest hit the internal time budget. Refusing to log a partial result.")
+        raise SystemExit(2)
     
     if args.timeframe == "4h" and not args.oos:
         print_regimes(result, data)
@@ -299,15 +322,16 @@ if __name__ == "__main__":
         new_exp_id = "exp1"
 
     desc = getattr(args, 'description', 'Auto-research iteration')
+    status = classify_run_status(result, score, args.timeframe)
     new_row = {
         "commit": new_exp_id,
         "score": f"{score:.3f}",
         "sharpe": f"{result.sharpe:.3f}",
         "max_dd": f"{result.max_drawdown_pct:.2f}",
-        "status": "KEEP" if score > 3.0 else "REVERT",
+        "status": status,
         "description": desc
     }
     
     with open("results.tsv", "a") as f:
         f.write("\t".join([str(new_row[c]) for c in ["commit", "score", "sharpe", "max_dd", "status", "description"]]) + "\n")
-    print(f"\nLogged to results.tsv as {new_exp_id}")
+    print(f"\nLogged to results.tsv as {new_exp_id} [{status}]")

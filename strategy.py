@@ -45,6 +45,8 @@ class Strategy:
         self.meta_models = {}
         self.long_models = {} # fallback
         self.short_models = {} # fallback
+        self.long_meta_models = {}
+        self.short_meta_models = {}
         self.symbol_caches = {}
         self.bar_counts = {}
         self.models_loaded = False
@@ -53,17 +55,25 @@ class Strategy:
         self.entry_prices = {}
         self.profit_targets = {} # Trailing Take-Profit (TTP)
         self.position_ages = {}
+        self._flat_cooldowns = {}
         self._price_buffers = {} # {symbol: [p1, p2, ...]} for local TAs
         self._market_ret_buf = []
         self._macro_bear = False
         self._macro_hmm = None
+        self._macro_hmm_scaler = None
         self._current_hmm_state = 0
         self._bars_since_calibration = 0
         self._entry_confidence = {} # exp351: Track confidence for spectrum exits
 
         # Load Marco HMM if exists
-        hmm_path = "models/exp256_active/macro_hmm.joblib"
-        scaler_path = "models/exp256_active/macro_scaler.joblib"
+        hmm_path = self._resolve_first_existing_path(
+            "models/exp256_active/macro_hmm.joblib",
+            "models/macro_hmm.joblib",
+        )
+        scaler_path = self._resolve_first_existing_path(
+            "models/exp256_active/macro_scaler.joblib",
+            "models/macro_scaler.joblib",
+        )
         if os.path.exists(hmm_path):
             try:
                 self._macro_hmm = joblib.load(hmm_path)
@@ -77,6 +87,63 @@ class Strategy:
             except Exception as e:
                 print(f"Warning: Failed to load HMM Scaler: {e}")
 
+        self._cfg_15m = {
+            "exit_decay_age": self._env_int("STRAT_15M_EXIT_DECAY_AGE", 5),
+            "max_hold": self._env_int("STRAT_15M_MAX_HOLD", 6),
+            "scalein_bull": self._env_float("STRAT_15M_SCALEIN_BULL", 0.56),
+            "scalein_meta": self._env_float("STRAT_15M_SCALEIN_META", 0.34),
+            "trend_bull": self._env_float("STRAT_15M_TREND_BULL", 0.45),
+            "trend_meta": self._env_float("STRAT_15M_TREND_META", 0.25),
+            "trend_m1h": self._env_float("STRAT_15M_TREND_M1H", 0.27),
+            "trend_m4h": self._env_float("STRAT_15M_TREND_M4H", 0.18),
+            "trend_rsi_max": self._env_float("STRAT_15M_TREND_RSI_MAX", 67.0),
+            "trend_macro_bear_bull": self._env_float("STRAT_15M_TREND_MACRO_BEAR_BULL", 0.53),
+            "trend_weight": self._env_float("STRAT_15M_TREND_WEIGHT", 0.65),
+            "push_bull": self._env_float("STRAT_15M_PUSH_BULL", 0.43),
+            "push_meta": self._env_float("STRAT_15M_PUSH_META", 0.32),
+            "push_m1h": self._env_float("STRAT_15M_PUSH_M1H", 0.38),
+            "push_rsi_max": self._env_float("STRAT_15M_PUSH_RSI_MAX", 63.0),
+            "push_weight": self._env_float("STRAT_15M_PUSH_WEIGHT", 0.22),
+            "max_positions": self._env_int("STRAT_15M_MAX_POSITIONS", 4),
+            "allocator": os.getenv("STRAT_15M_ALLOCATOR", "push_priority").strip().lower() or "push_priority",
+        }
+
+    def _resolve_first_existing_path(self, *paths: str) -> str:
+        for path in paths:
+            if os.path.exists(path):
+                return path
+        return paths[0]
+
+    def _env_float(self, name: str, default: float) -> float:
+        raw = os.getenv(name)
+        if raw is None:
+            return default
+        try:
+            return float(raw)
+        except ValueError:
+            return default
+
+    def _env_int(self, name: str, default: int) -> int:
+        raw = os.getenv(name)
+        if raw is None:
+            return default
+        try:
+            return int(raw)
+        except ValueError:
+            return default
+
+    def _try_load_xgb_model(self, paths: List[str]):
+        for path in paths:
+            if not os.path.exists(path):
+                continue
+            model = xgb.XGBClassifier()
+            try:
+                model.load_model(path)
+                return model
+            except Exception as exc:
+                print(f"Warning: Failed to load model {path}: {exc}")
+        return None
+
     def _parse_timeframe(self, tf: str) -> int:
         if tf == "15m":
             return 15 * 60
@@ -86,40 +153,148 @@ class Strategy:
             return 14400
         return 0
 
+    def _normalize_timestamp_frame(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Coerce merge keys to stable integer timestamps for asof alignment."""
+        if "timestamp" not in df.columns:
+            return df.copy()
+
+        normalized = df.copy()
+        ts = pd.to_numeric(normalized["timestamp"], errors="coerce")
+        normalized = normalized.loc[ts.notna()].copy()
+        normalized["timestamp"] = ts.loc[ts.notna()].round().astype("int64")
+        return normalized.sort_values("timestamp").reset_index(drop=True)
+
+    def _map_hmm_states_to_regimes(self, anchor: pd.DataFrame, raw_states: np.ndarray):
+        """Map arbitrary HMM labels to stable semantic regimes.
+
+        Raw HMM state ids are only meaningful for the specialist models that were
+        trained on those same ids. The live strategy, however, needs consistent
+        bull/neutral/bear/crash semantics for sizing and directional throttles.
+        """
+        semantic = np.full(len(raw_states), 1, dtype=int)  # default to neutral
+        if len(raw_states) == 0 or "btc_ret" not in anchor or "btc_vol" not in anchor:
+            return semantic, {}
+
+        state_df = pd.DataFrame({
+            "state": raw_states,
+            "btc_ret": anchor["btc_ret"].values,
+            "btc_vol": anchor["btc_vol"].values,
+        })
+        stats = (
+            state_df.groupby("state")
+            .agg(
+                count=("state", "size"),
+                btc_ret_mean=("btc_ret", "mean"),
+                btc_vol_mean=("btc_vol", "mean"),
+            )
+            .reset_index()
+        )
+
+        min_count = max(25, len(raw_states) // 1000)
+        active = stats[stats["count"] >= min_count].copy()
+        if active.empty:
+            return semantic, {}
+
+        mapping = {int(row.state): 1 for row in active.itertuples()}
+        if len(active) == 1:
+            only_state = int(active.iloc[0]["state"])
+            return semantic, {only_state: 1}
+
+        bull_row = active.sort_values(["btc_ret_mean", "count"], ascending=[False, False]).iloc[0]
+        bull_state = int(bull_row["state"])
+        if bull_row["btc_ret_mean"] > 0:
+            mapping[bull_state] = 0
+
+        downside = active.sort_values(["btc_ret_mean", "btc_vol_mean"], ascending=[True, False]).reset_index(drop=True)
+        worst_row = downside.iloc[0]
+        worst_state = int(worst_row["state"])
+        vol_median = active["btc_vol_mean"].median()
+        looks_like_crash = (
+            worst_row["btc_ret_mean"] < -5e-4
+            and worst_row["btc_vol_mean"] > max(vol_median * 1.25, 0.02)
+        )
+        if looks_like_crash:
+            mapping[worst_state] = 3
+            remaining_bears = downside.iloc[1:]
+            remaining_bears = remaining_bears[remaining_bears["btc_ret_mean"] < -1e-4]
+            if not remaining_bears.empty:
+                mapping[int(remaining_bears.iloc[0]["state"])] = 2
+        elif worst_row["btc_ret_mean"] < -1e-4:
+            mapping[worst_state] = 2
+
+        semantic = np.array([mapping.get(int(state), 1) for state in raw_states], dtype=int)
+        return semantic, mapping
+
     def _load_models(self):
         for tf in ["15m", "1h", "4h"]:
-            # Specialist Model Loading from exp256_active
+            if tf == "15m":
+                long_lead = self._try_load_xgb_model([
+                    "models/lead_long_15m.xgb",
+                    "models/exp256_active/lead_long_15m.xgb",
+                ])
+                short_lead = self._try_load_xgb_model([
+                    "models/lead_short_15m.xgb",
+                    "models/exp256_active/lead_short_15m.xgb",
+                ])
+                long_meta = self._try_load_xgb_model([
+                    "models/meta_long_15m.xgb",
+                    "models/exp256_active/meta_long_15m.xgb",
+                ])
+                short_meta = self._try_load_xgb_model([
+                    "models/meta_short_15m.xgb",
+                    "models/exp256_active/meta_short_15m.xgb",
+                ])
+
+                if long_lead is not None:
+                    self.long_models[tf] = long_lead
+                if short_lead is not None:
+                    self.short_models[tf] = short_lead
+                if long_meta is not None:
+                    self.long_meta_models[tf] = long_meta
+                if short_meta is not None:
+                    self.short_meta_models[tf] = short_meta
+
+            # Specialist Model Loading: prefer top-level state snapshots when present,
+            # then fall back to any archived specialist artifacts.
             for state in range(4):
-                s_lead_path = f"models/exp256_active/lead_{tf}_s{state}.xgb"
-                s_meta_path = f"models/exp256_active/meta_{tf}_s{state}.xgb"
-                
-                if os.path.exists(s_lead_path):
-                    if tf not in self.models: self.models[tf] = {}
-                    self.models[tf][state] = xgb.XGBClassifier()
-                    self.models[tf][state].load_model(s_lead_path)
-                    
-                if os.path.exists(s_meta_path):
-                    if tf not in self.meta_models: self.meta_models[tf] = {}
-                    self.meta_models[tf][state] = xgb.XGBClassifier()
-                    self.meta_models[tf][state].load_model(s_meta_path)
+                lead_candidates = [
+                    f"models/lead_{tf}_s{state}.json",
+                    f"models/lead_{tf}_s{state}.xgb",
+                    f"models/exp256_active/lead_{tf}_s{state}.xgb",
+                ]
+                meta_candidates = [
+                    f"models/meta_{tf}_s{state}.json",
+                    f"models/meta_{tf}_s{state}.xgb",
+                    f"models/exp256_active/meta_{tf}_s{state}.xgb",
+                ]
+
+                lead_model = self._try_load_xgb_model(lead_candidates)
+                if lead_model is not None:
+                    if tf not in self.models:
+                        self.models[tf] = {}
+                    self.models[tf][state] = lead_model
+
+                meta_model = self._try_load_xgb_model(meta_candidates)
+                if meta_model is not None:
+                    if tf not in self.meta_models:
+                        self.meta_models[tf] = {}
+                    self.meta_models[tf][state] = meta_model
 
             # Global Fallback Loading
             m_paths = [f"models/lead_{tf}.xgb", f"models/lead_{tf}.json"]
             meta_paths = [f"models/meta_{tf}.xgb", f"models/meta_{tf}.json"]
-            
-            for m_path in m_paths:
-                if os.path.exists(m_path):
-                    if tf not in self.models: self.models[tf] = {}
-                    self.models[tf]["global"] = xgb.XGBClassifier()
-                    self.models[tf]["global"].load_model(m_path)
-                    break
-            
-            for meta_path in meta_paths:
-                if os.path.exists(meta_path):
-                    if tf not in self.meta_models: self.meta_models[tf] = {}
-                    self.meta_models[tf]["global"] = xgb.XGBClassifier()
-                    self.meta_models[tf]["global"].load_model(meta_path)
-                    break
+
+            global_model = self._try_load_xgb_model(m_paths)
+            if global_model is not None:
+                if tf not in self.models:
+                    self.models[tf] = {}
+                self.models[tf]["global"] = global_model
+
+            global_meta_model = self._try_load_xgb_model(meta_paths)
+            if global_meta_model is not None:
+                if tf not in self.meta_models:
+                    self.meta_models[tf] = {}
+                self.meta_models[tf]["global"] = global_meta_model
 
         self.models_loaded = True
         print(f"LOADED QUANTUM FORTRESS SPECIALISTS: {list(self.models.keys())}")
@@ -128,9 +303,14 @@ class Strategy:
         if not data_dict:
             return {}
 
+        normalized_data = {
+            symbol: self._normalize_timestamp_frame(df)
+            for symbol, df in data_dict.items()
+        }
+
         all_vols = {}
         all_rets = {}
-        for symbol, df in data_dict.items():
+        for symbol, df in normalized_data.items():
             feat = calculate_features(df, timeframe=timeframe)
             all_vols[symbol] = feat["bb_width"]
             all_rets[symbol] = df["close"].pct_change()
@@ -139,37 +319,45 @@ class Strategy:
         m_ret = pd.DataFrame(all_rets).median(axis=1).fillna(0)
 
         # Pre-calculate Macro HMM for the entire batch
-        hmm_path = "models/macro_hmm.joblib"
+        hmm_path = self._resolve_first_existing_path(
+            "models/exp256_active/macro_hmm.joblib",
+            "models/macro_hmm.joblib",
+        )
+        scaler_path = self._resolve_first_existing_path(
+            "models/exp256_active/macro_scaler.joblib",
+            "models/macro_scaler.joblib",
+        )
         hmm_model = joblib.load(hmm_path) if os.path.exists(hmm_path) else None
+        hmm_scaler = joblib.load(scaler_path) if os.path.exists(scaler_path) else None
 
         macro_refs = {}
-        if hmm_model and data_dict:
+        if hmm_model and normalized_data:
             def _get_m(s):
-                d = data_dict.get(s)
-                return d if d is not None else next(iter(data_dict.values()))
-            
+                d = normalized_data.get(s)
+                return d if d is not None else next(iter(normalized_data.values()))
+
             b = _get_m("BTC")
             e = _get_m("ETH")
             x = _get_m("XAU")
             sp = _get_m("SP500")
-            
-            # Unified Precision Sync: Force int64 for timestamp alignment (prevents silent cache-misses)
-            df_b = pd.DataFrame({"timestamp": b["timestamp"].astype('int64')})
+
+            df_b = pd.DataFrame({"timestamp": b["timestamp"].astype("int64")})
             df_b["btc_ret"] = b["close"].pct_change().fillna(0).values
             df_b["btc_vol"] = calculate_features(b.copy(), timeframe=timeframe)["bb_width"].fillna(0).values
-            macro_refs["BTC"] = df_b.sort_values("timestamp")
-            
-            df_e = pd.DataFrame({"timestamp": e["timestamp"], "eth_ret": e["close"].pct_change().fillna(0).values})
+            macro_refs["BTC_RET"] = df_b.sort_values("timestamp")
+
+            df_e = pd.DataFrame({"timestamp": e["timestamp"].astype("int64"), "eth_ret": e["close"].pct_change().fillna(0).values})
             macro_refs["ETH"] = df_e.sort_values("timestamp")
-            
-            df_x = pd.DataFrame({"timestamp": x["timestamp"], "xau_ret": x["close"].pct_change().fillna(0).values})
+
+            df_x = pd.DataFrame({"timestamp": x["timestamp"].astype("int64"), "xau_ret": x["close"].pct_change().fillna(0).values})
             macro_refs["XAU"] = df_x.sort_values("timestamp")
-            
-            df_s = pd.DataFrame({"timestamp": sp["timestamp"], "spx_ret": sp["close"].pct_change().fillna(0).values})
+
+            df_s = pd.DataFrame({"timestamp": sp["timestamp"].astype("int64"), "spx_ret": sp["close"].pct_change().fillna(0).values})
             macro_refs["SP500"] = df_s.sort_values("timestamp")
 
         tables = {}
-        for symbol, df in data_dict.items():
+        first_symbol = next(iter(normalized_data.keys()))
+        for symbol, df in normalized_data.items():
             # calculate_features (from prepare.py) handles all indicators
             df_feat = calculate_features(df.copy(), timeframe=timeframe)
             df_feat["market_vol"] = m_vol
@@ -181,12 +369,14 @@ class Strategy:
             
             # High-Fidelity HMM State Detection
             df_feat["macro_state"] = 0
+            raw_states = None
             if hmm_model and macro_refs:
                 try:
                     # Align lengths and Scale for HMM
                     anchor = df[["timestamp"]].copy().sort_values("timestamp")
                     anchor["_orig"] = anchor.index
-                    for f_df in macro_refs.values():
+                    for ref_key in ("BTC_RET", "ETH", "XAU", "SP500"):
+                        f_df = macro_refs[ref_key]
                         anchor = pd.merge_asof(anchor, f_df, on="timestamp", direction="backward")
                     
                     anchor = anchor.sort_values("_orig").fillna(0)
@@ -199,14 +389,17 @@ class Strategy:
                         anchor["spx_ret"].values
                     ])
 
-                    if hasattr(self, "_macro_scaler") and self._macro_scaler:
-                        X_hmm = self._macro_scaler.transform(X_hmm)
+                    if hmm_scaler is not None:
+                        X_hmm = hmm_scaler.transform(X_hmm)
 
-                    df_feat["macro_state"] = hmm_model.predict(X_hmm)
+                    raw_states = hmm_model.predict(X_hmm)
+                    semantic_states, state_mapping = self._map_hmm_states_to_regimes(anchor, raw_states)
+                    df_feat["macro_state"] = semantic_states
                     
                     # Diagnostic: Print the state distribution for the FIRST symbol only to save log space
-                    if symbol == list(data_dict.keys())[0]:
+                    if symbol == first_symbol:
                         unique_states, state_counts = np.unique(df_feat["macro_state"], return_counts=True)
+                        print(f"--- HMM REGIME MAP: {state_mapping} ---")
                         print(f"--- HMM REGIME DISTRIBUTION: {dict(zip(unique_states, state_counts))} ---")
                 except Exception as e:
                     print(f"HMM High-Fideilty Predict Error: {e}")
@@ -215,50 +408,90 @@ class Strategy:
             print(f"DIAGNOSTIC: X_full for {symbol} - Shape: {X_full.shape} | Nulls: {X_full.isna().sum().sum()}")
             if X_full.isna().any().any():
                  print(f"WARNING: NaNs found in features: {X_full.columns[X_full.isna().any()].tolist()}")
-            states = df_feat["macro_state"].values
-            
-            tf_models = self.models.get(timeframe, {})
-            tf_meta = self.meta_models.get(timeframe, {})
-            
-            # Fallback Constraint: Collapse untrained macro states securely to 0.
-            # This perfectly reproduces the high-Sharpe performance when experimental states are sparsely trained.
-            states = np.array([s if s in tf_models and s != "global" else 0 for s in states])
-            df_feat["macro_state"] = states
+            raw_model_states = raw_states if raw_states is not None else df_feat["macro_state"].values
+            semantic_states = df_feat["macro_state"].values
             
             all_bull = np.zeros(len(df_feat))
             all_bear = np.zeros(len(df_feat))
             all_meta = np.zeros(len(df_feat))
-            
-            for state_id in range(4):
-                mask = (states == state_id)
-                if not any(mask): continue
-                
-                model = tf_models.get(state_id, tf_models.get("global"))
-                meta_model = tf_meta.get(state_id, tf_meta.get("global"))
-                
-                if model:
-                    probs = model.predict_proba(X_full[mask])
-                    # Force class mapping to bypass metadata loss during JSON loading
-                    # Lead models: 0=Neutral, 1=Long, 2=Short
-                    all_bull[mask] = probs[:, 1] if probs.shape[1] > 1 else 0.0
-                    all_bear[mask] = probs[:, 2] if probs.shape[1] > 2 else 0.0
-                    
-                    if meta_model:
-                        m_probs = meta_model.predict_proba(X_full[mask])
-                        # Meta models: 0=Fail, 1=Pass
-                        all_meta[mask] = m_probs[:, 1] if m_probs.shape[1] > 1 else 0.0
-                    
-                    # Probability Audit Print
-                    if symbol == list(data_dict.keys())[0]:
-                        print(f"DEBUG: {symbol} S{state_id} | MaxBull: {all_bull[mask].max():.4f} | MaxBear: {all_bear[mask].max():.4f} | MaxMeta: {all_meta[mask].max():.4f}")
+            all_meta_long = np.zeros(len(df_feat))
+            all_meta_short = np.zeros(len(df_feat))
+
+            directional_15m = timeframe == "15m" and (
+                "15m" in self.long_models
+                or "15m" in self.short_models
+                or "15m" in self.long_meta_models
+                or "15m" in self.short_meta_models
+            )
+
+            if directional_15m:
+                long_model = self.long_models.get("15m")
+                short_model = self.short_models.get("15m")
+                long_meta_model = self.long_meta_models.get("15m")
+                short_meta_model = self.short_meta_models.get("15m")
+
+                if long_model is not None:
+                    long_probs = long_model.predict_proba(X_full)
+                    all_bull = long_probs[:, 1] if long_probs.shape[1] > 1 else 0.0
+                if short_model is not None:
+                    short_probs = short_model.predict_proba(X_full)
+                    all_bear = short_probs[:, 1] if short_probs.shape[1] > 1 else 0.0
+                if long_meta_model is not None:
+                    long_meta_probs = long_meta_model.predict_proba(X_full)
+                    all_meta_long = long_meta_probs[:, 1] if long_meta_probs.shape[1] > 1 else 0.0
+                if short_meta_model is not None:
+                    short_meta_probs = short_meta_model.predict_proba(X_full)
+                    all_meta_short = short_meta_probs[:, 1] if short_meta_probs.shape[1] > 1 else 0.0
+
+                all_meta = np.maximum(all_meta_long, all_meta_short)
+
+                if symbol == first_symbol:
+                    print(
+                        f"DEBUG: {symbol} 15m split | MaxBull: {all_bull.max():.4f} | "
+                        f"MaxBear: {all_bear.max():.4f} | MaxMetaLong: {all_meta_long.max():.4f} | "
+                        f"MaxMetaShort: {all_meta_short.max():.4f}"
+                    )
+            else:
+                tf_models = self.models.get(timeframe, {})
+                tf_meta = self.meta_models.get(timeframe, {})
+
+                for state_id in range(4):
+                    mask = (raw_model_states == state_id)
+                    if not any(mask):
+                        continue
+
+                    model = tf_models.get(state_id, tf_models.get("global"))
+                    meta_model = tf_meta.get(state_id, tf_meta.get("global"))
+
+                    if model:
+                        probs = model.predict_proba(X_full[mask])
+                        # Force class mapping to bypass metadata loss during JSON loading
+                        # Lead models: 0=Neutral, 1=Long, 2=Short
+                        all_bull[mask] = probs[:, 1] if probs.shape[1] > 1 else 0.0
+                        all_bear[mask] = probs[:, 2] if probs.shape[1] > 2 else 0.0
+
+                        if meta_model:
+                            m_probs = meta_model.predict_proba(X_full[mask])
+                            # Meta models: 0=Fail, 1=Pass
+                            all_meta[mask] = m_probs[:, 1] if m_probs.shape[1] > 1 else 0.0
+
+                        # Probability Audit Print
+                        if symbol == first_symbol:
+                            print(
+                                f"DEBUG: {symbol} S{state_id} | MaxBull: {all_bull[mask].max():.4f} | "
+                                f"MaxBear: {all_bear[mask].max():.4f} | MaxMeta: {all_meta[mask].max():.4f}"
+                            )
             
             table = pd.DataFrame({
                 "timestamp": df["timestamp"].values,
                 f"bull_{timeframe}": all_bull,
                 f"bear_{timeframe}": all_bear,
                 f"meta_{timeframe}": all_meta,
-                "macro_state": states.astype(int),
+                "macro_state": semantic_states.astype(int),
             })
+            if timeframe == "15m":
+                table["meta_long_15m"] = all_meta_long
+                table["meta_short_15m"] = all_meta_short
             if include_state:
                 table["atr_pct"] = df_feat["atr_pct"].values # Fixed: Use pct for sizing/stops
                 table["atr_val"] = df_feat["atr_14"].values
@@ -280,7 +513,12 @@ class Strategy:
         base_split = split_name.replace("_15m", "")
 
         if self.timeframe_arg == "1h":
-            if "15m" in self.models or "15m" in self.meta_models:
+            if (
+                "15m" in self.models
+                or "15m" in self.meta_models
+                or "15m" in self.long_models
+                or "15m" in self.short_models
+            ):
                 split_15m = {
                     "train": "train_15m",
                     "val": "val_15m",
@@ -329,12 +567,13 @@ class Strategy:
             if symbol not in main_tables:
                 continue
 
-            main_df = main_tables[symbol]
+            main_df = self._normalize_timestamp_frame(main_tables[symbol])
             main_bull_col = f"bull_{self.timeframe_arg}"
             main_bear_col = f"bear_{self.timeframe_arg}"
             main_meta_col = f"meta_{self.timeframe_arg}"
 
-            base = main_df[["timestamp", "atr_pct", "market_ret", "rsi_8"]].copy()
+            base = main_df[["timestamp", "atr_pct", "market_ret", "rsi_8", "macro_state"]].copy()
+            base["funding_rate"] = main_df["funding_rate"].fillna(0).values if "funding_rate" in main_df else 0.0
             base[main_bull_col] = main_df[main_bull_col].fillna(0).values if main_bull_col in main_df else 0.0
             base[main_bear_col] = main_df[main_bear_col].fillna(0).values if main_bear_col in main_df else 0.0
             base["meta_15m"] = main_df[main_meta_col].fillna(0).values if self.timeframe_arg == "15m" and main_meta_col in main_df else 0.0
@@ -348,11 +587,12 @@ class Strategy:
             )
             base["meta_1h"] = main_df[main_meta_col].fillna(0).values if self.timeframe_arg == "1h" and main_meta_col in main_df else 0.0
             base["meta_4h"] = main_df[main_meta_col].fillna(0).values if self.timeframe_arg == "4h" and main_meta_col in main_df else 0.0
+            base = self._normalize_timestamp_frame(base)
 
             if symbol in aux_15m_tables:
                 merged_15m = pd.merge_asof(
                     base[["timestamp"]].sort_values("timestamp"),
-                    aux_15m_tables[symbol].sort_values("timestamp"),
+                    self._normalize_timestamp_frame(aux_15m_tables[symbol]),
                     on="timestamp",
                     direction="backward",
                 )
@@ -367,7 +607,7 @@ class Strategy:
             if symbol in aux_1h_tables:
                 merged_1h = pd.merge_asof(
                     base[["timestamp"]].sort_values("timestamp"),
-                    aux_1h_tables[symbol][["timestamp", "meta_1h"]].sort_values("timestamp"),
+                    self._normalize_timestamp_frame(aux_1h_tables[symbol][["timestamp", "meta_1h"]]),
                     on="timestamp",
                     direction="backward",
                 )
@@ -376,7 +616,7 @@ class Strategy:
             if symbol in aux_4h_tables:
                 merged_4h = pd.merge_asof(
                     base[["timestamp"]].sort_values("timestamp"),
-                    aux_4h_tables[symbol][["timestamp", "meta_4h"]].sort_values("timestamp"),
+                    self._normalize_timestamp_frame(aux_4h_tables[symbol][["timestamp", "meta_4h"]]),
                     on="timestamp",
                     direction="backward",
                 )
@@ -408,36 +648,27 @@ class Strategy:
             self.calibrate_regimes(bar_data)
             self._bars_since_calibration = 0
 
-        # === exp309: ARCHITECTURAL RESET — Restore exp269 Single-Gate Pattern ===
-        # Autonomous Ranker
-        entry_candidates = []
-        final_signals: List[Signal] = []
-        
-        # Snapshot current positions count
         current_pos_count = len([s for s, p in portfolio.positions.items() if p != 0])
+        ordered_candidates = []
+        trend_candidates = []
+        push_candidates = []
 
         for symbol, bar in bar_data.items():
             if self._allowed_symbols is not None and symbol not in self._allowed_symbols:
                 continue
             if symbol not in self.symbol_caches:
                 continue
-            
+
             lookup_ts = int(bar.timestamp)
             if lookup_ts > 1e11:
                 lookup_ts = lookup_ts // 1000
-                
+
             row = self.symbol_caches[symbol].get(lookup_ts)
             if row is None:
                 continue
-            
+
             pos = portfolio.positions.get(symbol, 0.0)
 
-            # Price buffer for ATR access
-            if symbol not in self._price_buffers: self._price_buffers[symbol] = []
-            self._price_buffers[symbol].append(bar.close)
-            if len(self._price_buffers[symbol]) > 20: self._price_buffers[symbol].pop(0)
-            
-            # Rolling macro bear detector
             if symbol == any_sym:
                 mret = row.get("market_ret", 0.0)
                 self._market_ret_buf.append(mret)
@@ -445,198 +676,245 @@ class Strategy:
                     self._market_ret_buf.pop(0)
                 self._macro_bear = sum(self._market_ret_buf) < -0.015
 
-            if len(self._price_buffers[symbol]) < 4:
-                continue
-
             tf = self.timeframe_arg
+            m_curr = row.get(f"meta_{tf}", 0.0)
             atr = row.get("atr_pct", 0.015)
-            # exp347: ATR Spike Filter (Re-stabilizing Alpha Density)
-            if "_atr_buf" not in self.__dict__: self._atr_buf = {}
-            if symbol not in self._atr_buf: self._atr_buf[symbol] = []
-            self._atr_buf[symbol].append(atr)
-            if len(self._atr_buf[symbol]) > 24: self._atr_buf[symbol].pop(0)
-            avg_atr = np.mean(self._atr_buf[symbol]) if self._atr_buf[symbol] else 0.015
-            vol_spike = atr > (1.8 * avg_atr)
-            
             rsi_8 = row.get("rsi_8", 50.0)
+            m_l = row.get(f"meta_long_{tf}", m_curr)
+            m_s = row.get(f"meta_short_{tf}", m_curr)
+            m1h = row.get("meta_1h", m_curr)
+            m4h = row.get("meta_4h", m_curr)
+            m15_long = row.get("meta_long_15m", 0.0)
+            m15_short = row.get("meta_short_15m", 0.0)
+            stop_dist = bar.close * (atr * 1.5)
+            stop_dist = max(stop_dist, max(abs(bar.close) * 1e-6, 1e-9))
 
-            # === SINGLE META SCORE (exp269 style) ===
-            # Combine long/short specialist outputs + 1h + 4h into one score
-            m_l   = row.get(f"meta_long_{tf}", 0.0)
-            m_s   = row.get(f"meta_short_{tf}", 0.0)
-            m1h   = row.get("meta_1h", 0.0)
-            m4h   = row.get("meta_4h", 0.0)
             active_meta = [m for m in (max(m_l, m_s), m1h, m4h) if m > 0]
-            meta_score  = float(np.mean(active_meta)) if active_meta else 0.0
+            blended_meta = float(np.mean(active_meta)) if active_meta else 0.0
 
-            # Specialist directional signals (1h only — primary timeframe)
-            bull_1h = row.get("bull_1h", 0.0)
-            bear_1h = row.get("bear_1h", 0.0)
+            state_adjust = {
+                0: {"long_gate": -0.05, "short_gate": +0.05, "size": 1.1},
+                1: {"long_gate": +0.05, "short_gate": -0.05, "size": 1.1},
+                2: {"long_gate": +0.02, "short_gate": +0.02, "size": 0.5},
+                3: {"long_gate": +0.10, "short_gate": +0.10, "size": 0.1},
+            }.get(row.get("macro_state", 0), {"long_gate": 0.0, "short_gate": 0.0, "size": 1.0})
 
-            # === HMM STATE → SIZING MULTIPLIER ONLY ===
-            # ACTUAL distribution: State 1 (neutral ~91%), State 2 (bear ~9%)
-            # State 0 never fires in current model
-            macro_state = row.get("macro_state", 1)
-            hmm_size = {
-                0: 1.4,   # Bull (hypothetical — never observed)
-                1: 1.0,   # Neutral — standard size
-                2: 0.6,   # Bear tendency — reduced longs
-                3: 0.0,   # Confirmed Crash — flat
-            }.get(macro_state, 1.0)
+            supportive_regime = (m1h <= 0 or m1h > 0.45)
+            supportive_regime_4h = (m4h <= 0 or m4h > 0.45)
 
-            # State 3 = hard block only (confirmed crash regime)
-            if hmm_size == 0.0:
-                # Still process exits
-                if pos != 0:
-                    entry_price = self.entry_prices.get(symbol, bar.close)
-                    if pos > 0:
-                        self.trailing_stops[symbol] = max(self.trailing_stops.get(symbol, 0), bar.close - (atr * 1.5 * bar.close))
-                        if bar.close > (entry_price + atr * 3.0 * bar.close) or bar.close < self.trailing_stops.get(symbol, 0):
-                            final_signals.append(Signal(symbol, 0.0))
-                    elif pos < 0:
-                        self.trailing_stops[symbol] = min(self.trailing_stops.get(symbol, 1e18), bar.close + (atr * 1.5 * bar.close))
-                        if bar.close < (entry_price - atr * 3.0 * bar.close) or bar.close > self.trailing_stops.get(symbol, 1e18):
-                            final_signals.append(Signal(symbol, 0.0))
+            bull_raw = row.get(f"bull_{tf}", 0.0)
+            bear_raw = row.get(f"bear_{tf}", 0.0)
+            bull_signal = bull_raw > (0.32 + state_adjust["long_gate"])
+            bear_signal = bear_raw > (0.55 + state_adjust["short_gate"])
+
+            tf_meta_score = row.get(f"meta_{tf}", 0.0)
+
+            bull_fortress = bull_signal and tf_meta_score > 0.28 and rsi_8 < 65
+            raw_bear_fortress = (
+                row.get(f"bear_{tf}", 0.0) > 0.62
+                and row.get(f"bear_{tf}", 0.0) > row.get(f"bull_{tf}", 0.0) + 0.12
+                and rsi_8 > 48
+            )
+            bear_fortress = (bear_signal and tf_meta_score > 0.28 and rsi_8 > 32) or raw_bear_fortress
+            bull_soft = bull_signal and supportive_regime and supportive_regime_4h and tf_meta_score > 0.50
+            bear_soft = bear_signal and supportive_regime and supportive_regime_4h and tf_meta_score > 0.50
+
+            if supportive_regime:
+                meta_factor = max(0.0, min(1.0, (blended_meta - 0.30) / 0.50))
+                risk_pct = 0.03 + 0.27 * meta_factor
+                risk_per_trade = equity * risk_pct
+                long_size = (risk_per_trade * bar.close) / stop_dist
+                short_size = (risk_per_trade * bar.close) / stop_dist
+            else:
+                long_size = equity * 0.08
+                short_size = equity * 0.08
+
+            if not supportive_regime:
+                long_size *= 0.05
+
+            mret_sum = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
+            long_factor = max(0.20, min(1.0, 1.0 + 45.0 * mret_sum))
+            short_factor = max(0.20, min(1.0, 1.0 - 45.0 * mret_sum))
+            long_size *= long_factor
+            short_size *= short_factor
+
+            long_size *= state_adjust["size"]
+            short_size *= state_adjust["size"]
+
+            if tf == "15m":
+                cfg15 = self._cfg_15m
+                if pos > 0:
+                    age = self.position_ages.get(symbol, 0) + 1
+                    self.position_ages[symbol] = age
+                    signal_decay_exit = age >= cfg15["exit_decay_age"] and (
+                        bull_raw < 0.40
+                        or m15_long < 0.20
+                        or (m1h > 0 and m1h < 0.20)
+                    )
+                    should_exit = (
+                        age >= cfg15["max_hold"]
+                        or bar.close < self.trailing_stops.get(symbol, 0)
+                        or signal_decay_exit
+                    )
+                    if should_exit:
+                        signals.append(Signal(symbol, 0.0))
+                        self.position_ages[symbol] = 0
+                    else:
+                        desired = pos
+                        if bull_raw > cfg15["scalein_bull"] and m15_long > cfg15["scalein_meta"] and abs(pos) + 1.0 < long_size:
+                            desired = long_size
+                        if abs(desired - pos) > 1.0:
+                            signals.append(Signal(symbol, desired))
+                        self.trailing_stops[symbol] = max(self.trailing_stops.get(symbol, 0), bar.high - stop_dist)
+                    continue
+
+                if pos < 0:
+                    signals.append(Signal(symbol, 0.0))
+                    self.position_ages[symbol] = 0
+                    continue
+
+                self.position_ages[symbol] = 0
+                trend_veto = (m1h > 0 and m1h < 0.10) or (m4h > 0 and m4h < 0.08)
+                push_veto = (m1h > 0 and m1h < 0.12)
+                trend_support = 0.65 + 0.25 * max(m1h, 0.0) + 0.10 * max(m4h, 0.0)
+                push_support = 0.75 + 0.25 * max(m1h, 0.0)
+                long_trend_ok = (
+                    bull_raw > cfg15["trend_bull"]
+                    and m15_long > cfg15["trend_meta"]
+                    and rsi_8 < cfg15["trend_rsi_max"]
+                    and (not self._macro_bear or bull_raw > cfg15["trend_macro_bear_bull"])
+                    and not trend_veto
+                )
+                long_push_ok = (
+                    bull_raw > cfg15["push_bull"]
+                    and m15_long > cfg15["push_meta"]
+                    and rsi_8 < cfg15["push_rsi_max"]
+                    and not self._macro_bear
+                    and not push_veto
+                )
+
+                if long_trend_ok:
+                    trend_score = bull_raw + 0.55 * m15_long + 0.10 * max(m1h, 0.0) + 0.06 * max(m4h, 0.0)
+                    candidate = (
+                        trend_score,
+                        symbol,
+                        long_size * cfg15["trend_weight"] * self._entry_scale * trend_support,
+                        bar.low - stop_dist,
+                    )
+                    ordered_candidates.append(candidate)
+                    trend_candidates.append(candidate)
+                elif long_push_ok:
+                    push_score = (
+                        bull_raw
+                        + 0.75 * m15_long
+                        + 0.14 * max(m1h, 0.0)
+                        + 0.06 * max(0.0, (cfg15["push_rsi_max"] - rsi_8) / 10.0)
+                        + 0.04
+                    )
+                    candidate = (
+                        push_score,
+                        symbol,
+                        long_size * cfg15["push_weight"] * self._entry_scale * push_support,
+                        bar.low - stop_dist,
+                    )
+                    ordered_candidates.append(candidate)
+                    push_candidates.append(candidate)
                 continue
 
-            # Volatility filter
-            vol_ok = 0.005 < atr < 0.035
-
-            # === POSITION MANAGEMENT: TP=3x, SL=2x, Trail=1.5x + 8-BAR TIME EXIT ===
             if pos != 0:
                 age = self.position_ages.get(symbol, 0) + 1
                 self.position_ages[symbol] = age
-                entry_price = self.entry_prices.get(symbol, bar.close)
+                max_hold_bars = self._max_hold
 
                 if pos > 0:
-                    # exp344: Tightened Ratchet Stop (Alpha Density)
-                    stop_mult = 1.5
-                    
-                    # Ratchet 1: Standard trailing stop (non-retreating)
-                    new_trail = bar.close - (atr * stop_mult * bar.close)
-                    self.trailing_stops[symbol] = max(self.trailing_stops.get(symbol, 0), new_trail)
-                    
-                    # Ratchet 2: Profit Lock (at 1.0x ATR profit, lock stop at entry)
-                    if bar.close > (entry_price + atr * 1.0 * bar.close):
-                        self.trailing_stops[symbol] = max(self.trailing_stops[symbol], entry_price)
-
-                    # exp352: Micro-TTP Lock (1.5x ATR)
-                    self.profit_targets[symbol] = max(self.profit_targets.get(symbol, entry_price), bar.close)
-                    ttp_mult = 1.5
-                    ttp_armed = self.profit_targets[symbol] > (entry_price + atr * ttp_mult * bar.close)
-                    ttp_hit   = ttp_armed and (bar.close < self.profit_targets[symbol] - atr * 0.5 * bar.close)
-
-                    trail_hit = bar.close < self.trailing_stops.get(symbol, 0)
-                    time_exit = (age >= 8 and bar.close > entry_price)
-                    if ttp_hit or trail_hit or time_exit:
-                        final_signals.append(Signal(symbol, 0.0))
-
-                elif pos < 0:
-                    # exp344: Tightened Ratchet Stop (Alpha Density)
-                    stop_mult = 1.5
-                    
-                    # Ratchet 1: Standard trailing stop (non-retreating)
-                    new_trail = bar.close + (atr * stop_mult * bar.close)
-                    self.trailing_stops[symbol] = min(self.trailing_stops.get(symbol, 1e18), new_trail)
-                    
-                    # Ratchet 2: Profit Lock (at 1.0x ATR profit, lock stop at entry)
-                    if bar.close < (entry_price - atr * 1.0 * bar.close):
-                        self.trailing_stops[symbol] = min(self.trailing_stops[symbol], entry_price)
-
-                    # exp352: Micro-TTP Lock (1.5x ATR)
-                    self.profit_targets[symbol] = min(self.profit_targets.get(symbol, entry_price), bar.close)
-                    ttp_mult = 1.5
-                    ttp_armed = self.profit_targets[symbol] < (entry_price - atr * ttp_mult * bar.close)
-                    ttp_hit   = ttp_armed and (bar.close > self.profit_targets[symbol] + atr * 0.5 * bar.close)
-
-                    trail_hit = bar.close > self.trailing_stops.get(symbol, 1e18)
-                    time_exit = (age >= 8 and bar.close < entry_price)
-                    if ttp_hit or trail_hit or time_exit:
-                        final_signals.append(Signal(symbol, 0.0))
+                    signal_decay_exit = age >= self._decay_age and (not bull_signal) and m15_long < 0.40
+                    should_exit = (
+                        age >= max_hold_bars
+                        or bar.close < self.trailing_stops.get(symbol, 0)
+                        or signal_decay_exit
+                    )
+                    if should_exit:
+                        signals.append(Signal(symbol, 0.0))
+                        self.position_ages[symbol] = 0
+                    else:
+                        desired = pos
+                        if bull_signal and m15_long > 0.65 and abs(pos) + 1.0 < long_size:
+                            desired = long_size
+                        if abs(desired - pos) > 1.0:
+                            signals.append(Signal(symbol, desired))
+                        self.trailing_stops[symbol] = max(self.trailing_stops.get(symbol, 0), bar.high - stop_dist)
+                else:
+                    signal_decay_exit = age >= self._decay_age and (not bear_signal) and m15_short < 0.40 and not raw_bear_fortress
+                    should_exit = (
+                        age >= max_hold_bars
+                        or bar.close > self.trailing_stops.get(symbol, 9e18)
+                        or signal_decay_exit
+                    )
+                    if should_exit:
+                        signals.append(Signal(symbol, 0.0))
+                        self.position_ages[symbol] = 0
+                    else:
+                        desired = pos
+                        if bear_signal and m15_short > 0.65 and abs(pos) + 1.0 < short_size:
+                            desired = -short_size
+                        if abs(desired - pos) > 1.0:
+                            signals.append(Signal(symbol, desired))
+                        self.trailing_stops[symbol] = min(self.trailing_stops.get(symbol, 9e18), bar.low + stop_dist)
                 continue
 
-            # === RESONANCE CASCADE ENTRY (exp333) ===
-            # Aim: 1.0+ trades/day + 60% WR
-            # Stacking multiple confluence paths:
-            # 1. T1: Proven 1h Spike (71% WR)
-            # 2. T2: 4h Trend Resonance (using strong 4h signal)
-            # 3. T3: 4h Extreme Regime Dominance
-            meta_1h_qual = row.get("meta_1h", 0.0)
-            meta_4h_qual = row.get("meta_4h", 0.0)
+            self.position_ages[symbol] = 0
+            ts = self._thresh_scale
+            long_gate_ok = blended_meta > (0.36 * ts + state_adjust["long_gate"])
+            short_gate_ok = blended_meta > (0.25 * ts + state_adjust["short_gate"])
+            macro_bull_ok = not self._macro_bear or blended_meta > 0.40 * ts
 
-            # Path 1: Pure 1h Spike (Classic Golden Gate) - exp347: Tight/Precise
-            p1_long  = (meta_1h_qual > 0.40 and meta_score > 0.43 and bull_1h > 0.12)
-            p1_short = (meta_1h_qual > 0.40 and meta_score > 0.43 and bear_1h > 0.12)
-
-            # Path 2: 1h + 4h Resonance (Strong 4h Trend) - exp347: Tight/Precise
-            p2_long  = (meta_4h_qual > 0.50 and meta_1h_qual > 0.43 and bull_1h > 0.10)
-            p2_short = (meta_4h_qual > 0.50 and meta_1h_qual > 0.43 and bear_1h > 0.10)
-
-            # Path 3: 4h Extremity (Regime Dominance) - exp347: Tight/Precise
-            p3_long  = (meta_4h_qual > 0.58 and meta_1h_qual > 0.38 and bull_1h > 0.08)
-            p3_short = (meta_4h_qual > 0.58 and meta_1h_qual > 0.38 and bear_1h > 0.08)
-
-            vol_ok = atr > 0.005 # Exp336 Volatility Filter
-            funding = row.get("funding_rate", 0.0)
-            m_ret_4h = sum(self._market_ret_buf[-4:]) if len(self._market_ret_buf) >= 4 else 0.0
-            
-            # Momentum Alignment (exp337) + Funding (exp340) + Spike Filter (exp347)
-            # exp352: The Alpha Dilution (Relaxed Gating + Soft Macro)
-            votes = sum([1 for m in (max(m_l, m_s), m1h, m4h) if m > 0.38])
-            votes = max(1, votes) # Ensure at least 1 vote weight
-            dynamic_thresh = {3: 0.35, 2: 0.40, 1: 0.46}.get(votes, 1.0)
-            
-            macro_mult_long  = 1.0 if macro_state == 1 else 0.25
-            macro_mult_short = 1.0 if macro_state == 2 else 0.25
-
-            is_entry_long  = (p1_long or p2_long or p3_long) and (meta_score > dynamic_thresh) and vol_ok and rsi_8 < 65 and m_ret_4h > -0.002 and funding < 0.0003 and not vol_spike
-            is_entry_short = (p1_short or p2_short or p3_short) and (meta_score > dynamic_thresh) and vol_ok and rsi_8 > 35 and m_ret_4h < 0.002 and funding > -0.0003 and not vol_spike
-
-            # === CONTINUOUS SIZING (exp256 baseline) ===
-            mret_sum  = sum(self._market_ret_buf) if self._market_ret_buf else 0.0
-            meta_factor  = max(0.0, min(1.0, (meta_score - 0.35) / 0.50))
-            # Risk Scaling: 3% bottom, 15% cap (Tamed Medallion)
-            risk_pct = 0.03 + 0.12 * meta_factor
-            alloc_pct = risk_pct
-            long_factor  = max(0.30, min(1.5, 1.0 + self._market_crush * mret_sum))
-            short_factor = max(0.30, min(1.5, 1.0 - self._market_crush * mret_sum))
-
-            # exp352: Vote-Weighted Sizing + Soft Macro Penalty
-            vote_mult = votes / 3.0
-            long_size  = equity * alloc_pct * long_factor  * hmm_size * vote_mult * macro_mult_long
-            short_size = equity * alloc_pct * short_factor * hmm_size * vote_mult * macro_mult_short
-
-            # Collect candidates for ranker
-            if is_entry_long:
-                self._entry_confidence[symbol] = votes # exp351: persist confidence
-                entry_candidates.append((meta_score, Signal(symbol, long_size), symbol, "long"))
-            elif is_entry_short:
-                self._entry_confidence[symbol] = votes # exp351: persist confidence
-                entry_candidates.append((meta_score, Signal(symbol, -short_size), symbol, "short"))
-
-        # === TOP-10 RANKER: quality-ranked entries, max 10 positions (exp333) ===
-        if entry_candidates:
-            entry_candidates.sort(key=lambda x: x[0], reverse=True)
-            for score, sig, symbol, side in entry_candidates:
-                if current_pos_count >= 12:
-                    break
-                final_signals.append(sig)
-                lookup_ts = int(bar_data[symbol].timestamp)
-                if lookup_ts > 1e11: lookup_ts //= 1000
-                row = self.symbol_caches[symbol].get(lookup_ts, {})
-                atr  = row.get("atr_pct", 0.015)
-                # exp344: Tightened Initial stop
-                s_mult = 1.5
-                if side == "long":
-                    self.trailing_stops[symbol] = bar_data[symbol].close - (atr * s_mult * bar_data[symbol].close)
-                else:
-                    self.trailing_stops[symbol] = bar_data[symbol].close + (atr * s_mult * bar_data[symbol].close)
-                self.entry_prices[symbol]  = bar_data[symbol].close
-                self.profit_targets[symbol] = bar_data[symbol].close # Initialize peak
+            if bull_fortress and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short) and macro_bull_ok and long_gate_ok:
+                entry_size = long_size * self._entry_scale
+                signals.append(Signal(symbol, entry_size))
+                self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
-                current_pos_count += 1
+            elif bull_soft and (not bear_soft or m15_long >= m15_short) and long_gate_ok:
+                entry_size = long_size * 0.5 * self._entry_scale
+                signals.append(Signal(symbol, entry_size))
+                self.trailing_stops[symbol] = bar.low - stop_dist
+                self.position_ages[symbol] = 0
+            elif bear_fortress and short_gate_ok:
+                entry_size = short_size * self._entry_scale
+                signals.append(Signal(symbol, -entry_size))
+                self.trailing_stops[symbol] = bar.high + stop_dist
+                self.position_ages[symbol] = 0
+            elif bear_soft and short_gate_ok:
+                entry_size = short_size * 0.5 * self._entry_scale
+                signals.append(Signal(symbol, -entry_size))
+                self.trailing_stops[symbol] = bar.high + stop_dist
+                self.position_ages[symbol] = 0
 
-        return final_signals
+        if self.timeframe_arg == "15m" and current_pos_count < self._cfg_15m["max_positions"]:
+            remaining_slots = self._cfg_15m["max_positions"] - current_pos_count
+            allocator = self._cfg_15m["allocator"]
+            if allocator == "baseline":
+                selected_entries = ordered_candidates[:remaining_slots]
+            elif allocator == "ranked":
+                selected_entries = sorted(ordered_candidates, key=lambda item: item[0], reverse=True)[:remaining_slots]
+            elif allocator == "trend_priority":
+                selected_entries = sorted(trend_candidates, key=lambda item: item[0], reverse=True)[:remaining_slots]
+                if len(selected_entries) < remaining_slots:
+                    selected_entries.extend(
+                        sorted(push_candidates, key=lambda item: item[0], reverse=True)[: remaining_slots - len(selected_entries)]
+                    )
+            else:
+                selected_entries = sorted(push_candidates, key=lambda item: item[0], reverse=True)[:remaining_slots]
+                if len(selected_entries) < remaining_slots:
+                    selected_entries.extend(
+                        sorted(trend_candidates, key=lambda item: item[0], reverse=True)[: remaining_slots - len(selected_entries)]
+                    )
+
+            for _, symbol, entry_size, trailing_stop in selected_entries:
+                signals.append(Signal(symbol, entry_size))
+                self.trailing_stops[symbol] = trailing_stop
+                self.position_ages[symbol] = 0
+
+        return signals
 
     def _perceive_macro_state(self, bar_data) -> int:
         """Infers the current hidden market regime using the Multivariate HMM."""
