@@ -68,9 +68,9 @@ HF_XAU_15M_URL = "https://huggingface.co/datasets/ZombitX64/xauusd-gold-price-hi
 #             Do NOT run evaluate.py or iterate against it.  Use --holdout ONCE
 #             at final production sign-off only.
 TRAIN_START   = "2017-01-01"   # Default global start (overridden per-symbol below)
-TRAIN_END     = "2022-06-30"   # Cut before validation starts
-VAL_START     = "2022-07-01"   # 2-year window: crash → recovery → bull
-VAL_END       = "2024-06-30"
+TRAIN_END     = "2022-06-30"   # Pre-crash baseline
+VAL_START     = "2022-07-01"   # 2 full years: bear, recovery, early bull
+VAL_END       = "2024-06-30"   # Stops before OOS
 TEST_START    = "2022-07-01"   # Legacy alias for val (unused)
 TEST_END      = "2024-06-30"
 DATA_END      = "2026-03-31"   # Extended to cover 2026 Q1 clean OOS window
