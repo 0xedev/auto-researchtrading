@@ -243,7 +243,13 @@ if __name__ == "__main__":
     parser.add_argument("--stress-fees", action="store_true")
     parser.add_argument("--capacity", action="store_true")
     parser.add_argument("--oos", action="store_true", help="Run firmly on strictly unseen 2025 quarantine data")
+    parser.add_argument("--2026q1", dest="oos_2026q1", action="store_true",
+                        help="Run on Jan–Mar 2026 (clean post-research-loop OOS)")
+    parser.add_argument("--holdout", action="store_true",
+                        help="FINAL SIGN-OFF ONLY: run on Oct–Dec 2025 holdout (NEVER re-iterate against this)")
     parser.add_argument("--description", type=str, default="Auto-research iteration", help="Description for results.tsv")
+    parser.add_argument("--leverage", type=float, default=1.0,
+                        help="Leverage multiplier applied to all position sizes (default: 1.0 = no leverage)")
     parser.add_argument("--slippage-bps", type=float, default=None,
                         help="Override prepare.SLIPPAGE_BPS for this run only (audit knob)")
     parser.add_argument("--taker-fee-bps", type=float, default=None,
@@ -258,6 +264,10 @@ if __name__ == "__main__":
     # Audit overrides — applied BEFORE the strategy and engine see anything.
     # These mutate prepare.* module state for the duration of this process only.
     # When --no-log is set, results.tsv is left alone so audits don't pollute the leaderboard.
+    if args.leverage != 1.0:
+        print(f"LEVERAGE: {args.leverage}x position sizes — returns and drawdowns scale proportionally")
+        # Raise MAX_LEVERAGE ceiling so the engine doesn't block larger positions
+        prepare.MAX_LEVERAGE = max(prepare.MAX_LEVERAGE, int(args.leverage * 5))
     if args.slippage_bps is not None:
         print(f"AUDIT OVERRIDE: SLIPPAGE_BPS {prepare.SLIPPAGE_BPS} -> {args.slippage_bps}")
         prepare.SLIPPAGE_BPS = args.slippage_bps
@@ -272,6 +282,24 @@ if __name__ == "__main__":
     else:
         sig.alarm(1800)              # Absolute Budget for Dual-XGB Research
 
+    # ── Holdout friction gate ─────────────────────────────────────────────────
+    # The holdout split (Oct–Dec 2025) must NEVER be used during research iteration.
+    # It is reserved for a single final sign-off run before live deployment.
+    # If you are running this during a research loop, do NOT use --holdout.
+    if args.holdout:
+        print("\n" + "!" * 60)
+        print("  HOLDOUT GATE — READ BEFORE CONTINUING")
+        print("  You are about to run on Oct–Dec 2025, the ONLY truly unseen")
+        print("  data remaining. This split must be used AT MOST ONCE for the")
+        print("  final production sign-off. Re-iterating against it destroys")
+        print("  its independence and invalidates the read.")
+        print("!" * 60)
+        confirm = input("\n  Type FINAL-SIGN-OFF to proceed, or anything else to abort: ").strip()
+        if confirm != "FINAL-SIGN-OFF":
+            print("  Aborted. Holdout preserved.")
+            raise SystemExit(0)
+        print()
+
     t_start = time.time()
 
     if args.timeframe == "4h":
@@ -280,20 +308,43 @@ if __name__ == "__main__":
         prepare.TAKER_FEE = 0.00075
         prepare.MAKER_FEE = 0.00075
         prepare.SLIPPAGE_BPS = 0.0
-        split_name = "oos" if args.oos else "robustness"
+        if args.holdout:
+            split_name = "holdout"
+        elif args.oos_2026q1:
+            split_name = "2026q1"
+        elif args.oos:
+            split_name = "oos"
+        else:
+            split_name = "robustness"
         data = load_data(split_name, resample_4h=True)
     elif args.timeframe == "15m":
         print("Mode: 15M VALIDATION")
-        split_name = "oos_15m" if args.oos else "val_15m"
+        if args.holdout:
+            split_name = "holdout_15m"
+        elif args.oos_2026q1:
+            split_name = "2026q1_15m"
+        elif args.oos:
+            split_name = "oos_15m"
+        else:
+            split_name = "val_15m"
         data = load_data(split_name)
     else:
         print("Mode: 1H VALIDATION")
-        split_name = "oos" if args.oos else "val"
+        if args.holdout:
+            split_name = "holdout"
+        elif args.oos_2026q1:
+            split_name = "2026q1"
+        elif args.oos:
+            split_name = "oos"
+        else:
+            split_name = "val"
         data = load_data(split_name)
     
     print(f"Loaded {sum(len(df) for df in data.values())} bars across {len(data)} symbols")
     
     strategy = Strategy(timeframe=args.timeframe)
+    if args.leverage != 1.0:
+        strategy._leverage_mult = args.leverage
     if hasattr(strategy, 'pre_calculate_signals'):
         strategy.pre_calculate_signals(data, split_name=split_name)
         

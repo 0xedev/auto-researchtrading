@@ -34,8 +34,25 @@ uv run backtest.py --timeframe 15m
 uv run backtest.py --timeframe 4h --stress-fees --capacity
 uv run backtest.py --timeframe 1h --oos
 
-# Full OOS suite
+# Cost stress tests (audit knobs, --no-log to avoid polluting leaderboard)
+uv run backtest.py --timeframe 1h --oos --slippage-bps 5 --no-log
+uv run backtest.py --timeframe 1h --oos --slippage-bps 10 --no-log
+
+# Full OOS robustness suite
 uv run evaluate.py --timeframe 1h --label exp269
+
+# Walk-forward validation (temporal consistency across rolling windows)
+uv run validate_wf.py --timeframe 1h
+uv run validate_wf.py --timeframe 1h --slippage-bps 5
+
+# Feature drift monitoring (PSI-based, run before live deployment)
+uv run drift_monitor.py
+uv run drift_monitor.py --recent-days 90 --ref-split train
+
+# FINAL PRODUCTION SIGN-OFF ONLY (interactive confirmation required)
+# DO NOT run during research iteration — destroys holdout independence
+uv run backtest.py --timeframe 1h --holdout
+uv run evaluate.py --timeframe 1h --holdout --label final
 
 # Benchmark comparison
 uv run run_benchmarks.py
@@ -125,6 +142,28 @@ Benchmark audit thresholds used by the CLIs:
 - Profit factor >= 4.0
 - Max drawdown < 10%
 
+## Holdout Discipline
+
+`prepare.py` defines `HOLDOUT_START = "2025-10-01"` and `HOLDOUT_END = "2025-12-31"`.
+
+**This is the only truly unseen data remaining.** The OOS period (Jan–Dec 2025) was
+observed hundreds of times during the research loop and is no longer independent.
+
+Rules:
+- Never run `evaluate.py` or `backtest.py --holdout` during research iteration.
+- Use `--holdout` exactly ONCE at final production sign-off.
+- Both CLIs gate behind an interactive "FINAL-SIGN-OFF" confirmation string.
+
+## Production-Readiness Status (as of exp490, April 2026)
+
+| Gap | Status | Result |
+|-----|--------|--------|
+| Cost model (10bp stress) | ✅ Done | OOS Sharpe 1.96 at 10bp, PF=4.81 |
+| Walk-forward validation | ✅ Done (see validate_wf.py) | Run and check results |
+| Hold-out carve-out | ✅ Done | Oct–Dec 2025 locked, gate added |
+| OOS contamination | ⚠️ Structural | OOS 2025 was seen ~hundreds of times |
+| Model drift monitoring | ✅ Done (see drift_monitor.py) | Run before live deployment |
+
 ## Key Files
 
 - [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py)
@@ -132,6 +171,8 @@ Benchmark audit thresholds used by the CLIs:
 - [train_model.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/train_model.py)
 - [backtest.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/backtest.py)
 - [evaluate.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/evaluate.py)
+- [validate_wf.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/validate_wf.py) — walk-forward temporal consistency harness
+- [drift_monitor.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/drift_monitor.py) — PSI-based feature drift monitor
 - [run_benchmarks.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/run_benchmarks.py)
 - [strategy_exp269.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy_exp269.py)
 - [strategy_diff.txt](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy_diff.txt)

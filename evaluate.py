@@ -278,19 +278,56 @@ if __name__ == "__main__":
     parser.add_argument("--skip-mc",    action="store_true", help="Skip Monte Carlo (faster)")
     parser.add_argument("--skip-regime", action="store_true")
     parser.add_argument("--split",      default="oos", help="OOS split name")
+    parser.add_argument("--holdout",    action="store_true",
+                        help="FINAL SIGN-OFF ONLY: run on Oct–Dec 2025 holdout (never re-iterate)")
     args = parser.parse_args()
 
-    tf   = args.timeframe
-    lbl  = args.label
+    tf    = args.timeframe
+    lbl   = args.label
     split = args.split
+
+    # ── Holdout friction gate ──────────────────────────────────────────────
+    if args.holdout:
+        print("\n" + "!" * 60)
+        print("  HOLDOUT GATE — READ BEFORE CONTINUING")
+        print("  Oct–Dec 2025 is the ONLY truly unseen data remaining.")
+        print("  Use this split AT MOST ONCE for final production sign-off.")
+        print("  Re-iterating against it invalidates the independence read.")
+        print("!" * 60)
+        confirm = input("\n  Type FINAL-SIGN-OFF to proceed, or anything else to abort: ").strip()
+        if confirm != "FINAL-SIGN-OFF":
+            print("  Aborted. Holdout preserved.")
+            raise SystemExit(0)
+        split = "holdout_15m" if tf == "15m" else "holdout"
+        print()
 
     print(f"\n{'#'*60}")
     print(f"  ROBUSTNESS SUITE: {lbl.upper()}  |  Timeframe: {tf.upper()}")
+    if args.holdout:
+        print(f"  *** HOLDOUT MODE: Oct–Dec 2025 (FINAL SIGN-OFF) ***")
     print(f"{'#'*60}")
     t0 = time.time()
 
-    # OOS
-    oos_res, oos_data, oos_score = run_oos(tf, lbl)
+    # OOS (or holdout)
+    if args.holdout:
+        # Run directly on the holdout split, bypassing run_oos() which hardcodes "oos"
+        holdout_split = "holdout_15m" if tf == "15m" else "holdout"
+        print(f"\n{'='*60}")
+        print(f"  HOLDOUT TEST  [{lbl}]  ({prepare.HOLDOUT_START} → {prepare.HOLDOUT_END})")
+        print(f"{'='*60}")
+        oos_res, oos_data = _load_and_run(tf, holdout_split)
+        dur = oos_res.duration_days if oos_res.duration_days > 0 else 1
+        trades_per_day = oos_res.num_trades / dur
+        oos_score = compute_score(oos_res)
+        print(f"  Score:          {oos_score:.4f}")
+        print(f"  Sharpe:         {oos_res.sharpe:.4f}")
+        print(f"  Return:         {oos_res.total_return_pct:.2f}%")
+        print(f"  Max DD:         {oos_res.max_drawdown_pct:.2f}%")
+        print(f"  Trades:         {oos_res.num_trades}  ({trades_per_day:.2f}/day)")
+        print(f"  Win Rate:       {oos_res.win_rate_pct:.2f}%")
+        print(f"  Profit Factor:  {oos_res.profit_factor:.3f}")
+    else:
+        oos_res, oos_data, oos_score = run_oos(tf, lbl)
 
     # Fee Stress
     run_fee_stress(tf, split, oos_data, lbl)

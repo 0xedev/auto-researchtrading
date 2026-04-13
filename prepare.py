@@ -59,19 +59,25 @@ BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
 HF_XAU_15M_URL = "https://huggingface.co/datasets/ZombitX64/xauusd-gold-price-historical-data-2004-2025/resolve/main/XAU_15m_data.jsonl"
 
 # Date splits (UTC timestamps) - 2025 Strictly Quarantined as OOS
-# Training: 2017-01-01 → 2022-06-30 (pre-crash baseline)
-# Validation: 2022-07-01 → 2024-06-30 (2 full years: bear, recovery, early bull)
-# Robustness: 2018-01-01 → 2024-06-30 (all meaningful crypto history)
-# OOS: 2025-01-01 → 2025-12-31 (full year of unseen data)
-TRAIN_START = "2017-01-01"   # Default global start (overridden per-symbol below)
-TRAIN_END   = "2022-06-30"   # Cut before validation starts
-VAL_START   = "2022-07-01"   # 2-year window: crash → recovery → bull
-VAL_END     = "2024-06-30"
-TEST_START  = "2022-07-01"
-TEST_END    = "2024-06-30"
-DATA_END    = "2025-12-31"   # Download horizon must cover the quarantined OOS year
-ROBUST_START = "2018-01-01"
-ROBUST_END   = "2024-06-30"
+# Training:   2017-01-01 → 2022-06-30  (pre-crash baseline)
+# Validation: 2022-07-01 → 2024-06-30  (2 full years: bear, recovery, early bull)
+# Robustness: 2018-01-01 → 2024-06-30  (all meaningful crypto history)
+# OOS:        2025-01-01 → 2025-12-31  (full year of unseen data, now contaminated)
+# Holdout:    2025-10-01 → 2025-12-31  *** NEVER TOUCH — true unseen test set ***
+#             This 3-month tail of 2025 was carved out AFTER the research loop.
+#             Do NOT run evaluate.py or iterate against it.  Use --holdout ONCE
+#             at final production sign-off only.
+TRAIN_START   = "2017-01-01"   # Default global start (overridden per-symbol below)
+TRAIN_END     = "2022-06-30"   # Cut before validation starts
+VAL_START     = "2022-07-01"   # 2-year window: crash → recovery → bull
+VAL_END       = "2024-06-30"
+TEST_START    = "2022-07-01"   # Legacy alias for val (unused)
+TEST_END      = "2024-06-30"
+DATA_END      = "2026-03-31"   # Extended to cover 2026 Q1 clean OOS window
+ROBUST_START  = "2018-01-01"
+ROBUST_END    = "2024-06-30"
+HOLDOUT_START = "2025-10-01"   # *** NEVER TOUCH until production sign-off ***
+HOLDOUT_END   = "2025-12-31"   # 3-month tail of 2025, carved out post-research-loop
 
 # Per-symbol earliest usable training start
 # Universal goal: use deepest available price history for each asset
@@ -843,14 +849,21 @@ def load_data(split: str = "val", resample_4h: bool = False, resample_15m: bool 
     When resample_15m=True, loads from {symbol}_15m.parquet files instead of 1h.
     """
     splits = {
-        "train":      (TRAIN_START, TRAIN_END),
-        "val":        (VAL_START,   VAL_END),
-        "test":       (TEST_START,  TEST_END),
-        "robustness": (ROBUST_START, ROBUST_END),
-        "val_15m":    (VAL_START,   VAL_END),
-        "train_15m":  (TRAIN_START, TRAIN_END),
-        "oos":        ("2025-01-01", "2025-12-31"),
-        "oos_15m":    ("2025-01-01", "2025-12-31"),
+        "train":      (TRAIN_START,   TRAIN_END),
+        "val":        (VAL_START,     VAL_END),
+        "test":       (TEST_START,    TEST_END),
+        "robustness": (ROBUST_START,  ROBUST_END),
+        "val_15m":    (VAL_START,     VAL_END),
+        "train_15m":  (TRAIN_START,   TRAIN_END),
+        "oos":        ("2025-01-01",  "2025-12-31"),
+        "oos_15m":    ("2025-01-01",  "2025-12-31"),
+        # 2026 Q1 — clean post-research-loop test (Jan–Mar 2026)
+        "2026q1":     ("2026-01-01",  "2026-03-31"),
+        "2026q1_15m": ("2026-01-01",  "2026-03-31"),
+        # *** HOLDOUT — NEVER use during research iteration ***
+        # Reserved for final production sign-off ONLY (run once, never re-iterate against it)
+        "holdout":    (HOLDOUT_START, HOLDOUT_END),
+        "holdout_15m":(HOLDOUT_START, HOLDOUT_END),
     }
     assert split in splits, f"split must be one of {list(splits.keys())}"
     global_start_str, end_str = splits[split]

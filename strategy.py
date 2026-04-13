@@ -30,6 +30,7 @@ class Strategy:
         self._atr_scale = tf_ratio ** 0.25
         self._entry_scale = min(1.0, tf_ratio ** 0.5)
         self._thresh_scale = max(1.0, (1.0 / tf_ratio) ** 0.25)
+        self._leverage_mult = 1.0  # set externally (e.g. backtest.py --leverage)
 
         self.models = {}
         self.meta_models = {}
@@ -196,9 +197,11 @@ class Strategy:
         if self.timeframe_arg == "1h":
             if "15m" in self.models or "15m" in self.meta_models:
                 split_15m = {
-                    "train": "train_15m",
-                    "val": "val_15m",
-                    "oos": "oos_15m",
+                    "train":   "train_15m",
+                    "val":     "val_15m",
+                    "oos":     "oos_15m",
+                    "2026q1":  "2026q1_15m",
+                    "holdout": "holdout_15m",
                 }.get(split_name)
                 if split_15m:
                     aux_15m_data = load_data(split=split_15m)
@@ -476,22 +479,22 @@ class Strategy:
             funding = bar.funding_rate if hasattr(bar, 'funding_rate') else 0.0
             fund_scale = max(0.5, min(2.5, 1.0 - 3000.0 * funding))
             if bull_fortress and not_falling_knife and not_hyper_vol and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short) and macro_bull_ok and long_gate_ok:
-                entry_size = long_size * self._entry_scale * vol_scale * rsi_scale * mret_scale * fund_scale
+                entry_size = long_size * self._entry_scale * vol_scale * rsi_scale * mret_scale * fund_scale * self._leverage_mult
                 signals.append(Signal(symbol, entry_size))
                 self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
             elif bull_soft and (not bear_soft or m15_long >= m15_short) and long_gate_ok:
-                entry_size = long_size * 0.5 * self._entry_scale
+                entry_size = long_size * 0.5 * self._entry_scale * self._leverage_mult
                 signals.append(Signal(symbol, entry_size))
                 self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
             elif bear_fortress and short_gate_ok:
-                entry_size = short_size * self._entry_scale
+                entry_size = short_size * self._entry_scale * self._leverage_mult
                 signals.append(Signal(symbol, -entry_size))
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
             elif bear_soft and short_gate_ok:
-                entry_size = short_size * 0.5 * self._entry_scale
+                entry_size = short_size * 0.5 * self._entry_scale * self._leverage_mult
                 signals.append(Signal(symbol, -entry_size))
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
