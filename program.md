@@ -1,108 +1,188 @@
-# autotrader
+# Current Experiment Program
 
-Autonomous trading strategy research on Hyperliquid perpetual futures.
+This file is the operational guide for the current branch.
 
-## 🚨 CRITICAL ENGINE AUDIT (March 2026)
+## Ground Truth
 
-**The evaluation harness (`prepare.py`) was found to have a severe accounting bug (#4)** in its position reversal logic. This bug incorrectly inflated PnL and Sharpe ratios (previously reporting Sharpe > 20).
+- The backtest engine in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py) is the source of truth.
+- The engine was audited in March 2026. Old 20+ Sharpe claims elsewhere in the repo are historical and should not be treated as current expectations.
+- The live stack is XGBoost plus macro HMM regime tooling, not the older simplified single-file story.
 
-The engine has been **FIXED**. Real-world Sharpe ratios for these hourly strategies are in the 0.0-3.0 range. Any result higher than 5.0 should be treated with extreme skepticism and checked for overfitting (#2).
+## Current Objective
 
-## Current Leaderboard (FIXED ENGINE)
+Improve the fixed-engine score and robustness of [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py) while keeping the workflow reproducible.
 
-Your goal is to discover strategies that beat the robust baseline established on the corrected harness.
+The default path is:
 
-## Leaderboard (Adaptive Engine + 18 Symbols)
+1. Prepare data
+2. Optionally retrain models
+3. Update `strategy.py`
+4. Run validation backtests
+5. Run OOS robustness checks
+6. Compare against benchmarks
 
-| Rank | Strategy               | Sharpe | Drawdown | Turnover | Score |
-| :--- | :--------------------- | :----- | :------- | :------- | :---- |
-| 1    | `regime_mm`            | 2.228  | 4.7%     | 13,451   | 2.228 |
-| 2    | `simple_momentum`      | 2.122  | 5.6%     | 1,310    | 2.122 |
-| 3    | `xgb_iteration_v1`     | 1.800  | 5.0%     | 1.86M    | 1.800 |
-| 4    | `adaptive_ensemble_h1` | 1.054  | 16.3%    | 0.86M    | 0.991 |
-| 5    | `xgb_baseline_v0`      | 0.671  | 0.7%     | 417k     | 0.671 |
+## Files That Matter
 
-> [!IMPORTANT]
-> **Breakthrough (Iteration 1)**: By adding 48h momentum and 24h RSI features and lowering the entry threshold to 53%, the model achieved a **1.80 Sharpe** with a **67.6% win rate**. It is now significantly outperforming the hardcoded ensemble.
+- [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py): primary experiment surface
+- [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py): feature engine, dataset prep, data loading, backtest engine, score function
+- [train_model.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/train_model.py): XGBoost and HMM training
+- [backtest.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/backtest.py): validation and robustness CLI
+- [evaluate.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/evaluate.py): OOS suite with fee stress, capacity, regime breakdown, and Monte Carlo
+- [run_benchmarks.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/run_benchmarks.py): benchmark comparison
+- [analyze_results.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/analyze_results.py): results analyzer and research-memory refresher
+- [verify_harness.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/verify_harness.py): harness drift checker
+- [research_loop.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/research_loop.py): guided experiment-cycle runner
+- [RESEARCH_MEMORY.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/RESEARCH_MEMORY.md): short-lived strategic memory for the AI researcher
+- [models/MODELS.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/models/MODELS.md): current artifact map
 
-**New Target**: Beat the simple momentum baseline of **2.122**.
+Helpful comparison artifacts:
 
-## 🏗️ Experimentation Workflow
+- [strategy_exp269.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy_exp269.py)
+- [strategy_diff.txt](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy_diff.txt)
 
-1. **Modify `strategy.py`** — This is the only mutable file.
-2. **Run `uv run backtest.py`** — Evaluates on validation data (Jul 2024 - Mar 2025).
-3. **Budget**: 120 seconds. Ensure signal calculations are vectorized for speed.
-4. **Scoring**: `score = sharpe * sqrt(trade_count_factor) - drawdown_penalty - turnover_penalty`.
+## Current Workflow
 
-## Setup
+### 1. Refresh data when needed
 
-To set up a new experiment, work with the user to:
-
-1. **Agree on a run tag**: propose a tag based on today's date (e.g. `mar10`). The branch `autotrader/<tag>` must not already exist.
-2. **Create the branch**: `git checkout -b autotrader/<tag>` from current master.
-3. **Read the in-scope files**: `prepare.py`, `strategy.py`, `backtest.py`, this file.
-4. **Verify data exists**: `ls ~/.cache/autotrader/data/`
-5. **Initialize results.tsv**: `echo -e "commit\tscore\tsharpe\tmax_dd\tstatus\tdescription" > results.tsv`
-6. **Confirm and go**.
-
-## Experimentation
-
-Each experiment runs a backtest . Launch: `uv run backtest.py`.
-
-**What you CAN do:**
-
-- Modify `strategy.py` — this is the only file you edit. Everything is fair game.
-
-**What you CANNOT do:**
-
-- Modify `prepare.py`, `backtest.py`, or anything in `benchmarks/`.
-- Install new packages. Only numpy, pandas, scipy, and standard library.
-- Look at test set data.
-
-**The goal: get the highest `score`.** Higher is better. Baseline is 2.724.
-
-## Output format
-
-```
-grep "^score:" run.log
+```bash
+uv run prepare.py
+uv run prepare.py --mode 15m
 ```
 
-## Results TSV
+### 2. Retrain models when the experiment requires it
 
+```bash
+uv run train_model.py --timeframe 1h
+uv run train_model.py --timeframe 4h
+uv run train_model.py --timeframe 15m
+uv run train_model.py --timeframe 1h --train_hmm
 ```
-commit	score	sharpe	max_dd	status	description
+
+### 3. Run validation backtests
+
+```bash
+uv run backtest.py --timeframe 1h
+uv run backtest.py --timeframe 4h --stress-fees --capacity
+uv run backtest.py --timeframe 1h --oos
 ```
 
-## The experiment loop
+### 4. Refresh research memory and verify the harness
 
-LOOP FOREVER:
+```bash
+uv run analyze_results.py --update-memory
+uv run verify_harness.py
+```
 
-1. Look at git state
-2. Modify `strategy.py` with an experimental idea
-3. git commit
-4. `uv run backtest.py > run.log 2>&1`
-5. `grep "^score:\|^sharpe:\|^max_drawdown_pct:" run.log`
-6. If empty → crashed. `tail -n 50 run.log`, fix or skip.
-7. Record in results.tsv (untracked)
-8. If score IMPROVED (higher than best so far): keep
-9. If score equal or worse: `git reset --hard HEAD~1`
+### 5. Run the full OOS suite
 
-## 🧪 Research Lessons
+```bash
+uv run evaluate.py --timeframe 1h --label exp269
+```
 
-- **Simplicity Wins**: Complexity often hides overfitting. The original ensemble performed worse on the fixed engine than a simple momentum trend follower.
-- **BB Squeeze Alpha**: Bollinger Band width compression is a verified event-driven signal (#2) but works best as a sparse filter, not an always-on voting signal.
-- **Turnover Management**: High-frequency flipping leads to massive fee bleed and turnover penalties. Aim for <500x annual turnover.
-- **Benchmark Lens Matters**: The built-in `score` only enforces overall trades/day, not trades/day/symbol. Always read the benchmark audit before declaring a strategy "good".
-- **Directional 15m Split Helps Quality, Not Frequency**: Separate long/short 15m lead+meta models improved win rate and profit factor, but did not solve the opportunity-count bottleneck by themselves.
-- **Current Safe Restore Point**: The exp35-style 15m shell is the last trustworthy live baseline. When structural experiments fail, restore to that before continuing.
-- **Dense Labels Unlock Frequency but Can Destroy Alpha**: Moving 15m labels from sparse outliers to dense normalized thresholds made frequency achievable, but the first dense-label branches produced severe fee bleed, poor PF, and catastrophic drawdowns.
-- **Medium-Density Labels Were Too Sparse**: Raising the 15m normalized threshold to `0.70` improved selectivity, but starved the model again unless thresholds were relaxed so much that quality collapsed.
-- **Relative-Strength Features Alone Were Not Enough**: Adding cross-sectional features like `rel_ret_1h`, `rel_ret_4h`, and `rel_bb_width` improved some validation diagnostics, but did not automatically translate into a profitable live backtest.
-- **Mixed-Generation Model Inputs Need Alignment**: When feature sets change, older 1h/4h models will crash or silently misbehave unless prediction inputs are reindexed to each model's trained feature names.
-- **Ranker / Top-N Allocator Family Is Rejected For Now**: Converting 15m signals into a cross-sectional ranker solved the frequency target too aggressively, but every tested version overtraded and blew up quality. Do not repeat raw top-N 15m ranking without a fundamentally different gating layer.
-- **Cooldowns Alone Do Not Save Bad Entry Quality**: Adding top-1 picks, cooldowns, and longer holds reduced churn, but still left PF sub-1 and drawdowns above 90% in the ranker branch.
-- **Paper-Driven Next Step**: The next structural branch should be regime-conditioned 15m models and/or event-driven sampling, not more threshold sweeps or more ranker tuning.
+### 6. Optionally run one guided cycle end to end
+
+```bash
+uv run research_loop.py --timeframe 1h --description "test idea"
+```
+
+### 7. Compare with benchmarks
+
+```bash
+uv run run_benchmarks.py
+```
+
+## Rules
+
+- Treat `strategy.py` as the default experiment surface.
+- Treat `prepare.py`, `backtest.py`, and `benchmarks/` as fixed infrastructure unless the task is explicitly repository maintenance.
+- Do not use old README or social-post metrics as the current baseline.
+- Use the fixed-engine score and OOS behavior as the decision rule.
+- Prefer small, auditable changes over broad rewrites.
+
+## Current Codebase Facts
+
+### Data windows
+
+From [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L61):
+
+- `train`: 2017-01-01 to 2022-06-30, with per-symbol floors
+- `val`: 2022-07-01 to 2024-06-30
+- `robustness`: 2018-01-01 to 2024-06-30
+- `oos`: 2025-01-01 to 2025-12-31
+
+### Universe
+
+- 17 symbols on 1h data
+- 16 symbols on 15m data
+
+### Model stack
+
+- XGBoost directional and meta models in [train_model.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/train_model.py#L135)
+- Macro HMM regime training in [train_model.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/train_model.py#L57)
+- Cached probability tables and HMM state mapping in [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py#L127)
+
+### Default strategy behavior
+
+The current `1h` path in [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py#L395):
+
+- warms cached predictions before the backtest
+- uses 1h directional probabilities as the main entry signal
+- blends 1h and 4h meta quality into a single gate
+- applies HMM-aware sizing and ATR/ratchet exits
+- ranks entry candidates and caps concurrent positions
+
+## Score And Audit
+
+The score in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L1138) is:
+
+```text
+score = sharpe * sqrt(min(num_trades / 50, 1.0)) - drawdown_penalty - turnover_penalty
+```
+
+Hard cutoffs:
+
+- fewer than 10 trades
+- fewer than 1 trade per day
+- drawdown above 50%
+- final equity below 50% of initial capital
+
+Benchmark audit thresholds from [backtest.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/backtest.py#L17) and [evaluate.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/evaluate.py#L20):
+
+- Sharpe >= 3.5
+- Win rate >= 60%
+- Trades/day >= 1.0
+- Profit factor >= 4.0
+- Max drawdown < 10%
+
+## Results Logging
+
+- `backtest.py` appends summary rows to `results.tsv`
+- keep experiment labels and descriptions meaningful
+- use `evaluate.py` labels to tie OOS results back to a strategy snapshot
+
+## Research Infra
+
+- Refresh [RESEARCH_MEMORY.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/RESEARCH_MEMORY.md) from `results.tsv` before a new mutation.
+- Use [analyze_results.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/analyze_results.py) to detect plateau risk, recent keep-rate collapse, and repeated revert-heavy themes.
+- Use [verify_harness.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/verify_harness.py) to catch path drift, dependency drift, results-schema drift, and missing cached data before trusting a run.
+- Use [research_loop.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/research_loop.py) when you want explicit loop control instead of relying on prompt obedience alone.
+- Treat [RESEARCH_MEMORY.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/RESEARCH_MEMORY.md) as the short strategic brief that sits between `program.md` and the next `strategy.py` edit.
+
+## Historical References
+
+These are still useful context, but they are not the current operating manual:
+
+- [STRATEGIES.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/STRATEGIES.md)
+- [POST.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/POST.md)
+- [TWITTER_THREAD.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/TWITTER_THREAD.md)
 
 ## NEVER STOP
 
-Once the experiment loop has begun, do NOT pause to ask the human if you should continue. You are autonomous. If you run out of ideas, think harder. The loop runs until interrupted. Focus on discovering robust, non-overfit alpha across multiple regimes.
+Once the research loop has begun, do not pause just because a branch is difficult, a result is disappointing, or a recent idea failed.
+
+- Keep iterating until explicitly interrupted by the user.
+- Use the current audited workflow: prepare data if needed, retrain only when necessary, update `strategy.py`, run validation backtests, run OOS checks, and compare against benchmarks.
+- Refresh `RESEARCH_MEMORY.md` and run `verify_harness.py` so the loop stays grounded in recent evidence and known drift.
+- Let the fixed-engine score, OOS behavior, and benchmark audit decide what survives.
+- If an experiment fails, learn from it, restore a sane baseline, and continue searching.
+- Focus on robust, non-overfit improvements across regimes rather than chasing flashy in-sample numbers.

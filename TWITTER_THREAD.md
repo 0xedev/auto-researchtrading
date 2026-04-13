@@ -1,6 +1,10 @@
-# Autoresearch Trading — How We Let AI Teach Itself to Trade
+# Autoresearch Trading - How We Let AI Teach Itself to Trade
 
-> **TL;DR:** We gave an AI a simple trading strategy and let it run 103 scored experiments on its own — no human touching anything. It improved its own performance by 7.9x and, in the process, discovered that deleting its own "smart" features made it better. Everything is open source.
+> Historical note
+>
+> This thread reflects the earlier pre-audit autonomous-loop story. It is preserved for archive purposes and should not be read as the current description of the fixed-engine branch after the March 2026 backtest audit.
+
+> **TL;DR:** We gave an AI a simple trading strategy and let it run 103 scored experiments on its own - no human touching anything. It improved its own performance by 7.9x and, in the process, discovered that deleting its own "smart" features made it better. Everything is open source.
 
 ---
 

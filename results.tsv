@@ -1,4 +1,4 @@
-commit	score	sharpe	max_dd	status	description
+commit          	 score   	 sharpe 	 max_dd	 status     	 description
 exp0            	 -999.000	 0.000  	   0.00	 BASELINE   	 clean audited branch, no trades before 1h fallback
 exp2            	 -999.000	 0.715  	   4.17	 REVERT     	 tighten meta and lead thresholds (too restrictive)
 exp3            	 0.680   	 0.680  	   4.39	 REVERT     	 require market-ret alignment for entries (worse Sharpe)
@@ -198,96 +198,154 @@ exp267          	 -999.000	 0.000  	   0.00	 REVERT     	 Training Consolidation
 exp268          	 3.012   	 4.850  	   1.85	 KEEP       	 Weighted Specialist Retraining: applied balanced sample_weights, trade generation unlocked
 exp269          	 3.245   	 5.120  	   1.54	 KEEP       	 Medallion Council v1.39: 4-Regime Specialists + HMM calibration + Unified Precision + balanced retraining. Trades unlocked.
 
-exp270	-999.000	0.000	0.00	REVERT	Medallion Remote Migration: v2.3 Precision Exits + 7.5x/2.5x Targets.
-exp271	-999.000	-0.200	3.58	REVERT	Medallion Remote Migration: v2.3 Precision Exits + 7.5x/2.5x Targets.
-exp272	-999.000	0.487	7.21	REVERT	Medallion Restoration: 0.25 Gates + 9x/4x Swing Exits (Reverting Decay).
-exp273	-999.000	0.564	8.25	REVERT	Medallion MTF Resonance: 15m Signal Gating + 1.6x High-Conviction Sizing.
-exp274	-999.000	0.562	12.18	REVERT	Medallion exp274: Funding-Aware Contrarian + State 0 Overweight (1.8x) + Meta 0.28.
-exp275	-999.000	0.563	9.58	REVERT	Auto-research iteration
-exp276	-999.000	0.563	9.58	REVERT	Auto-research iteration
-exp277	-0.310	0.203	25.27	REVERT	Auto-research iteration
-exp278	-0.647	-0.320	21.54	REVERT	Auto-research iteration
-exp279	-0.379	-0.050	21.59	REVERT	Auto-research iteration
-exp280	-1.065	-0.044	35.42	REVERT	Auto-research iteration
-exp281	-1.311	-0.024	40.74	REVERT	Auto-research iteration
-exp282	-999.000	0.848	2.63	REVERT	Auto-research iteration
-exp283	-999.000	0.143	10.42	REVERT	Auto-research iteration
-exp284	-999.000	0.813	4.30	REVERT	Auto-research iteration
-exp285	-999.000	0.795	2.10	REVERT	Auto-research iteration
-exp286	-0.688	-0.564	17.49	REVERT	Auto-research iteration
-exp287	-999.000	0.667	2.44	REVERT	Auto-research iteration
-exp288	-999.000	0.666	3.40	REVERT	Auto-research iteration
-exp289	-999.000	0.452	6.41	REVERT	Auto-research iteration
-exp290	-999.000	0.431	6.10	REVERT	Auto-research iteration
-exp291	-999.000	1.745	1.04	REVERT	Auto-research iteration
-exp292	-0.901	-0.678	19.46	REVERT	Auto-research iteration
-exp293	-999.000	0.452	6.41	REVERT	Auto-research iteration
-exp294	-999.000	0.452	6.41	REVERT	Auto-research iteration
-exp295	-999.000	0.187	8.14	REVERT	Auto-research iteration
-exp296	-999.000	-0.121	9.10	REVERT	Auto-research iteration
-exp297	-999.000	0.131	9.47	REVERT	Auto-research iteration
-exp298	-999.000	-0.018	10.73	REVERT	Properly enforced 3-position limit. Performance collapsed, suggesting first-come gating is suboptimal.
-exp300	-999.000	0.991	5.61	SUCCESS	Vol-Adaptive Fix + 0.45 Meta. Sharpe jumped to 0.99, DD fell to 5.6%. Elite quality, but likely under-trading.
-exp301	0.667	0.667	2.69	REVERT	exp338: Quantum Medallion Hybrid (Sizing 0.03-0.15 + 5-D RSI HMM)
-exp302	0.681	0.681	2.60	REVERT	exp339: Ratchet Trailing Stops (Lock-at-Entry 1.0x ATR + Non-Retreating Standard Trail)
-exp303	0.506	0.506	4.17	REVERT	exp340: Short-Side Symmetry + Funding Filter (Relaxed short gates by 0.02 + Contrarian funding < 0.03% abs)
-exp304	0.391	0.391	4.56	REVERT	exp341: Adaptive Vol-Stop Scaling (State 2: 2.5x ATR, State 1: 1.8x ATR)
-exp305	0.392	0.392	5.66	REVERT	exp342: Specialist Council Voting (15m/1h/4h confluence boost 1.25x)
-exp306	-2.108	-1.028	36.61	REVERT	exp344: Alpha Density Push (Loosened gates ~0.05, 1.5x ATR stops, TTP armed 3.0x ATR)
-exp307	0.437	0.437	3.95	REVERT	exp347: Precision Alpha + Vol-Spike Filter (Restore Gates, ATR 1.8x Skip, 1.5x Ratchet)
-exp308	-999.000	0.461	2.06	REVERT	exp348: Macro-Regime Resonance (Longs only in S1, Shorts only in S2)
-exp309	0.238	0.238	3.73	REVERT	exp349: Soft Macro Resonance (0.5x size penalty for counter-trend trades)
-exp310	-999.000	0.461	1.65	REVERT	Auto-research iteration
-exp311	-999.000	0.461	1.65	REVERT	Auto-research iteration
-exp312	0.180	0.180	1.21	REVERT	apr08-vast4090 remote baseline
-exp313	0.180	0.180	1.21	REVERT	apr08-vast4090 restore state routing
-exp314	-999.000	-0.525	24.91	REVERT	apr08-vast4090 restore exp269 logic v3
-exp315	-4.191	-2.950	39.83	REVERT	apr08-vast4090 zero macro fallback
-exp316	0.091	0.091	1.23	REVERT	apr08-vast4090 add XAU 1h anchor v3
-exp317	0.091	0.091	1.23	REVERT	apr08-vast4090 retrain 1h+hmm specialists
-exp318	-999.000	0.000	0.00	REVERT	apr08-vast4090 activate macro+funding cache
-exp319	0.170	0.170	2.58	REVERT	apr08-vast4090 calibrated hmm semantics
-exp320	0.212	0.212	2.39	REVERT	apr08-vast4090 balanced retrain calibrated hmm
-exp321	-999.000	-0.590	2.64	REVERT	apr08-vast4090 exp320 oos retest
-exp322	0.093	0.093	1.26	REVERT	apr08-vast4090 pretrain models live regime wiring
-exp323	-999.000	-0.590	2.64	REVERT	apr08-vast4090 1h retrain old 4h oos
-exp324	-999.000	-0.590	2.64	REVERT	apr08-vast4090 pretrain wiring oos
-exp325	-0.375	-0.375	7.73	REVERT	apr08-vast4090 1h core gate simplification
-exp326	-999.000	0.036	1.44	REVERT	apr08-vast4090 1h core gate tightening
-exp327	-0.145	-0.145	3.74	REVERT	apr08-vast4090 1h budgeted allocator
-exp328	-0.158	-0.158	2.41	REVERT	apr08-vast4090 1h 15m timing filter
-exp329	-0.274	-0.274	4.23	REVERT	apr08-vast4090 restore 15m directional specialists
-exp330	-999.000	-0.279	1.89	REVERT	apr08-vast4090 15m specialist confirmation
-exp331	-999.000	-0.096	1.78	REVERT	apr08-vast4090 asymmetric short gate
-exp332	-999.000	-0.096	1.78	REVERT	apr08-vast4090 long only diagnostic
-exp333	-999.000	-0.519	21.87	REVERT	apr08-vast4090 exp269 architecture retest
-exp334	-999.000	0.000	0.00	REVERT	apr08-vast4090 15m architecture probe
-exp335	0.045	0.045	4.20	REVERT	apr08-vast4090 15m long bias calibration
-exp336	0.242	0.242	5.84	REVERT	apr08-vast4090 15m long bias trim
-exp337	-999.000	0.056	5.46	REVERT	apr08-vast4090 15m long bias trim v2
-exp338	-999.000	0.470	2.85	REVERT	apr08-vast4090 15m flow recovery
-exp339	-999.000	0.470	2.85	REVERT	apr08-vast4090 15m add-on unlock
-exp340	0.672	0.672	2.85	REVERT	apr08-vast4090 15m push unlock
-exp341	0.786	0.786	2.44	REVERT	apr08-vast4090 15m trend push reweight
-exp342	-999.000	0.132	5.46	REVERT	apr08-vast4090 15m longer hold
-exp343	-999.000	0.657	2.85	REVERT	apr08-vast4090 15m scalein clamp
-exp344	-999.000	0.657	2.85	REVERT	apr08-vast4090 15m ranked entry allocator
-exp345	-999.000	0.657	2.85	REVERT	apr08-vast4090 15m push priority allocator
-exp346	-999.000	0.774	2.44	REVERT	apr08-vast4090 15m campaign push_priority p4 control push_bias
-exp347	0.858	0.858	2.85	REVERT	apr08-vast4090 15m campaign push_priority p4 push_relax control
-exp348	1.001	1.001	2.44	REVERT	apr08-vast4090 15m campaign push_priority p4 push_relax push_bias
-exp349	-999.000	1.029	2.45	REVERT	apr08-vast4090 15m campaign push_priority p4 hybrid control
-exp350	-999.000	1.143	2.25	REVERT	apr08-vast4090 15m campaign push_priority p4 hybrid push_bias
-exp351	-999.000	0.657	2.85	REVERT	apr08-vast4090 15m campaign push_priority p3 control control
-exp352	-999.000	0.774	2.44	REVERT	apr08-vast4090 15m campaign push_priority p3 control push_bias
-exp353	0.858	0.858	2.85	REVERT	apr08-vast4090 15m campaign push_priority p3 push_relax control
-exp354	1.002	1.002	2.44	REVERT	apr08-vast4090 15m campaign push_priority p3 push_relax push_bias
-exp355	-999.000	1.029	2.45	REVERT	apr08-vast4090 15m campaign push_priority p3 hybrid control
-exp356	-999.000	1.143	2.25	REVERT	apr08-vast4090 15m campaign push_priority p3 hybrid push_bias
-exp357	-999.000	0.657	2.85	REVERT	apr08-vast4090 15m campaign ranked p4 control control
-exp358	-999.000	0.774	2.44	REVERT	apr08-vast4090 15m campaign ranked p4 control push_bias
-exp359	0.858	0.858	2.85	REVERT	apr08-vast4090 15m campaign ranked p4 push_relax control
-exp360	1.001	1.001	2.44	REVERT	apr08-vast4090 15m campaign ranked p4 push_relax push_bias
-exp361	0.613	0.613	5.08	CANDIDATE	apr08-vast4090 15m infra reset soft slow-tf ranking
-exp362	0.937	0.937	4.36	CANDIDATE	apr08-vast4090 15m soft slow-tf ranked p4 push_relax push_bias
-exp363	0.937	0.937	4.36	CANDIDATE	apr08-vast4090 15m soft slow-tf ranked p3 push_relax push_bias
+exp270          	 -999.000	 0.000  	   0.00	 REVERT     	 Medallion Remote Migration: v2.3 Precision Exits + 7.5x/2.5x Targets.
+exp271          	 -999.000	 -0.200 	   3.58	 REVERT     	 Medallion Remote Migration: v2.3 Precision Exits + 7.5x/2.5x Targets.
+exp272          	 -999.000	 0.487  	   7.21	 REVERT     	 Medallion Restoration: 0.25 Gates + 9x/4x Swing Exits (Reverting Decay).
+exp273          	 -999.000	 0.564  	   8.25	 REVERT     	 Medallion MTF Resonance: 15m Signal Gating + 1.6x High-Conviction Sizing.
+exp274          	 -999.000	 0.562  	  12.18	 REVERT     	 Medallion exp274: Funding-Aware Contrarian + State 0 Overweight (1.8x) + Meta 0.28.
+exp275          	 -999.000	 0.563  	   9.58	 REVERT     	 Auto-research iteration
+exp276          	 -999.000	 0.563  	   9.58	 REVERT     	 Auto-research iteration
+exp277          	 -0.310  	 0.203  	  25.27	 REVERT     	 Auto-research iteration
+exp278          	 -0.647  	 -0.320 	  21.54	 REVERT     	 Auto-research iteration
+exp279          	 -0.379  	 -0.050 	  21.59	 REVERT     	 Auto-research iteration
+exp280          	 -1.065  	 -0.044 	  35.42	 REVERT     	 Auto-research iteration
+exp281          	 -1.311  	 -0.024 	  40.74	 REVERT     	 Auto-research iteration
+exp282          	 -999.000	 0.848  	   2.63	 REVERT     	 Auto-research iteration
+exp283          	 -999.000	 0.143  	  10.42	 REVERT     	 Auto-research iteration
+exp284          	 -999.000	 0.813  	   4.30	 REVERT     	 Auto-research iteration
+exp285          	 -999.000	 0.795  	   2.10	 REVERT     	 Auto-research iteration
+exp286          	 -0.688  	 -0.564 	  17.49	 REVERT     	 Auto-research iteration
+exp287          	 -999.000	 0.667  	   2.44	 REVERT     	 Auto-research iteration
+exp288          	 -999.000	 0.666  	   3.40	 REVERT     	 Auto-research iteration
+exp289          	 -999.000	 0.452  	   6.41	 REVERT     	 Auto-research iteration
+exp290          	 -999.000	 0.431  	   6.10	 REVERT     	 Auto-research iteration
+exp291          	 -999.000	 1.745  	   1.04	 REVERT     	 Auto-research iteration
+exp292          	 -0.901  	 -0.678 	  19.46	 REVERT     	 Auto-research iteration
+exp293          	 -999.000	 0.452  	   6.41	 REVERT     	 Auto-research iteration
+exp294          	 -999.000	 0.452  	   6.41	 REVERT     	 Auto-research iteration
+exp295          	 -999.000	 0.187  	   8.14	 REVERT     	 Auto-research iteration
+exp296          	 -999.000	 -0.121 	   9.10	 REVERT     	 Auto-research iteration
+exp297          	 -999.000	 0.131  	   9.47	 REVERT     	 Auto-research iteration
+exp298          	 -999.000	 -0.018 	  10.73	 REVERT     	 Properly enforced 3-position limit. Performance collapsed, suggesting first-come gating is suboptimal.
+exp300          	 -999.000	 0.991  	   5.61	 SUCCESS    	 Vol-Adaptive Fix + 0.45 Meta. Sharpe jumped to 0.99, DD fell to 5.6%. Elite quality, but likely under-trading.
+exp301          	 0.667   	 0.667  	   2.69	 REVERT     	 exp338: Quantum Medallion Hybrid (Sizing 0.03-0.15 + 5-D RSI HMM)
+exp302          	 0.681   	 0.681  	   2.60	 REVERT     	 exp339: Ratchet Trailing Stops (Lock-at-Entry 1.0x ATR + Non-Retreating Standard Trail)
+exp303          	 0.506   	 0.506  	   4.17	 REVERT     	 exp340: Short-Side Symmetry + Funding Filter (Relaxed short gates by 0.02 + Contrarian funding < 0.03% abs)
+exp304          	 0.391   	 0.391  	   4.56	 REVERT     	 exp341: Adaptive Vol-Stop Scaling (State 2: 2.5x ATR, State 1: 1.8x ATR)
+exp305          	 0.392   	 0.392  	   5.66	 REVERT     	 exp342: Specialist Council Voting (15m/1h/4h confluence boost 1.25x)
+exp306          	 -2.108  	 -1.028 	  36.61	 REVERT     	 exp344: Alpha Density Push (Loosened gates ~0.05, 1.5x ATR stops, TTP armed 3.0x ATR)
+exp307          	 0.437   	 0.437  	   3.95	 REVERT     	 exp347: Precision Alpha + Vol-Spike Filter (Restore Gates, ATR 1.8x Skip, 1.5x Ratchet)
+exp308          	 -999.000	 0.461  	   2.06	 REVERT     	 exp348: Macro-Regime Resonance (Longs only in S1, Shorts only in S2)
+exp309          	 0.238   	 0.238  	   3.73	 REVERT     	 exp349: Soft Macro Resonance (0.5x size penalty for counter-trend trades)
+exp310          	 -999.000	 0.461  	   1.65	 REVERT     	 Auto-research iteration
+exp311          	 -999.000	 0.461  	   1.65	 REVERT     	 Auto-research iteration
+exp312          	 0.180   	 0.180  	   1.21	 REVERT     	 apr08-vast4090 remote baseline
+exp313          	 0.180   	 0.180  	   1.21	 REVERT     	 apr08-vast4090 restore state routing
+exp314          	 -999.000	 -0.525 	  24.91	 REVERT     	 apr08-vast4090 restore exp269 logic v3
+exp315          	 -4.191  	 -2.950 	  39.83	 REVERT     	 apr08-vast4090 zero macro fallback
+exp316          	 0.091   	 0.091  	   1.23	 REVERT     	 apr08-vast4090 add XAU 1h anchor v3
+exp317          	 0.091   	 0.091  	   1.23	 REVERT     	 apr08-vast4090 retrain 1h+hmm specialists
+exp318          	 -999.000	 0.000  	   0.00	 REVERT     	 apr08-vast4090 activate macro+funding cache
+exp319          	 0.170   	 0.170  	   2.58	 REVERT     	 apr08-vast4090 calibrated hmm semantics
+exp320          	 0.212   	 0.212  	   2.39	 REVERT     	 apr08-vast4090 balanced retrain calibrated hmm
+exp321          	 -999.000	 -0.590 	   2.64	 REVERT     	 apr08-vast4090 exp320 oos retest
+exp322          	 0.093   	 0.093  	   1.26	 REVERT     	 apr08-vast4090 pretrain models live regime wiring
+exp323          	 -999.000	 -0.590 	   2.64	 REVERT     	 apr08-vast4090 1h retrain old 4h oos
+exp324          	 -999.000	 -0.590 	   2.64	 REVERT     	 apr08-vast4090 pretrain wiring oos
+exp325          	 -0.375  	 -0.375 	   7.73	 REVERT     	 apr08-vast4090 1h core gate simplification
+exp326          	 -999.000	 0.036  	   1.44	 REVERT     	 apr08-vast4090 1h core gate tightening
+exp327          	 -0.145  	 -0.145 	   3.74	 REVERT     	 apr08-vast4090 1h budgeted allocator
+exp328          	 -0.158  	 -0.158 	   2.41	 REVERT     	 apr08-vast4090 1h 15m timing filter
+exp329          	 -0.274  	 -0.274 	   4.23	 REVERT     	 apr08-vast4090 restore 15m directional specialists
+exp330          	 -999.000	 -0.279 	   1.89	 REVERT     	 apr08-vast4090 15m specialist confirmation
+exp331          	 -999.000	 -0.096 	   1.78	 REVERT     	 apr08-vast4090 asymmetric short gate
+exp332          	 -999.000	 -0.096 	   1.78	 REVERT     	 apr08-vast4090 long only diagnostic
+exp333          	 -999.000	 -0.519 	  21.87	 REVERT     	 apr08-vast4090 exp269 architecture retest
+exp334          	 -999.000	 0.000  	   0.00	 REVERT     	 apr08-vast4090 15m architecture probe
+exp335          	 0.045   	 0.045  	   4.20	 REVERT     	 apr08-vast4090 15m long bias calibration
+exp336          	 0.242   	 0.242  	   5.84	 REVERT     	 apr08-vast4090 15m long bias trim
+exp337          	 -999.000	 0.056  	   5.46	 REVERT     	 apr08-vast4090 15m long bias trim v2
+exp338          	 -999.000	 0.470  	   2.85	 REVERT     	 apr08-vast4090 15m flow recovery
+exp339          	 -999.000	 0.470  	   2.85	 REVERT     	 apr08-vast4090 15m add-on unlock
+exp340          	 0.672   	 0.672  	   2.85	 REVERT     	 apr08-vast4090 15m push unlock
+exp341          	 0.786   	 0.786  	   2.44	 REVERT     	 apr08-vast4090 15m trend push reweight
+exp342          	 -999.000	 0.132  	   5.46	 REVERT     	 apr08-vast4090 15m longer hold
+exp343          	 -999.000	 0.657  	   2.85	 REVERT     	 apr08-vast4090 15m scalein clamp
+exp344          	 -999.000	 0.657  	   2.85	 REVERT     	 apr08-vast4090 15m ranked entry allocator
+exp345          	 -999.000	 0.657  	   2.85	 REVERT     	 apr08-vast4090 15m push priority allocator
+exp346          	 -999.000	 0.774  	   2.44	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 control push_bias
+exp347          	 0.858   	 0.858  	   2.85	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 push_relax control
+exp348          	 1.001   	 1.001  	   2.44	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 push_relax push_bias
+exp349          	 -999.000	 1.029  	   2.45	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 hybrid control
+exp350          	 -999.000	 1.143  	   2.25	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 hybrid push_bias
+exp351          	 -999.000	 0.657  	   2.85	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 control control
+exp352          	 -999.000	 0.774  	   2.44	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 control push_bias
+exp353          	 0.858   	 0.858  	   2.85	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 push_relax control
+exp354          	 1.002   	 1.002  	   2.44	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 push_relax push_bias
+exp355          	 -999.000	 1.029  	   2.45	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 hybrid control
+exp356          	 -999.000	 1.143  	   2.25	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 hybrid push_bias
+exp357          	 -999.000	 0.657  	   2.85	 REVERT     	 apr08-vast4090 15m campaign ranked p4 control control
+exp358          	 -999.000	 0.774  	   2.44	 REVERT     	 apr08-vast4090 15m campaign ranked p4 control push_bias
+exp359          	 0.858   	 0.858  	   2.85	 REVERT     	 apr08-vast4090 15m campaign ranked p4 push_relax control
+exp360          	 1.001   	 1.001  	   2.44	 REVERT     	 apr08-vast4090 15m campaign ranked p4 push_relax push_bias
+exp361          	 0.613   	 0.613  	   5.08	 CANDIDATE  	 apr08-vast4090 15m infra reset soft slow-tf ranking
+exp362          	 0.937   	 0.937  	   4.36	 CANDIDATE  	 apr08-vast4090 15m soft slow-tf ranked p4 push_relax push_bias
+exp363          	 0.937   	 0.937  	   4.36	 CANDIDATE  	 apr08-vast4090 15m soft slow-tf ranked p3 push_relax push_bias
+exp364          	 1.502   	 1.502  	   1.86	 REVERT     	 Auto-research iteration
+exp365          	 1.502   	 1.502  	   1.86	 REVERT     	 Auto-research iteration
+exp366          	 2.201   	 2.201  	   1.87	 REVERT     	 Auto-research iteration
+exp367          	 1.562   	 1.562  	   1.85	 REVERT     	 Auto-research iteration
+exp368          	 2.204   	 2.204  	   1.87	 REVERT     	 Auto-research iteration
+exp369          	 2.204   	 2.204  	   1.87	 REVERT     	 Auto-research iteration
+exp370          	 1.559   	 1.559  	   1.85	 REVERT     	 Auto-research iteration
+exp371          	 2.005   	 2.005  	   1.87	 REVERT     	 Auto-research iteration
+exp372          	 1.453   	 1.453  	   1.30	 REVERT     	 Auto-research iteration
+exp373          	 2.110   	 2.110  	   1.87	 REVERT     	 Auto-research iteration
+exp374          	 1.559   	 1.559  	   1.85	 REVERT     	 Auto-research iteration
+exp375          	 1.559   	 1.559  	   1.85	 REVERT     	 Auto-research iteration
+exp376          	 2.204   	 2.204  	   1.87	 REVERT     	 Auto-research iteration
+exp377          	 2.174   	 2.174  	   2.49	 REVERT     	 Auto-research iteration
+exp378          	 1.498   	 1.498  	   2.47	 REVERT     	 Auto-research iteration
+exp379          	 1.425   	 1.425  	   1.20	 REVERT     	 Auto-research iteration
+exp380          	 2.146   	 2.146  	   1.24	 REVERT     	 Auto-research iteration
+exp381          	 -999.000	 1.515  	   1.12	 REVERT     	 Auto-research iteration
+exp382          	 -999.000	 1.789  	   1.72	 REVERT     	 Auto-research iteration
+exp383          	 1.594   	 1.594  	   1.20	 REVERT     	 Auto-research iteration
+exp384          	 2.066   	 2.066  	   1.79	 REVERT     	 Auto-research iteration
+exp385          	 1.713   	 1.713  	   1.48	 REVERT     	 Auto-research iteration
+exp386          	 2.340   	 2.340  	   1.60	 REVERT     	 Auto-research iteration
+exp387          	 1.678   	 1.678  	   1.57	 REVERT     	 Auto-research iteration
+exp388          	 2.324   	 2.324  	   1.63	 REVERT     	 Auto-research iteration
+exp389          	 1.742   	 1.742  	   1.39	 REVERT     	 Auto-research iteration
+exp390          	 2.356   	 2.356  	   1.57	 REVERT     	 Auto-research iteration
+exp391          	 1.785   	 1.785  	   1.29	 REVERT     	 Auto-research iteration
+exp392          	 2.368   	 2.368  	   1.55	 REVERT     	 Auto-research iteration
+exp393          	 1.830   	 1.830  	   1.20	 REVERT     	 Auto-research iteration
+exp394          	 2.378   	 2.378  	   1.52	 REVERT     	 Auto-research iteration
+exp395          	 1.874   	 1.874  	   1.11	 REVERT     	 Auto-research iteration
+exp396          	 2.381   	 2.381  	   1.49	 REVERT     	 Auto-research iteration
+exp397          	 1.959   	 1.959  	   0.93	 REVERT     	 Auto-research iteration
+exp398          	 2.358   	 2.358  	   1.43	 REVERT     	 Auto-research iteration
+exp399          	 1.785   	 1.785  	   1.29	 REVERT     	 Auto-research iteration
+exp400          	 1.816   	 1.816  	   1.29	 REVERT     	 Auto-research iteration
+exp401          	 2.399   	 2.399  	   1.55	 REVERT     	 Auto-research iteration
+exp402          	 1.832   	 1.832  	   1.29	 REVERT     	 Auto-research iteration
+exp403          	 2.403   	 2.403  	   1.55	 REVERT     	 Auto-research iteration
+exp404          	 1.834   	 1.834  	   1.29	 REVERT     	 Auto-research iteration
+exp405          	 2.398   	 2.398  	   1.55	 REVERT     	 Auto-research iteration
+exp406          	 1.832   	 1.832  	   1.29	 REVERT     	 Auto-research iteration
+exp407          	 -999.000	 1.813  	   1.29	 REVERT     	 Auto-research iteration
+exp408          	 2.403   	 2.403  	   1.55	 REVERT     	 Auto-research iteration
+exp409          	 2.403   	 2.403  	   1.55	 REVERT     	 Auto-research iteration
+exp410          	 2.206   	 2.206  	   1.58	 REVERT     	 Auto-research iteration
+exp411          	 1.832   	 1.832  	   1.29	 REVERT     	 Auto-research iteration
+exp412          	 2.403   	 2.403  	   1.55	 REVERT     	 Auto-research iteration
+exp413          	 1.666   	 1.666  	   1.61	 REVERT     	 Auto-research iteration
+exp414          	 2.179   	 2.179  	   1.82	 REVERT     	 Auto-research iteration
+exp415          	 -999.000	 1.798  	   1.29	 REVERT     	 Auto-research iteration
+exp416          	 2.403   	 2.403  	   1.55	 REVERT     	 Auto-research iteration
+exp417          	 -999.000	 2.037  	   1.18	 REVERT     	 Auto-research iteration
+exp418          	 2.068   	 2.068  	   1.55	 REVERT     	 Auto-research iteration
+exp419          	 1.832   	 1.832  	   1.29	 REVERT     	 Auto-research iteration
+exp420          	 2.403   	 2.403  	   1.55	 REVERT     	 Auto-research iteration
+exp421          	 2.206   	 2.206  	   1.58	 REVERT     	 Auto-research iteration

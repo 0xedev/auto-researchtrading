@@ -1058,6 +1058,7 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
             # Update position
             if sig.target_position == 0:
                 # Closing position — realize PnL
+                pnl = 0.0
                 if sig.symbol in portfolio.entry_prices:
                     entry = portfolio.entry_prices[sig.symbol]
                     if entry > 0:
@@ -1066,7 +1067,7 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
                     del portfolio.entry_prices[sig.symbol]
                 if sig.symbol in portfolio.positions:
                     del portfolio.positions[sig.symbol]
-                trade_log.append(("close", sig.symbol, delta, exec_price, pnl if 'pnl' in dir() else 0))
+                trade_log.append(("close", sig.symbol, delta, exec_price, pnl))
             else:
                 if current_pos == 0:
                     # Opening new position

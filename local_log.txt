@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/Users/ayobamiadefolalu/Downloads/auto-researchtrading/backtest.py", line 11, in <module>
+    import prepare
+  File "/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py", line 23, in <module>
+    from hmmlearn import hmm
+ModuleNotFoundError: No module named 'hmmlearn'

@@ -244,8 +244,27 @@ if __name__ == "__main__":
     parser.add_argument("--capacity", action="store_true")
     parser.add_argument("--oos", action="store_true", help="Run firmly on strictly unseen 2025 quarantine data")
     parser.add_argument("--description", type=str, default="Auto-research iteration", help="Description for results.tsv")
-    
+    parser.add_argument("--slippage-bps", type=float, default=None,
+                        help="Override prepare.SLIPPAGE_BPS for this run only (audit knob)")
+    parser.add_argument("--taker-fee-bps", type=float, default=None,
+                        help="Override prepare.TAKER_FEE for this run only (audit knob)")
+    parser.add_argument("--no-log", action="store_true",
+                        help="Do not append result to results.tsv (audit / re-audit runs)")
+    parser.add_argument("--label", type=str, default=None,
+                        help="Print this label in the results header (audit runs)")
+
     args = parser.parse_args()
+
+    # Audit overrides — applied BEFORE the strategy and engine see anything.
+    # These mutate prepare.* module state for the duration of this process only.
+    # When --no-log is set, results.tsv is left alone so audits don't pollute the leaderboard.
+    if args.slippage_bps is not None:
+        print(f"AUDIT OVERRIDE: SLIPPAGE_BPS {prepare.SLIPPAGE_BPS} -> {args.slippage_bps}")
+        prepare.SLIPPAGE_BPS = args.slippage_bps
+    if args.taker_fee_bps is not None:
+        new_taker = args.taker_fee_bps / 10000.0
+        print(f"AUDIT OVERRIDE: TAKER_FEE {prepare.TAKER_FEE} -> {new_taker}")
+        prepare.TAKER_FEE = new_taker
 
     # Set OS alarm: 4H needs extra budget for regime breakdown (5 backtests)
     if args.timeframe == "4h":
@@ -284,8 +303,13 @@ if __name__ == "__main__":
     t_end = time.time()
     
     print("\n" + "=" * 60)
-    print(f"  BASELINE RESULTS ({args.timeframe.upper()})")
+    header = f"  BASELINE RESULTS ({args.timeframe.upper()})"
+    if args.label:
+        header += f"  [{args.label}]"
+    print(header)
     print("=" * 60)
+    if args.slippage_bps is not None or args.taker_fee_bps is not None:
+        print(f"  audit overrides: slippage_bps={prepare.SLIPPAGE_BPS} taker_fee={prepare.TAKER_FEE}")
     print(f"score:              {score:.6f}")
     print(f"sharpe:             {result.sharpe:.6f}")
     print(f"total_return_pct:   {result.total_return_pct:.6f}")
@@ -313,10 +337,15 @@ if __name__ == "__main__":
     if args.capacity:
         run_capacity(data, args.timeframe, split_name)
 
+    if args.no_log:
+        print("\n--no-log: skipping results.tsv append (audit run).")
+        raise SystemExit(0)
+
     # Autonomous Logging to results.tsv
     try:
         df_res = pd.read_csv("results.tsv", sep="\t")
-        last_exp = df_res[df_res["commit"].str.startswith("exp")]["commit"].str.extract(r"exp(\d+)").dropna().astype(int).max().iloc[0]
+        df_res.columns = df_res.columns.str.strip()
+        last_exp = df_res[df_res["commit"].str.strip().str.match(r"exp\d+")]["commit"].str.strip().str.extract(r"exp(\d+)").dropna().astype(int).max().iloc[0]
         new_exp_id = f"exp{last_exp + 1}"
     except Exception:
         new_exp_id = "exp1"

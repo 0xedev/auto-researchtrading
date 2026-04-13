@@ -1,115 +1,145 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file gives code agents the current operating context for this repository.
 
 ## Project Overview
 
-Nunchi Auto-Research Trading: an autonomous strategy research framework where Claude iteratively evolves trading strategies on Hyperliquid perpetual futures. The system modifies `strategy.py`, backtests it, keeps improvements, and reverts failures — fully autonomous (Baseline Sharpe ~1.0-2.1 on 18 assets).
+This repository is a trading research workspace built around:
+
+- cached 1h and 15m market data
+- a fixed backtest engine in `prepare.py`
+- XGBoost directional and meta models
+- a macro HMM regime layer
+- a live strategy implementation in `strategy.py`
+- validation and OOS robustness runners
+
+The older "single mutable file with 20+ Sharpe" story still exists in historical docs, but it is not the right mental model for the current audited branch.
 
 ## Commands
 
 ```bash
-# Download/refresh 1H market data (cached to ~/.cache/autotrader/data/)
+# Refresh data caches
 uv run prepare.py
-
-# Download 15-minute data (Binance + HuggingFace XAU)
 uv run prepare.py --mode 15m
 
-# Train ML models (per-timeframe) & Run Monte Carlo tests
-uv run train_model.py                    # 1H model → model_1h.joblib
-uv run train_model.py --timeframe 4h     # 4H model → model_4h.joblib
-uv run train_model.py --timeframe 4h --monte-carlo 1000  # 1,000 parallel GPU simulations
+# Train models
+uv run train_model.py --timeframe 1h
+uv run train_model.py --timeframe 4h
+uv run train_model.py --timeframe 15m
+uv run train_model.py --timeframe 1h --train_hmm
 
-# Run baseline validation backtest (1H bars)
+# Validation and robustness backtests
 uv run backtest.py --timeframe 1h
+uv run backtest.py --timeframe 15m
+uv run backtest.py --timeframe 4h --stress-fees --capacity
+uv run backtest.py --timeframe 1h --oos
 
-# Run robustness test (4H bars, 2004–2024, 0.15% RT costs, regime breakdown)
-uv run backtest.py --timeframe 4h
+# Full OOS suite
+uv run evaluate.py --timeframe 1h --label exp269
 
-# Run Fee Stress Test & Capacity Constraints
-uv run backtest.py --timeframe 4h --stress-fees --capacity --oos
+# Benchmark comparison
+uv run run_benchmarks.py
 ```
 
-There are no tests, linters, or CI/CD pipelines. Validation is done entirely through backtest scores.
+There are no unit tests or CI checks. Backtests and OOS evaluation are the verification path.
+
+## Working Assumptions
+
+- `strategy.py` is still the primary experiment surface.
+- `prepare.py`, `backtest.py`, and `benchmarks/` should normally be treated as fixed infrastructure.
+- Updating docs or maintenance files is allowed when the task explicitly asks for it.
+- Old materials that quote 20+ Sharpe are historical. On the corrected harness, realistic hourly Sharpe is generally much lower.
 
 ## Architecture
 
-### Immutable vs Mutable Boundary
+### Data
 
-**Only `strategy.py` is mutable during experiments.** Everything else — especially `prepare.py` (backtesting engine, ~2100 lines) — is fixed infrastructure.
+Defined in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L38):
 
-### Data Flow
+- 17 symbols on 1h bars
+- 16 symbols on 15m bars
+- train / val / robustness / oos splits with fixed dates in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L61)
 
-1. `prepare.py` downloads and caches OHLCV + funding rate data for 17 assets (15 crypto, 2 macro: XAU, SP500)
-   - 1H data: CryptoCompare candles + Binance/Hyperliquid funding rates
-   - 15m data: Binance spot klines (16 symbols, no SP500/DXY) + HuggingFace XAU
-2. `train_model.py --timeframe {1h,4h,15m}` trains per-timeframe RandomForest models
-3. `backtest.py --timeframe 1h` calls `prepare.load_data(split="val")` then `prepare.run_backtest(strategy, data)`
-4. `backtest.py --timeframe 4h` runs robustness test: 4H bars, full history, 0.15% RT costs, per-year regime breakdown, with `--stress-fees` and `--capacity` matrix options.
-5. The engine iterates bars, calling `strategy.on_bar(bar_data, portfolio) → List[Signal]` each step
-6. Results: Sharpe, total return, max drawdown, trade count, win rate, profit factor, turnover, i want at least 2 trades per day.
+1h candles come from CryptoCompare with Hyperliquid fallback.
+Funding comes from Binance with Hyperliquid fallback.
+15m candles come from Binance spot plus a HuggingFace XAU source.
 
-### Multi-Timeframe Architecture
+### Features
 
-- **15m model** (`model_15m.joblib`): Intraday momentum, highest signal frequency
-- **1H model** (`model_1h.joblib`): Swing trades, baseline timeframe
-- **4H model** (`model_4h.joblib`): Trend-level alpha, highest conviction
-- Same 13 features across all timeframes — bar-count periods map to different real-time windows
-- Each model learns its own timeframe's statistical distribution
+Feature generation lives in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L146) and includes:
 
-### Strategy Interface
+- multi-horizon returns
+- RSI and MACD
+- Bollinger width and ATR
+- Donchian / VWAP distance
+- market context and relative-strength features
+- simple market-structure proxies
+- fractional differentiation
 
-Every strategy must implement:
+### Models
 
-```python
-class Strategy:
-    def __init__(self): ...
-    def on_bar(self, bar_data: dict, portfolio: PortfolioState) -> list[Signal]:
-        # bar_data: dict[symbol → BarData] with .close, .open, .high, .low, .volume, .funding_rate, .history (last 500 bars)
-        # portfolio: .cash, .positions, .entry_prices, .equity
-        # Returns: list of Signal(symbol, target_position)
-```
+Training lives in [train_model.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/train_model.py#L135).
 
-### Scoring Function
+Current stack:
 
-```
-score = sharpe × √(trade_count_factor) - drawdown_penalty - turnover_penalty
-```
+- XGBoost directional classifiers
+- XGBoost meta models
+- optional state-specific artifacts when enough HMM-state data exists
+- macro HMM training in [train_model.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/train_model.py#L57)
 
-Hard cutoffs (score → -999): <10 trades, >50% drawdown, final equity <50% of initial.
+Artifact layout is documented in [models/MODELS.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/models/MODELS.md).
 
-### Key Constants (prepare.py)
+### Strategy Runtime
 
-- Initial capital: $100K, Max leverage: 20x
-- Fees (1H harness): 2 bps maker, 5 bps taker, 1 bps slippage
-- Fees (robustness/4H): 7.5 bps per side (0.15% RT), no slippage
-- Backtest time budget: 120s (1H), 300s (robustness)
-- History buffer: 500 bars per `on_bar` call
-- 17 symbols: BTC, ETH, SOL, BNB, XRP, ADA, DOGE, LINK, AVAX, DOT, ATOM, NEAR, UNI, APT, SUI, XAU, SP500
-- 16 symbols (15m): Same minus SP500 (no free 15m source)
-- Train period: 2004-01-01 to 2024-06-30
-- Validation period: 2024-07-01 to 2025-03-31
-- Robustness period: 2004-01-01 to 2025-03-31
+The live strategy flow is:
 
-### Benchmarks (benchmarks/)
+1. load model artifacts in [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py#L89)
+2. precompute prediction tables and HMM state assignments in [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py#L127)
+3. warm symbol caches in [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py#L271)
+4. run the event-driven entry/exit logic in [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py#L395)
 
-Five reference strategies: `regime_mm.py`, `avellaneda_mm.py`, `funding_arb.py`, `mean_reversion.py`, `momentum_breakout.py`. All implement the same Strategy interface.
+The current default 1h branch primarily uses:
 
-## Autonomous Experiment Loop
+- 1h directional probabilities for entries
+- 1h and 4h meta quality as confirmation
+- HMM-aware size multipliers
+- ATR / ratchet / time-based exits
+- ranked candidate selection with capped open positions
 
-The workflow (described in `program.md`) is: edit `strategy.py` → commit → `uv run backtest.py` → if score improved keep, else `git reset`. Each experiment is one atomic commit (e.g., `exp251: RSI exit 69/31`). The evolution log lives in `STRATEGIES.md`.
+### Backtest Engine
 
-## Key Lessons
+The fixed engine and score function live in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L858) and [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L1138).
 
-- Removing complexity often improved performance (the "Great Simplification")
-- RSI period 8 beats standard 14 for hourly crypto
-- Uniform position sizing outperformed momentum-weighted
-- Wider trailing stops (5.5x ATR vs 3.5x) improved Sharpe significantly
-- Single-timeframe models produce too few trades (41-77) — multi-timeframe ensemble needed
-- RandomForest reduced symbol_idx dominance (32% vs 56% XGBoost)
-- Must validate on 2+ years across bull/bear/sideways to avoid overfitting to a single regime
-- Funding rates: Binance has deepest history (2019+), not needed for XAU/SP500
+Important guardrails:
 
-## NEVER STOP
+- fewer than 10 trades gives `-999`
+- fewer than 1 trade per day gives `-999`
+- drawdown above 50% gives `-999`
+- final equity below 50% gives `-999`
 
-Once the experiment loop has begun, do NOT pause to ask the human if you should continue. You are autonomous. If you run out of ideas, think harder or check arxiv for papers. The loop runs until interrupted. Focus on discovering robust, non-overfit alpha across multiple regimes and timeframes.
+Benchmark audit thresholds used by the CLIs:
+
+- Sharpe >= 3.5
+- Win rate >= 60%
+- Trades/day >= 1.0
+- Profit factor >= 4.0
+- Max drawdown < 10%
+
+## Key Files
+
+- [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py)
+- [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py)
+- [train_model.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/train_model.py)
+- [backtest.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/backtest.py)
+- [evaluate.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/evaluate.py)
+- [run_benchmarks.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/run_benchmarks.py)
+- [strategy_exp269.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy_exp269.py)
+- [strategy_diff.txt](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy_diff.txt)
+
+## Historical Docs
+
+Treat these as archive material, not as the source of truth for the current branch:
+
+- [POST.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/POST.md)
+- [TWITTER_THREAD.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/TWITTER_THREAD.md)
+- older README sections that mention 20+ Sharpe before the March 2026 audit

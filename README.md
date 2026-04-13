@@ -2,42 +2,28 @@
   <img src="assets/logo.png" alt="Nunchi" width="480" />
 </p>
 
-<h3 align="center">Autonomous Trading Strategy Research</h3>
+<h3 align="center">Multi-Timeframe Trading Research Workspace</h3>
 
 <p align="center">
-  Karpathy-style autoresearch for Hyperliquid perpetual futures — 103 experiments, zero human intervention
-</p>
-
-<p align="center">
-  <a href="https://github.com/Nunchi-trade/agent-cli"><strong>Agent CLI</strong></a> &nbsp;•&nbsp;
-  <a href="https://docs.nunchi.trade"><strong>Docs</strong></a> &nbsp;•&nbsp;
-  <a href="https://research.nunchi.trade"><strong>Research</strong></a> &nbsp;•&nbsp;
-  <a href="https://discord.gg/nunchi"><strong>Discord</strong></a> &nbsp;•&nbsp;
-  <a href="https://x.com/nunchi"><strong>X</strong></a>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/python-3.10+-3776AB?logo=python&logoColor=white" alt="Python" />
-  <img src="https://img.shields.io/badge/experiments-103-C9A84C" alt="Experiments" />
-  <img src="https://img.shields.io/badge/max%20drawdown-0.3%25-brightgreen" alt="Drawdown" />
-  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License" />
+  XGBoost + HMM regime research for cross-asset trading on a fixed backtest harness
 </p>
 
 ---
 
-An AI agent autonomously modifies a single file (`strategy.py`), backtests each change against historical [Hyperliquid](https://hyperliquid.xyz) perp data, and keeps only improvements. Adapts [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) pattern for trading strategy discovery. Starting from a simple momentum baseline (Sharpe 2.7), the system discovered a 6-signal ensemble strategy achieving **Sharpe 21.4 with 0.3% max drawdown** — a 7.9x improvement over 103 fully autonomous experiments.
+This repository is the current research workspace behind the trading experiments. The live codebase is no longer just a single-file strategy loop: it now includes data preparation, model training, model snapshots, a fixed backtest engine, benchmark runners, and an out-of-sample robustness suite.
 
----
+> Historical note
+>
+> Several files in this repo still preserve the earlier pre-audit autonomous-loop story. Those materials are kept for reference, but they do not describe the current fixed-engine setup. After the March 2026 engine audit, realistic hourly Sharpe on this harness is usually in the low single digits, not the 20+ range quoted in older materials.
 
 ## Quick Start
 
 ### Prerequisites
 
-- **Python 3.10+**
-- **[uv](https://docs.astral.sh/uv/)** — fast Python package manager
+- Python 3.10+
+- `uv`
 
 ```bash
-# Install uv if you don't have it
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
@@ -46,268 +32,183 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```bash
 git clone https://github.com/Nunchi-trade/auto-researchtrading.git
 cd auto-researchtrading
-uv run prepare.py                # Download data (~1 min, cached to ~/.cache/autotrader/data/)
+uv run prepare.py
+uv run prepare.py --mode 15m
 ```
 
-No API keys required. Data is fetched from public CryptoCompare and Hyperliquid APIs.
+1h data is cached to `~/.cache/autotrader/data/*_1h.parquet`.
+15m data is cached to `~/.cache/autotrader/data/*_15m.parquet`.
 
-### Run a Backtest
+## Main Commands
 
 ```bash
-uv run backtest.py               # Run current strategy against validation data
+# Validation backtest on the default 1h path
+uv run backtest.py --timeframe 1h
+
+# 4h robustness pass with optional fee/capacity sweeps
+uv run backtest.py --timeframe 4h --stress-fees --capacity
+
+# Full OOS robustness suite on 2025 data
+uv run evaluate.py --timeframe 1h --label exp269
+
+# Retrain XGBoost models
+uv run train_model.py --timeframe 1h
+uv run train_model.py --timeframe 4h
+uv run train_model.py --timeframe 15m
+
+# Retrain the macro HMM as well
+uv run train_model.py --timeframe 1h --train_hmm
+
+# Run reference benchmarks
+uv run run_benchmarks.py
+
+# Refresh research memory from results.tsv
+uv run analyze_results.py --update-memory
+
+# Verify harness assumptions before a research session
+uv run verify_harness.py
+
+# Run one guided research cycle
+uv run research_loop.py --timeframe 1h --description "test idea"
 ```
 
-```
-score:              20.634000
-sharpe:             20.634000
-total_return_pct:   130.000000
-max_drawdown_pct:   0.300000
-num_trades:         7605
-```
+There are no unit tests or CI pipelines. Validation is done through `backtest.py`, `evaluate.py`, and benchmark comparison.
 
-### Run All Benchmarks
+## Current Setup
 
-```bash
-uv run run_benchmarks.py         # Compare 5 reference strategies
-```
+### Data Universe
 
----
+- 1h universe: 17 symbols in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L38)
+  - BTC, ETH, SOL, BNB, XRP, ADA, DOGE, LINK, AVAX, DOT, ATOM, NEAR, UNI, APT, SUI, XAU, SP500
+- 15m universe: 16 symbols in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L44)
+  - Same set minus SP500
+- 1h candles come from CryptoCompare with Hyperliquid fallback; funding comes from Binance with Hyperliquid fallback in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L457)
+- 15m candles come from Binance spot plus a HuggingFace XAU source in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L610)
 
-## Running Your Own Experiments
+### Splits
 
-### Rules
+The fixed date windows come from [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L61):
 
-| Rule | Detail |
-|------|--------|
-| **Only edit `strategy.py`** | This is the single mutable file |
-| **Do not modify** | `prepare.py`, `backtest.py`, or anything in `benchmarks/` |
-| **No new dependencies** | Only `numpy`, `pandas`, `scipy`, `requests`, `pyarrow`, and stdlib |
-| **Time budget** | 120 seconds per backtest |
+- `train`: 2017-01-01 to 2022-06-30, with per-symbol start floors
+- `val`: 2022-07-01 to 2024-06-30
+- `robustness`: 2018-01-01 to 2024-06-30
+- `oos`: 2025-01-01 to 2025-12-31
 
-### Manual Experiment Loop
+### Models
 
-```bash
-git checkout -b autotrader/myexp          # 1. Create experiment branch
+- Feature generation happens in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L146)
+- Training is XGBoost based, not RandomForest, in [train_model.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/train_model.py#L21)
+- The repo also trains and uses a macro HMM regime model in [train_model.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/train_model.py#L57)
+- Current model artifacts and loading behavior are documented in [models/MODELS.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/models/MODELS.md)
 
-# 2. Edit strategy.py with your idea (parameters, signals, entry/exit logic)
+### Strategy Runtime
 
-uv run backtest.py                        # 3. Run the backtest
+The live strategy is [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py#L19).
 
-# 4. If score improved → keep
-git add strategy.py && git commit -m "exp1: description of change"
+Its runtime flow is:
 
-# 5. If score got worse → revert
-git reset --hard HEAD~1
-```
+1. Load model artifacts in [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py#L89)
+2. Build per-symbol prediction tables with engineered features and HMM states in [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py#L127)
+3. Warm timeframe-aligned caches in [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py#L271)
+4. On each bar, combine 1h directional outputs with 1h/4h meta gating, HMM-aware sizing, ATR-based exits, and a ranked entry allocator in [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py#L395)
 
-Repeat. Each commit is one atomic experiment. The git history becomes your experiment log.
+The default research path is the 1h strategy plus OOS evaluation with `evaluate.py`.
 
-### Autonomous Loop (with Claude Code)
+## Validation Lens
 
-The intended workflow uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with the `/autoresearch` skill to run experiments without human intervention:
+### Score
 
-```bash
-claude                           # Start Claude Code from repo root
-/autoresearch                    # Launch the autonomous loop
+The score is computed in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L1138):
+
+```text
+score = sharpe * sqrt(min(num_trades / 50, 1.0)) - drawdown_penalty - turnover_penalty
 ```
 
-The agent will:
-1. Read the current strategy and scores
-2. Propose and implement a modification to `strategy.py`
-3. Run `uv run backtest.py` and parse the score
-4. Keep the change if score improved, revert if not
-5. Repeat indefinitely until interrupted
+Hard cutoffs send the score to `-999` when:
 
-See [`program.md`](program.md) for detailed instructions on guiding the autonomous loop.
+- fewer than 10 trades
+- fewer than 1 trade per day
+- max drawdown above 50%
+- final equity below 50% of initial capital
 
----
+### Benchmark Audit
 
-## Strategy Interface
+`backtest.py` and `evaluate.py` use the same benchmark lens from [backtest.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/backtest.py#L17) and [evaluate.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/evaluate.py#L20):
 
-Your strategy must implement a `Strategy` class with a single `on_bar()` method — no shared state, no hidden coupling.
+- Sharpe >= 3.5
+- Win rate >= 60%
+- Trades/day >= 1.0
+- Profit factor >= 4.0
+- Max drawdown < 10%
 
-```python
-class Strategy:
-    def __init__(self):
-        # Initialize any tracking state
-        pass
+These are audit thresholds, not guarantees that a branch is good enough to ship.
 
-    def on_bar(self, bar_data: dict, portfolio: PortfolioState) -> list[Signal]:
-        """
-        Called once per hourly bar across all symbols.
+## Workflow
 
-        Args:
-            bar_data: dict of symbol → BarData
-                - BarData.close, .open, .high, .low, .volume, .funding_rate
-                - BarData.history: DataFrame of last 500 bars
-            portfolio: PortfolioState
-                - portfolio.cash: available cash
-                - portfolio.positions: dict of symbol → signed USD notional
+For day-to-day research:
 
-        Returns:
-            List of Signal(symbol, target_position, order_type="market")
-            target_position is signed USD notional (+long, -short, 0=close)
-        """
-        return []
-```
+1. Refresh [RESEARCH_MEMORY.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/RESEARCH_MEMORY.md) with `uv run analyze_results.py --update-memory`
+2. Run `uv run verify_harness.py` to catch drift in artifacts, dependencies, or cache assumptions
+3. Refresh data if needed with `prepare.py`
+4. Retrain models if the experiment needs new artifacts
+5. Change `strategy.py`
+6. Run `uv run backtest.py --timeframe 1h` or use `uv run research_loop.py --timeframe 1h --description "<idea>"`
+7. Run `uv run evaluate.py --timeframe 1h --label <label>`
+8. Compare against `run_benchmarks.py`
 
-### Data Available
+`backtest.py` also appends a summary row to `results.tsv`.
 
-| Field | Description |
-|-------|-------------|
-| `bar_data[symbol].history` | DataFrame of last 500 hourly bars |
-| Columns | `timestamp`, `open`, `high`, `low`, `close`, `volume`, `funding_rate` |
-| Symbols | BTC, ETH, SOL |
-| Validation period | 2024-07-01 to 2025-03-31 |
-| Initial capital | $100,000 |
-| Fees | 2 bps maker, 5 bps taker, 1 bps slippage |
+The new research infra is:
 
-### Scoring Formula
+- [analyze_results.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/analyze_results.py): summarizes `results.tsv`, detects plateau risk, and refreshes [RESEARCH_MEMORY.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/RESEARCH_MEMORY.md)
+- [verify_harness.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/verify_harness.py): checks schema, dependency drift, model-path drift, and cache presence
+- [research_loop.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/research_loop.py): runs verifier, backtest, memory refresh, and optional OOS evaluation as one cycle
+- [RESEARCH_MEMORY.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/RESEARCH_MEMORY.md): the lightweight guidance layer the AI researcher should read before each mutation
 
-```
-score = sharpe × √(min(trades/50, 1.0)) − drawdown_penalty − turnover_penalty
-```
+Reference snapshots for comparison:
 
-| Component | Formula |
-|-----------|---------|
-| Sharpe | `mean(daily_returns) / std(daily_returns) × √365` |
-| Drawdown penalty | `max(0, max_drawdown_pct − 15) × 0.05` |
-| Turnover penalty | `max(0, annual_turnover/capital − 500) × 0.001` |
-| Hard cutoffs (→ −999) | Fewer than 10 trades, drawdown > 50%, lost > 50% of capital |
-
----
-
-## Benchmarks
-
-5 reference strategies to beat. The baseline to clear is **2.724**.
-
-| Rank | Strategy | Score | Sharpe | Return | Max DD | Trades |
-|------|----------|-------|--------|--------|--------|--------|
-| 1 | `simple_momentum` | 2.724 | 2.724 | +42.6% | 7.6% | 9081 |
-| 2 | `funding_arb` | -0.191 | -0.191 | -1.3% | 9.4% | 1403 |
-| 3 | `regime_mm` | -0.322 | -0.322 | -3.1% | 11.2% | 12854 |
-| 4 | `mean_reversion` | -3.964 | -3.380 | -26.2% | 26.7% | 3185 |
-| 5 | `momentum_breakout` | -999 | — | — | — | 0 |
-
----
-
-## Results
-
-### Score Progression (103 Autonomous Experiments)
-
-| Experiment | Score | Sharpe | Max DD | Trades | Key Change |
-|-----------|-------|--------|--------|--------|------------|
-| Baseline | 2.724 | 2.724 | 7.6% | 9081 | Simple momentum starting point |
-| exp15 | 8.393 | 8.823 | 3.1% | 2562 | 5-signal ensemble, 4/5 votes, cooldown |
-| exp28 | 9.382 | 9.944 | 3.0% | 2545 | ATR 5.5 trailing stop |
-| exp37 | 10.305 | 11.125 | 2.3% | 3212 | BB width compression (6th signal) |
-| exp42 | 11.302 | 11.886 | 1.4% | 3024 | Remove funding boost |
-| exp46 | 13.480 | 14.015 | 1.4% | 3157 | Remove strength scaling |
-| exp56 | 14.592 | 14.666 | 0.7% | 4205 | Cooldown 3 |
-| exp66 | 15.718 | 15.849 | 0.7% | 4467 | Simplified momentum |
-| exp72 | 19.697 | 20.099 | 0.7% | 6283 | **RSI period 8** |
-| exp86 | 19.859 | 20.498 | 0.6% | 7534 | Cooldown 2 |
-| **exp102** | **20.634** | **20.634** | **0.3%** | **7605** | RSI 50/50, BB 85, position 0.08 |
-
-**Final score: 20.634** — 7.6x improvement over baseline, fully autonomous.
-
-### Key Discoveries
-
-| Rank | Discovery | Impact | Insight |
-|------|-----------|--------|---------|
-| 1 | **RSI period 8** | +5.0 Sharpe | Standard 14-period RSI is too slow for hourly crypto |
-| 2 | **Remove strength scaling** | +1.7 Sharpe | Uniform sizing beats momentum-weighted sizing |
-| 3 | **Simplified momentum** | +0.8 Sharpe | Just `ret > threshold`, no multi-timeframe confirmation needed |
-| 4 | **BB width compression** | +0.9 Sharpe | Bollinger Band width percentile as 6th ensemble signal |
-| 5 | **ATR 5.5 trailing stop** | +1.0 Sharpe | Hold winners much longer than conventional 3.5x ATR |
-| 6 | **The Great Simplification** | +2.0 Sharpe | Removing pyramiding, funding boost, BTC filter, correlation filter |
-| 7 | **Position size 0.08** | +0.6 Sharpe | Smaller positions eliminate turnover penalty |
-
-### Biggest Lesson: Simplicity Wins
-
-The strongest gains came from *removing* complexity, not adding it. Every "smart" feature — BTC lead-lag filter, correlation-based weight adjustment, momentum strength scaling, pyramiding, funding carry — was tested, then permanently removed when it hurt performance. The final strategy is remarkably simple.
-
-See [`STRATEGIES.md`](STRATEGIES.md) for the complete evolution log with mathematical details for all 103 experiments.
-
----
-
-## Best Strategy Architecture
-
-**6-signal ensemble with 4/6 majority vote:**
-
-| Signal | Bull Condition | Bear Condition |
-|--------|---------------|----------------|
-| Momentum | 12h return > dynamic threshold | 12h return < -dynamic threshold |
-| Very-short momentum | 6h return > threshold × 0.7 | 6h return < -threshold × 0.7 |
-| EMA crossover | EMA(7) > EMA(26) | EMA(7) < EMA(26) |
-| RSI(8) | RSI > 50 | RSI < 50 |
-| MACD(14,23,9) | MACD histogram > 0 | MACD histogram < 0 |
-| BB compression | BB width < 85th percentile | BB width < 85th percentile |
-
-**Exit conditions (priority order):**
-1. **ATR trailing stop** — 5.5x ATR from peak/trough
-2. **RSI mean-reversion** — Exit longs at RSI > 69, exit shorts at RSI < 31
-3. **Signal flip** — Reverse position when opposing ensemble fires
-
-**Key parameters:**
-
-| Parameter | Value | Purpose |
-|-----------|-------|---------|
-| `BASE_POSITION_PCT` | 0.08 | Per-symbol position size as fraction of equity |
-| `COOLDOWN_BARS` | 2 | Minimum bars between exit and re-entry |
-| `RSI_PERIOD` | 8 | Fast RSI tuned for hourly crypto |
-| `ATR_STOP_MULT` | 5.5 | Wide trailing stop to let winners run |
-| `MIN_VOTES` | 4 | Majority vote threshold (4 of 6 signals) |
-
----
+- [strategy_exp269.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy_exp269.py)
+- [strategy_diff.txt](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy_diff.txt)
 
 ## Project Structure
 
+```text
+├── strategy.py
+├── strategy_exp269.py
+├── strategy_diff.txt
+├── prepare.py
+├── backtest.py
+├── evaluate.py
+├── train_model.py
+├── run_benchmarks.py
+├── benchmarks/
+├── models/
+├── results.tsv
+├── program.md
+├── CLAUDE.md
+├── STRATEGIES.md
+├── POST.md
+├── TWITTER_THREAD.md
+└── pyproject.toml
 ```
-├── strategy.py          # The only file you edit — your strategy lives here
-├── backtest.py          # Entry point — runs one backtest (fixed, do not modify)
-├── prepare.py           # Data download + backtest engine (fixed, do not modify)
-├── run_benchmarks.py    # Run all 5 benchmark strategies
-├── benchmarks/          # 5 reference strategies for comparison
-│   ├── simple_momentum.py
-│   ├── funding_arb.py
-│   ├── regime_mm.py
-│   ├── mean_reversion.py
-│   └── momentum_breakout.py
-├── program.md           # Detailed instructions for the autonomous loop
-├── STRATEGIES.md        # Complete evolution log of all 103 experiments
-├── charts/              # Visualization PNGs of experiment progression
-├── pyproject.toml       # Dependencies (numpy, pandas, scipy, requests, pyarrow)
-└── uv.lock              # Locked dependencies for reproducibility
-```
 
----
+## Historical Documents
 
-## Branches
+These files are kept as archive material and should be read as historical context, not as the source of truth for the current branch:
 
-| Branch | Description |
-|--------|-------------|
-| `main` | Base scaffold and data pipeline |
-| `autotrader/mar10c` | Best autotrader strategy (score 20.634) |
-| `autoresearch/mar10-opus` | LLM training optimization experiments |
+- [POST.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/POST.md)
+- [TWITTER_THREAD.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/TWITTER_THREAD.md)
 
----
+The current source of truth is the code plus:
+
+- [program.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/program.md)
+- [CLAUDE.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/CLAUDE.md)
+- [.github/copilot-instructions.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/.github/copilot-instructions.md)
+- [models/MODELS.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/models/MODELS.md)
 
 ## Attribution
 
-Built on [Karpathy's autoresearch](https://github.com/karpathy/autoresearch) pattern. Data from [CryptoCompare](https://www.cryptocompare.com/) and [Hyperliquid](https://hyperliquid.xyz).
-
----
-
-## Links
-
-- **Agent CLI** — [github.com/Nunchi-trade/agent-cli](https://github.com/Nunchi-trade/agent-cli)
-- **Docs** — [docs.nunchi.trade](https://docs.nunchi.trade)
-- **Research** — [research.nunchi.trade](https://research.nunchi.trade)
-- **Discord** — [discord.gg/nunchi](https://discord.gg/nunchi)
-- **X** — [@nunchi](https://x.com/nunchi)
-
----
+Built on the autoresearch pattern popularized by Karpathy-style experiment loops. Market data comes from CryptoCompare, Binance, Hyperliquid, and the XAU source linked in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L58).
 
 <p align="center">
   <sub>Built by <a href="https://nunchi.trade">Nunchi</a> • MIT License</sub>

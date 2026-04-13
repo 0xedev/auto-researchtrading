@@ -59,6 +59,7 @@ def train_macro_hmm():
     Identifies hidden macro regimes for the strategy to adapt to.
     """
     print("Training Multivariate Macro HMM (Medallion Regime Engine)...")
+    cutoff_ms = int(pd.Timestamp(VAL_START, tz="UTC").timestamp() * 1000)
     
     macro_assets = ["BTC", "ETH", "XAU", "SP500"]
     data_frames = {}
@@ -67,6 +68,10 @@ def train_macro_hmm():
         try:
             path = os.path.join(os.path.expanduser("~"), ".cache", "autotrader", "data", f"{symbol}_1h.parquet")
             df = pd.read_parquet(path)
+            df = df[pd.to_numeric(df["timestamp"], errors="coerce") < cutoff_ms].copy()
+            if df.empty:
+                print(f"Warning: No pre-validation data left for macro asset {symbol}")
+                continue
             df['log_ret'] = np.log(df['close'] / df['close'].shift(1))
             df['volatility'] = df['log_ret'].rolling(24).std()
             data_frames[symbol] = df[['timestamp', 'log_ret', 'volatility']].dropna()
@@ -129,7 +134,7 @@ def train_macro_hmm():
     os.makedirs("models", exist_ok=True)
     joblib.dump(model, "models/macro_hmm.joblib")
     joblib.dump(scaler, "models/macro_scaler.joblib")
-    print(f"Successfully saved HMM and Scaler ({X_scaled.shape}) to models/")
+    print(f"Successfully saved HMM and Scaler ({X_scaled.shape}) to models/ using data before {VAL_START}")
 
 
 def train(timeframe, specialists=True):

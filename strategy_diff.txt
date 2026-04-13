@@ -1,0 +1,300 @@
+import os												import os
+import xgboost as xgb											import xgboost as xgb
+import numpy as np											import numpy as np
+import pandas as pd											import pandas as pd
+import joblib												import joblib
+from hmmlearn import hmm										from hmmlearn import hmm
+from dataclasses import dataclass									from dataclasses import dataclass
+from typing import List											from typing import List
+from prepare import calculate_features, FEATURE_COLS, load_data						from prepare import calculate_features, FEATURE_COLS, load_data
+													
+													
+@dataclass												@dataclass
+class Signal:												class Signal:
+    symbol: str												    symbol: str
+    target_position: float										    target_position: float
+    order_type: str = "market"										    order_type: str = "market"
+													
+													
+class Strategy:												class Strategy:
+    def __init__(self, timeframe: str = "1h"):								    def __init__(self, timeframe: str = "1h"):
+        self.timeframe_arg = timeframe									        self.timeframe_arg = timeframe
+        self.interval_sec = self._parse_timeframe(timeframe)						        self.interval_sec = self._parse_timeframe(timeframe)
+													
+        # Timeframe-derived constants (all calibrated at 1h, scaled automatically)			        # Timeframe-derived constants (all calibrated at 1h, scaled automatically)
+        _bph = 3600 / self.interval_sec  # bars per hour						        _bph = 3600 / self.interval_sec  # bars per hour
+        _tf_ratio = self.interval_sec / 3600  # 0.25 for 15m, 1.0 for 1h, 4.0 for 4h			        _tf_ratio = self.interval_sec / 3600  # 0.25 for 15m, 1.0 for 1h, 4.0 for 4h
+        self._regime_window = max(18, int(72 * _bph))       # 72h regime lookback			        self._regime_window = max(18, int(72 * _bph))       # 72h regime lookback
+        self._max_hold = max(2, round(6 * _tf_ratio ** 0.5))  # sqrt-scaled hold			        self._max_hold = max(2, round(6 * _tf_ratio ** 0.5))  # sqrt-scaled hold
+        self._decay_age = max(2, round(3 * _tf_ratio ** 0.5)) # sqrt-scaled signal decay		        self._decay_age = max(2, round(3 * _tf_ratio ** 0.5)) # sqrt-scaled signal decay
+        # Sizing and Targets (exp256 Medallion Baseline)					   |            self._atr_scale = _tf_ratio ** 0.25                    # ATR mult: constant stop/range 
+        self._min_alloc = 0.03									   <    
+        self._max_alloc = 0.30									   <    
+        self._tp_atr = 3.0        # exp330: 3x TP (WR-optimal at medium thresh)			   <    
+        self._sl_atr = 2.0									   <    
+        self._trail_atr = 1.5									   <    
+        self._macro_bear_thresh = -0.015							   <    
+        self._entry_scale = min(1.0, _tf_ratio ** 0.5)         # entry size scaling			        self._entry_scale = min(1.0, _tf_ratio ** 0.5)         # entry size scaling
+        self._thresh_scale = max(1.0, (1.0 / _tf_ratio) ** 0.25)  # meta gate quality: higher f		        self._thresh_scale = max(1.0, (1.0 / _tf_ratio) ** 0.25)  # meta gate quality: higher f
+        self._market_crush = 45.0								   <    
+        											   <    
+        # Allowed symbols: Global Expansion							   <    
+        self._allowed_symbols = None								   <    
+													
+        self.models = {}  # {tf: {state_id: model}}							        self.models = {}  # {tf: {state_id: model}}
+        self.meta_models = {}										        self.meta_models = {}
+        self.long_models = {} # fallback								        self.long_models = {} # fallback
+        self.short_models = {} # fallback								        self.short_models = {} # fallback
+        self.symbol_caches = {}										        self.symbol_caches = {}
+        self.bar_counts = {}										        self.bar_counts = {}
+        self.models_loaded = False									        self.models_loaded = False
+        self.trailing_stops = {}									        self.trailing_stops = {}
+        self.take_profits = {}									   <    
+        self.entry_prices = {}									   <    
+        self.profit_targets = {} # Trailing Take-Profit (TTP)					   <    
+        self.position_ages = {}										        self.position_ages = {}
+        self._price_buffers = {} # {symbol: [p1, p2, ...]} for local TAs			   <    
+        self._market_ret_buf = []									        self._market_ret_buf = []
+        self._macro_bear = False									        self._macro_bear = False
+        self._macro_hmm = None										        self._macro_hmm = None
+        self._current_hmm_state = 0									        self._current_hmm_state = 0
+        self._bars_since_calibration = 0								        self._bars_since_calibration = 0
+													
+        # Load Marco HMM if exists									        # Load Marco HMM if exists
+        hmm_path = "models/exp256_active/macro_hmm.joblib"					   |            hmm_path = "models/macro_hmm.joblib"
+        scaler_path = "models/exp256_active/macro_scaler.joblib"				   |            scaler_path = "models/macro_scaler.joblib"
+        if os.path.exists(hmm_path):									        if os.path.exists(hmm_path):
+            try:											            try:
+                self._macro_hmm = joblib.load(hmm_path)							                self._macro_hmm = joblib.load(hmm_path)
+                print(f"LOADED MEDALLION HMM ENGINE")						   |                    print(f"LOADED MACRO HMM (Medallion Engine)")
+            except Exception as e:									            except Exception as e:
+                print(f"Warning: Failed to load HMM: {e}")						                print(f"Warning: Failed to load HMM: {e}")
+        if os.path.exists(scaler_path):									        if os.path.exists(scaler_path):
+            try:											            try:
+                self._macro_scaler = joblib.load(scaler_path)						                self._macro_scaler = joblib.load(scaler_path)
+                print(f"LOADED MEDALLION SCALER")						   |                    print(f"LOADED MACRO SCALER")
+            except Exception as e:									            except Exception as e:
+                print(f"Warning: Failed to load HMM Scaler: {e}")					                print(f"Warning: Failed to load HMM Scaler: {e}")
+													
+    def _parse_timeframe(self, tf: str) -> int:								    def _parse_timeframe(self, tf: str) -> int:
+        if tf == "15m":											        if tf == "15m":
+            return 15 * 60										            return 15 * 60
+        if tf == "1h":											        if tf == "1h":
+            return 3600											            return 3600
+        if tf == "4h":											        if tf == "4h":
+            return 14400										            return 14400
+        return 0											        return 0
+													
+    def _load_models(self):										    def _load_models(self):
+        for tf in ["15m", "1h", "4h"]:									        for tf in ["15m", "1h", "4h"]:
+            # Specialist Model Loading from exp256_active					   |                # Specialist Model Loading
+            for state in range(4):									            for state in range(4):
+                s_lead_path = f"models/exp256_active/lead_{tf}_s{state}.xgb"			   |                    s_lead_path = f"models/lead_{tf}_s{state}.json"
+                s_meta_path = f"models/exp256_active/meta_{tf}_s{state}.xgb"			   |                    s_meta_path = f"models/meta_{tf}_s{state}.json"
+                											                
+                if os.path.exists(s_lead_path):								                if os.path.exists(s_lead_path):
+                    if tf not in self.models: self.models[tf] = {}					                    if tf not in self.models: self.models[tf] = {}
+                    self.models[tf][state] = xgb.XGBClassifier()					                    self.models[tf][state] = xgb.XGBClassifier()
+                    self.models[tf][state].load_model(s_lead_path)					                    self.models[tf][state].load_model(s_lead_path)
+                    											                    
+                if os.path.exists(s_meta_path):								                if os.path.exists(s_meta_path):
+                    if tf not in self.meta_models: self.meta_models[tf] = {}				                    if tf not in self.meta_models: self.meta_models[tf] = {}
+                    self.meta_models[tf][state] = xgb.XGBClassifier()					                    self.meta_models[tf][state] = xgb.XGBClassifier()
+                    self.meta_models[tf][state].load_model(s_meta_path)					                    self.meta_models[tf][state].load_model(s_meta_path)
+													
+            # Global Fallback Loading									            # Global Fallback Loading
+            m_paths = [f"models/lead_{tf}.xgb", f"models/lead_{tf}.json"]			   |                m_path = f"models/lead_{tf}.json"
+            meta_paths = [f"models/meta_{tf}.xgb", f"models/meta_{tf}.json"]			   |                meta_path = f"models/meta_{tf}.json"
+            											   |                if os.path.exists(m_path):
+            for m_path in m_paths:								   |                    if tf not in self.models: self.models[tf] = {}
+                if os.path.exists(m_path):							   |                    self.models[tf]["global"] = xgb.XGBClassifier()
+                    if tf not in self.models: self.models[tf] = {}				   |                    self.models[tf]["global"].load_model(m_path)
+                    self.models[tf]["global"] = xgb.XGBClassifier()				   |                if os.path.exists(meta_path):
+                    self.models[tf]["global"].load_model(m_path)				   |                    if tf not in self.meta_models: self.meta_models[tf] = {}
+                    break									   |                    self.meta_models[tf]["global"] = xgb.XGBClassifier()
+            											   |                    self.meta_models[tf]["global"].load_model(meta_path)
+            for meta_path in meta_paths:							   <    
+                if os.path.exists(meta_path):							   <    
+                    if tf not in self.meta_models: self.meta_models[tf] = {}			   <    
+                    self.meta_models[tf]["global"] = xgb.XGBClassifier()			   <    
+                    self.meta_models[tf]["global"].load_model(meta_path)			   <    
+                    break									   <    
+													
+        self.models_loaded = True									        self.models_loaded = True
+        print(f"LOADED QUANTUM FORTRESS SPECIALISTS: {list(self.models.keys())}")			        print(f"LOADED QUANTUM FORTRESS SPECIALISTS: {list(self.models.keys())}")
+													
+    def _build_prediction_tables(self, data_dict, timeframe: str, include_state: bool = False):		    def _build_prediction_tables(self, data_dict, timeframe: str, include_state: bool = False):
+        if not data_dict:										        if not data_dict:
+            return {}											            return {}
+													
+        all_vols = {}											        all_vols = {}
+        all_rets = {}											        all_rets = {}
+        for symbol, df in data_dict.items():								        for symbol, df in data_dict.items():
+            feat = calculate_features(df, timeframe=timeframe)						            feat = calculate_features(df, timeframe=timeframe)
+            all_vols[symbol] = feat["bb_width"]								            all_vols[symbol] = feat["bb_width"]
+            all_rets[symbol] = df["close"].pct_change()							            all_rets[symbol] = df["close"].pct_change()
+													
+        m_vol = pd.DataFrame(all_vols).median(axis=1).fillna(0)						        m_vol = pd.DataFrame(all_vols).median(axis=1).fillna(0)
+        m_ret = pd.DataFrame(all_rets).median(axis=1).fillna(0)						        m_ret = pd.DataFrame(all_rets).median(axis=1).fillna(0)
+													
+        # Pre-calculate Macro HMM for the entire batch							        # Pre-calculate Macro HMM for the entire batch
+        hmm_path = "models/macro_hmm.joblib"								        hmm_path = "models/macro_hmm.joblib"
+        hmm_model = joblib.load(hmm_path) if os.path.exists(hmm_path) else None				        hmm_model = joblib.load(hmm_path) if os.path.exists(hmm_path) else None
+													
+        macro_refs = {}										   <    
+        if hmm_model and data_dict:								   <    
+            def _get_m(s):									   <    
+                d = data_dict.get(s)								   <    
+                return d if d is not None else next(iter(data_dict.values()))			   <    
+            											   <    
+            b = _get_m("BTC")									   <    
+            e = _get_m("ETH")									   <    
+            x = _get_m("XAU")									   <    
+            sp = _get_m("SP500")								   <    
+            											   <    
+            # Unified Precision Sync: Force int64 for timestamp alignment (prevents silent cach    <    
+            df_b = pd.DataFrame({"timestamp": b["timestamp"].astype('int64')})			   <    
+            df_b["btc_ret"] = b["close"].pct_change().fillna(0).values				   <    
+            df_b["btc_vol"] = calculate_features(b.copy(), timeframe=timeframe)["bb_width"].fil    <    
+            macro_refs["BTC"] = df_b.sort_values("timestamp")					   <    
+            											   <    
+            df_e = pd.DataFrame({"timestamp": e["timestamp"], "eth_ret": e["close"].pct_change(    <    
+            macro_refs["ETH"] = df_e.sort_values("timestamp")					   <    
+            											   <    
+            df_x = pd.DataFrame({"timestamp": x["timestamp"], "xau_ret": x["close"].pct_change(    <    
+            macro_refs["XAU"] = df_x.sort_values("timestamp")					   <    
+            											   <    
+            df_s = pd.DataFrame({"timestamp": sp["timestamp"], "spx_ret": sp["close"].pct_chang    <    
+            macro_refs["SP500"] = df_s.sort_values("timestamp")					   <    
+												   <    
+        tables = {}											        tables = {}
+        for symbol, df in data_dict.items():								        for symbol, df in data_dict.items():
+            # calculate_features (from prepare.py) handles all indicators				            # calculate_features (from prepare.py) handles all indicators
+            df_feat = calculate_features(df.copy(), timeframe=timeframe)				            df_feat = calculate_features(df.copy(), timeframe=timeframe)
+            df_feat["market_vol"] = m_vol								            df_feat["market_vol"] = m_vol
+            df_feat["market_ret"] = m_ret								            df_feat["market_ret"] = m_ret
+            market_ret_4h = m_ret.rolling(4, min_periods=1).sum().fillna(0.0)				            market_ret_4h = m_ret.rolling(4, min_periods=1).sum().fillna(0.0)
+            df_feat["rel_ret_1h"] = df_feat["ret_1h"] - df_feat["market_ret"]				            df_feat["rel_ret_1h"] = df_feat["ret_1h"] - df_feat["market_ret"]
+            df_feat["rel_ret_4h"] = df_feat["ret_4h"] - market_ret_4h					            df_feat["rel_ret_4h"] = df_feat["ret_4h"] - market_ret_4h
+            df_feat["rel_bb_width"] = df_feat["bb_width"] - df_feat["market_vol"]			            df_feat["rel_bb_width"] = df_feat["bb_width"] - df_feat["market_vol"]
+            												            
+            # High-Fidelity HMM State Detection								            # High-Fidelity HMM State Detection
+            df_feat["macro_state"] = 0									            df_feat["macro_state"] = 0
+            if hmm_model and macro_refs:							   |                if hmm_model:
+                try:											                try:
+                    # Align lengths and Scale for HMM						   |                        # Retrieve the macro anchor assets from the data_dict
+                    anchor = df[["timestamp"]].copy().sort_values("timestamp")			   |                        # [BTC_Ret, BTC_Vol, ETH/BTC_Ret, XAU_Ret, SP500_Ret]
+                    anchor["_orig"] = anchor.index						   |                        # Note: We assume these are in the data_dict from prepare.py
+                    for f_df in macro_refs.values():						   |                        btc = data_dict.get("BTC", df)
+                        anchor = pd.merge_asof(anchor, f_df, on="timestamp", direction="backwar    |                        eth = data_dict.get("ETH", df)
+												   >                        xau = data_dict.get("XAU", df)
+												   >                        spx = data_dict.get("SP500", df)
+                    											                    
+                    anchor = anchor.sort_values("_orig").fillna(0)				   |                        btc_ret = btc["close"].pct_change().fillna(0).values
+												   >                        btc_vol = calculate_features(btc, timeframe=timeframe)["bb_width"].fillna(0
+												   >                        eth_btc_ret = (eth["close"].pct_change() - btc_ret).fillna(0).values
+												   >                        xau_ret = xau["close"].pct_change().fillna(0).values
+												   >                        spx_ret = spx["close"].pct_change().fillna(0).values
+                    											                    
+												   >                        # Align lengths and Scale for HMM
+                    X_hmm = np.column_stack([								                    X_hmm = np.column_stack([
+                        anchor["btc_ret"].values,						   |                            btc_ret, btc_vol, eth_btc_ret, xau_ret, spx_ret
+                        anchor["btc_vol"].values,						   <    
+                        (anchor["eth_ret"] - anchor["btc_ret"]).values,				   <    
+                        anchor["xau_ret"].values,						   <    
+                        anchor["spx_ret"].values						   <    
+                    ])											                    ])
+												   >                        if len(X_hmm) > len(df_feat): X_hmm = X_hmm[-len(df_feat):]
+												   >                        elif len(X_hmm) < len(df_feat):
+												   >                            padding = np.zeros((len(df_feat) - len(X_hmm), 5))
+												   >                            X_hmm = np.vstack([padding, X_hmm])
+													
+                    if hasattr(self, "_macro_scaler") and self._macro_scaler:				                    if hasattr(self, "_macro_scaler") and self._macro_scaler:
+                        X_hmm = self._macro_scaler.transform(X_hmm)					                        X_hmm = self._macro_scaler.transform(X_hmm)
+													
+                    df_feat["macro_state"] = hmm_model.predict(X_hmm)					                    df_feat["macro_state"] = hmm_model.predict(X_hmm)
+                    											                    
+                    # Diagnostic: Print the state distribution for the FIRST symbol only to sav		                    # Diagnostic: Print the state distribution for the FIRST symbol only to sav
+                    if symbol == list(data_dict.keys())[0]:						                    if symbol == list(data_dict.keys())[0]:
+                        unique_states, state_counts = np.unique(df_feat["macro_state"], return_		                        unique_states, state_counts = np.unique(df_feat["macro_state"], return_
+                        print(f"--- HMM REGIME DISTRIBUTION: {dict(zip(unique_states, state_cou		                        print(f"--- HMM REGIME DISTRIBUTION: {dict(zip(unique_states, state_cou
+                except Exception as e:									                except Exception as e:
+                    print(f"HMM High-Fideilty Predict Error: {e}")					                    print(f"HMM High-Fideilty Predict Error: {e}")
+													
+            X_full = df_feat[FEATURE_COLS]								            X_full = df_feat[FEATURE_COLS]
+            print(f"DIAGNOSTIC: X_full for {symbol} - Shape: {X_full.shape} | Nulls: {X_full.is		            print(f"DIAGNOSTIC: X_full for {symbol} - Shape: {X_full.shape} | Nulls: {X_full.is
+            if X_full.isna().any().any():								            if X_full.isna().any().any():
+                 print(f"WARNING: NaNs found in features: {X_full.columns[X_full.isna().any()].		                 print(f"WARNING: NaNs found in features: {X_full.columns[X_full.isna().any()].
+            states = df_feat["macro_state"].values							            states = df_feat["macro_state"].values
+            												            
+            tf_models = self.models.get(timeframe, {})							            tf_models = self.models.get(timeframe, {})
+            tf_meta = self.meta_models.get(timeframe, {})						            tf_meta = self.meta_models.get(timeframe, {})
+            												            
+            # Fallback Constraint: Collapse untrained macro states securely to 0.		   <    
+            # This perfectly reproduces the high-Sharpe performance when experimental states ar    <    
+            states = np.array([s if s in tf_models and s != "global" else 0 for s in states])      <    
+            df_feat["macro_state"] = states							   <    
+            											   <    
+            all_bull = np.zeros(len(df_feat))								            all_bull = np.zeros(len(df_feat))
+            all_bear = np.zeros(len(df_feat))								            all_bear = np.zeros(len(df_feat))
+            all_meta = np.zeros(len(df_feat))								            all_meta = np.zeros(len(df_feat))
+            												            
+            for state_id in range(4):									            for state_id in range(4):
+                mask = (states == state_id)								                mask = (states == state_id)
+                if not any(mask): continue								                if not any(mask): continue
+                											                
+                model = tf_models.get(state_id, tf_models.get("global"))				                model = tf_models.get(state_id, tf_models.get("global"))
+                meta_model = tf_meta.get(state_id, tf_meta.get("global"))				                meta_model = tf_meta.get(state_id, tf_meta.get("global"))
+                											                
+                if model:										                if model:
+                    probs = model.predict_proba(X_full[mask])						                    probs = model.predict_proba(X_full[mask])
+                    # Force class mapping to bypass metadata loss during JSON loading			                    # Force class mapping to bypass metadata loss during JSON loading
+                    # Lead models: 0=Neutral, 1=Long, 2=Short						                    # Lead models: 0=Neutral, 1=Long, 2=Short
+                    all_bull[mask] = probs[:, 1] if probs.shape[1] > 1 else 0.0				                    all_bull[mask] = probs[:, 1] if probs.shape[1] > 1 else 0.0
+                    all_bear[mask] = probs[:, 2] if probs.shape[1] > 2 else 0.0				                    all_bear[mask] = probs[:, 2] if probs.shape[1] > 2 else 0.0
+                    											                    
+                    if meta_model:									                    if meta_model:
+                        m_probs = meta_model.predict_proba(X_full[mask])				                        m_probs = meta_model.predict_proba(X_full[mask])
+                        # Meta models: 0=Fail, 1=Pass							                        # Meta models: 0=Fail, 1=Pass
+                        all_meta[mask] = m_probs[:, 1] if m_probs.shape[1] > 1 else 0.0			                        all_meta[mask] = m_probs[:, 1] if m_probs.shape[1] > 1 else 0.0
+                    											                    
+                    # Probability Audit Print								                    # Probability Audit Print
+                    if symbol == list(data_dict.keys())[0]:						                    if symbol == list(data_dict.keys())[0]:
+                        print(f"DEBUG: {symbol} S{state_id} | MaxBull: {all_bull[mask].max():.4		                        print(f"DEBUG: {symbol} S{state_id} | MaxBull: {all_bull[mask].max():.4
+            												            
+            table = pd.DataFrame({									            table = pd.DataFrame({
+                "timestamp": df["timestamp"].values,							                "timestamp": df["timestamp"].values,
+                f"bull_{timeframe}": all_bull,								                f"bull_{timeframe}": all_bull,
+                f"bear_{timeframe}": all_bear,								                f"bear_{timeframe}": all_bear,
+                f"meta_{timeframe}": all_meta,								                f"meta_{timeframe}": all_meta,
+                "macro_state": states.astype(int),							                "macro_state": states.astype(int),
+            })												            })
+            if include_state:										            if include_state:
+                table["atr_pct"] = df_feat["atr_pct"].values # Fixed: Use pct for sizing/stops     <    
+                table["atr_val"] = df_feat["atr_14"].values						                table["atr_val"] = df_feat["atr_14"].values
+                table["market_ret"] = df_feat["market_ret"].values					                table["market_ret"] = df_feat["market_ret"].values
+                table["rsi_8"] = df_feat["rsi_8"].values						                table["rsi_8"] = df_feat["rsi_8"].values
+                table["funding_rate"] = df["funding_rate"].fillna(0.0).values if "funding_rate"    <    
+            tables[symbol] = table.sort_values("timestamp").reset_index(drop=True)			            tables[symbol] = table.sort_values("timestamp").reset_index(drop=True)
+        return tables											        return tables
+													
+    def pre_calculate_signals(self, data_dict, split_name: str = "val"):				    def pre_calculate_signals(self, data_dict, split_name: str = "val"):
+        if not self.models_loaded:									        if not self.models_loaded:
+            self._load_models()										            self._load_models()
+													
+        print("Calculating timeframe-aligned model caches...")						        print("Calculating timeframe-aligned model caches...")
+        main_tables = self._build_prediction_tables(data_dict, self.timeframe_arg, include_stat		        main_tables = self._build_prediction_tables(data_dict, self.timeframe_arg, include_stat
+        aux_15m_tables = {}										        aux_15m_tables = {}
+        aux_1h_tables = {}										        aux_1h_tables = {}
+        aux_4h_tables = {}										        aux_4h_tables = {}
+        base_split = split_name.replace("_15m", "")							        base_split = split_name.replace("_15m", "")
+													
+        if self.timeframe_arg == "1h":									        if self.timeframe_arg == "1h":
+            if "15m" in self.models or "15m" in self.meta_models:					            if "15m" in self.models or "15m" in self.meta_models:
+                split_15m = {										                split_15m = {
+                    "train": "train_15m",								                    "train": "train_15m",
+                    "val": "val_15m",									                    "val": "val_15m",
+                    "oos": "oos_15m",									                    "oos": "oos_15m",
+                }.get(split_name)									                }.get(split_name)
+                if split_15m:										                if split_15m:
+                    aux_15m_data = load_data(split=split_15m)						                    aux_15m_data = load_data(split=split_15m)
