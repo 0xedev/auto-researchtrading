@@ -460,7 +460,7 @@ class Strategy:
             if market_regime_family == "bull":
                 long_size *= 1.25
             if market_regime_family == "sideways":
-                long_size *= 0.50
+                long_size *= 0.45
 
             long_factor = max(0.05, min(1.0, 1.0 + 8.0 * mret_sum))
             short_factor = max(0.05, min(1.0, 1.0 - 8.0 * mret_sum))
