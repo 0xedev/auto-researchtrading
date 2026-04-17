@@ -10,6 +10,7 @@ This file is the lightweight guidance layer for the AI researcher. Manual notes 
 - Prefer small, auditable changes in [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py).
 - Let the fixed-engine score, OOS behavior, and benchmark audit decide what survives.
 - When the loop starts plateauing, switch from threshold churn to structural changes.
+- Do not casually change the frozen control defined in [CONTROL_BASELINE.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/CONTROL_BASELINE.md).
 
 ## Human Notes
 

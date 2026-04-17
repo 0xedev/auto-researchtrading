@@ -10,16 +10,14 @@ This directory now contains a mix of live fallback artifacts, archived snapshots
 
 ## What The Current Strategy Loads
 
-The live loader in [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py#L89) tries to:
+The live loader in [strategy.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/strategy.py#L60) now pins the default control to `exp256_active`.
 
-1. load state-specific snapshot files from `models/exp256_active/lead_{tf}_s{state}.xgb` and `models/exp256_active/meta_{tf}_s{state}.xgb`
-2. fall back to root global files in this order:
-   - `models/lead_{tf}.xgb`
-   - `models/lead_{tf}.json`
-   - `models/meta_{tf}.xgb`
-   - `models/meta_{tf}.json`
+The search order is:
 
-In the current checkout there are no `lead_{tf}_s{state}.xgb` or `meta_{tf}_s{state}.xgb` files under `exp256_active/`, so the default runtime falls back to the root global models.
+1. `models/exp256_active/`
+2. `models/`
+
+Within each directory, generic lead/meta artifacts prefer `.xgb` before `.json`. The current default control is the `exp256_active` snapshot because it reproduces the accepted `2026q1` validation read under the live `strategy.py`.
 
 ## Root Artifacts Present Today
 
@@ -34,7 +32,7 @@ In the current checkout there are no `lead_{tf}_s{state}.xgb` or `meta_{tf}_s{st
 - `meta_1h.json`
 - `meta_4h.xgb`
 
-`strategy.py` prefers the `.xgb` root files when both `.xgb` and `.json` exist.
+Root artifacts are fallback/training outputs rather than the first source of truth for the default control.
 
 ### Additional experimental artifacts
 
@@ -78,7 +76,20 @@ Contains a frozen snapshot of:
 - `meta_long_15m.xgb`
 - `meta_short_15m.xgb`
 
-This directory currently holds snapshot globals, not the state-specific `*_s{state}` files that the loader checks first.
+This directory is now the default pinned control.
+
+### `exp490_production/`
+
+Contains an archived `1h` comparison set:
+
+- `lead_1h.json`
+- `meta_1h.json`
+- `lead_1h_s0.json`
+- `lead_1h_s2.json`
+- `meta_1h_s0.json`
+- `meta_1h_s2.json`
+- `macro_hmm.joblib`
+- `macro_scaler.joblib`
 
 ### `exp256_pre_retrain/`
 

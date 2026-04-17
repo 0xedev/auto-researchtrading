@@ -7,6 +7,8 @@ This file is the operational guide for the current branch.
 - The backtest engine in [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py) is the source of truth.
 - The engine was audited in March 2026. Old 20+ Sharpe claims elsewhere in the repo are historical and should not be treated as current expectations.
 - The live stack is XGBoost plus macro HMM regime tooling, not the older simplified single-file story.
+- The active product lane is documented in [POSITIONING.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/POSITIONING.md).
+- The frozen research control is documented in [CONTROL_BASELINE.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/CONTROL_BASELINE.md).
 
 ## Current Objective
 
@@ -34,6 +36,8 @@ The default path is:
 - [research_loop.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/research_loop.py): guided experiment-cycle runner
 - [RESEARCH_MEMORY.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/RESEARCH_MEMORY.md): short-lived strategic memory for the AI researcher
 - [models/MODELS.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/models/MODELS.md): current artifact map
+- [POSITIONING.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/POSITIONING.md): exact lane and product non-goals
+- [CONTROL_BASELINE.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/CONTROL_BASELINE.md): pinned control and model-pin rules
 
 Helpful comparison artifacts:
 
@@ -77,6 +81,7 @@ uv run verify_harness.py
 
 ```bash
 uv run evaluate.py --timeframe 1h --label exp269
+uv run evaluate.py --timeframe 1h --split 2026q1 --label exp269
 ```
 
 ### 6. Optionally run one guided cycle end to end
@@ -95,6 +100,7 @@ uv run run_benchmarks.py
 
 - Treat `strategy.py` as the default experiment surface.
 - Treat `prepare.py`, `backtest.py`, and `benchmarks/` as fixed infrastructure unless the task is explicitly repository maintenance.
+- Do not casually change the frozen split windows or the default model pin.
 - Do not use old README or social-post metrics as the current baseline.
 - Use the fixed-engine score and OOS behavior as the decision rule.
 - Prefer small, auditable changes over broad rewrites.
@@ -154,6 +160,15 @@ Benchmark audit thresholds from [backtest.py](/Users/ayobamiadefolalu/Downloads/
 - Profit factor >= 4.0
 - Max drawdown < 10%
 
+Additional institutional metrics now reported by [evaluate.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/evaluate.py):
+
+- annualized Sortino
+- beta to `SP500`
+- annualized alpha vs `SP500`
+- excess return vs `SP500`
+
+When the local `SP500_1h.parquet` benchmark is missing, `evaluate.py` falls back to daily FRED `SP500` data for the SPX-relative metrics.
+
 ## Results Logging
 
 - `backtest.py` appends summary rows to `results.tsv`
@@ -165,7 +180,6 @@ Benchmark audit thresholds from [backtest.py](/Users/ayobamiadefolalu/Downloads/
 - Refresh [RESEARCH_MEMORY.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/RESEARCH_MEMORY.md) from `results.tsv` before a new mutation.
 - Use [analyze_results.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/analyze_results.py) to detect plateau risk, recent keep-rate collapse, and repeated revert-heavy themes.
 - Use [verify_harness.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/verify_harness.py) to catch path drift, dependency drift, results-schema drift, and missing cached data before trusting a run.
-- Use [research_loop.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/research_loop.py) when you want explicit loop control instead of relying on prompt obedience alone.
 - Treat [RESEARCH_MEMORY.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/RESEARCH_MEMORY.md) as the short strategic brief that sits between `program.md` and the next `strategy.py` edit.
 
 ## Historical References
@@ -178,11 +192,6 @@ These are still useful context, but they are not the current operating manual:
 
 ## NEVER STOP
 
-Once the research loop has begun, do not pause just because a branch is difficult, a result is disappointing, or a recent idea failed.
+The idea is that you are a completely autonomous researcher trying things out. If they work, keep. If they don't, discard. And you're advancing the branch so that you can iterate. If you feel like you're getting stuck in some way, you can rewind but you should probably do this very very sparingly (if ever).
 
-- Keep iterating until explicitly interrupted by the user.
-- Use the current audited workflow: prepare data if needed, retrain only when necessary, update `strategy.py`, run validation backtests, run OOS checks, and compare against benchmarks.
-- Refresh `RESEARCH_MEMORY.md` and run `verify_harness.py` so the loop stays grounded in recent evidence and known drift.
-- Let the fixed-engine score, OOS behavior, and benchmark audit decide what survives.
-- If an experiment fails, learn from it, restore a sane baseline, and continue searching.
-- Focus on robust, non-overfit improvements across regimes rather than chasing flashy in-sample numbers.
+NEVER STOP: Once the experiment loop has begun (after the initial setup), do NOT pause to ask the human if you should continue. Do NOT ask "should I keep going?" or "is this a good stopping point?". The human might be asleep, or gone from a computer and expects you to continue working indefinitely until you are manually stopped. You are autonomous. If you run out of ideas, think harder — read papers, re-read the in-scope files for new angles, try combining previous near-misses, try more radical architectural changes. The loop runs until the human interrupts you, period.

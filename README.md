@@ -12,6 +12,11 @@
 
 This repository is the current research workspace behind the trading experiments. The live codebase is no longer just a single-file strategy loop: it now includes data preparation, model training, model snapshots, a fixed backtest engine, benchmark runners, and an out-of-sample robustness suite.
 
+The active product lane and frozen research control are documented in:
+
+- [POSITIONING.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/POSITIONING.md)
+- [CONTROL_BASELINE.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/CONTROL_BASELINE.md)
+
 > Historical note
 >
 > Several files in this repo still preserve the earlier pre-audit autonomous-loop story. Those materials are kept for reference, but they do not describe the current fixed-engine setup. After the March 2026 engine audit, realistic hourly Sharpe on this harness is usually in the low single digits, not the 20+ range quoted in older materials.
@@ -51,6 +56,9 @@ uv run backtest.py --timeframe 4h --stress-fees --capacity
 # Full OOS robustness suite on 2025 data
 uv run evaluate.py --timeframe 1h --label exp269
 
+# Clean post-research OOS check without consuming holdout
+uv run evaluate.py --timeframe 1h --split 2026q1 --label exp269
+
 # Retrain XGBoost models
 uv run train_model.py --timeframe 1h
 uv run train_model.py --timeframe 4h
@@ -65,11 +73,9 @@ uv run run_benchmarks.py
 # Refresh research memory from results.tsv
 uv run analyze_results.py --update-memory
 
-# Verify harness assumptions before a research session
+# Verify harness assresearch_loop.pyumptions before a research session
 uv run verify_harness.py
 
-# Run one guided research cycle
-uv run research_loop.py --timeframe 1h --description "test idea"
 ```
 
 There are no unit tests or CI pipelines. Validation is done through `backtest.py`, `evaluate.py`, and benchmark comparison.
@@ -100,6 +106,7 @@ The fixed date windows come from [prepare.py](/Users/ayobamiadefolalu/Downloads/
 - Training is XGBoost based, not RandomForest, in [train_model.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/train_model.py#L21)
 - The repo also trains and uses a macro HMM regime model in [train_model.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/train_model.py#L57)
 - Current model artifacts and loading behavior are documented in [models/MODELS.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/models/MODELS.md)
+- The default control model pin is `exp256_active`
 
 ### Strategy Runtime
 
@@ -143,6 +150,15 @@ Hard cutoffs send the score to `-999` when:
 
 These are audit thresholds, not guarantees that a branch is good enough to ship.
 
+### Institutional Metrics
+
+`evaluate.py` now also reports:
+
+- annualized Sortino
+- beta to `SP500` using the parquet benchmark when present, with daily FRED fallback
+- annualized alpha vs `SP500`
+- excess return vs `SP500`
+
 ## Workflow
 
 For day-to-day research:
@@ -154,6 +170,7 @@ For day-to-day research:
 5. Change `strategy.py`
 6. Run `uv run backtest.py --timeframe 1h` or use `uv run research_loop.py --timeframe 1h --description "<idea>"`
 7. Run `uv run evaluate.py --timeframe 1h --label <label>`
+   - optional clean post-research check: `uv run evaluate.py --timeframe 1h --split 2026q1 --label <label>`
 8. Compare against `run_benchmarks.py`
 
 `backtest.py` also appends a summary row to `results.tsv`.
@@ -164,6 +181,8 @@ The new research infra is:
 - [verify_harness.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/verify_harness.py): checks schema, dependency drift, model-path drift, and cache presence
 - [research_loop.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/research_loop.py): runs verifier, backtest, memory refresh, and optional OOS evaluation as one cycle
 - [RESEARCH_MEMORY.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/RESEARCH_MEMORY.md): the lightweight guidance layer the AI researcher should read before each mutation
+- [POSITIONING.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/POSITIONING.md): exact lane and non-goals for the project
+- [CONTROL_BASELINE.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/CONTROL_BASELINE.md): frozen control definition and model-pin rules
 
 Reference snapshots for comparison:
 

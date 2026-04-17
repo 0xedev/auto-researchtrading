@@ -24,6 +24,8 @@ CORE_FILES = [
     "train_model.py",
     "program.md",
     "README.md",
+    "POSITIONING.md",
+    "CONTROL_BASELINE.md",
 ]
 PREPARE_CONSTANTS = [
     "TIME_BUDGET",
@@ -39,6 +41,19 @@ PREPARE_CONSTANTS = [
     "DATA_END",
     "ROBUST_START",
     "ROBUST_END",
+]
+CONTROL_MODEL_DIR = Path("models/exp256_active")
+CONTROL_MODEL_FILES = [
+    "lead_15m.xgb",
+    "meta_15m.xgb",
+    "lead_long_15m.xgb",
+    "lead_short_15m.xgb",
+    "meta_long_15m.xgb",
+    "meta_short_15m.xgb",
+    "lead_1h.xgb",
+    "meta_1h.xgb",
+    "lead_4h.xgb",
+    "meta_4h.xgb",
 ]
 
 
@@ -113,6 +128,12 @@ def run_checks(strict: bool = False) -> tuple[list[CheckResult], int]:
     else:
         _add(results, "PASS", "pyproject dependency declarations cover visible model/runtime imports")
 
+    strategy_text = _read_text(ROOT / "strategy.py")
+    if 'AUTOTRADER_MODEL_SET", "exp256_active"' in strategy_text:
+        _add(results, "PASS", "strategy.py default model pin is exp256_active")
+    else:
+        _add(results, "WARN", "strategy.py does not appear to pin the default model set to exp256_active")
+
     data_dir = Path.home() / ".cache" / "autotrader" / "data"
     if data_dir.exists():
         count_1h = len(list(data_dir.glob("*_1h.parquet")))
@@ -122,26 +143,23 @@ def run_checks(strict: bool = False) -> tuple[list[CheckResult], int]:
             _add(results, "WARN", "No 1h parquet files found in the data cache")
         if count_15m == 0:
             _add(results, "WARN", "No 15m parquet files found in the data cache")
+        if (data_dir / "SP500_1h.parquet").exists():
+            _add(results, "PASS", "SP500 cache present for beta/excess-return reporting")
+        else:
+            _add(results, "WARN", "SP500_1h.parquet is missing, so beta-to-SPX will rely on the daily FRED fallback")
     else:
         _add(results, "WARN", f"Data cache directory missing: {data_dir}")
 
-    exact_refs = [
-        Path("models/exp256_active/macro_hmm.joblib"),
-        Path("models/exp256_active/macro_scaler.joblib"),
-    ]
-    fallback_refs = {
-        Path("models/exp256_active/macro_hmm.joblib"): Path("models/macro_hmm.joblib"),
-        Path("models/exp256_active/macro_scaler.joblib"): Path("models/macro_scaler.joblib"),
-    }
-    for ref in exact_refs:
-        exact_path = ROOT / ref
-        fallback = ROOT / fallback_refs[ref]
-        if exact_path.exists():
-            _add(results, "PASS", f"Exact strategy reference exists: {ref}")
-        elif fallback.exists():
-            _add(results, "WARN", f"Missing exact strategy reference `{ref}`, but fallback artifact exists at `{fallback_refs[ref]}`")
-        else:
-            _add(results, "FAIL", f"Missing strategy reference `{ref}` and no obvious fallback artifact exists")
+    control_dir = ROOT / CONTROL_MODEL_DIR
+    if control_dir.exists():
+        _add(results, "PASS", f"Control model directory present: {CONTROL_MODEL_DIR}")
+        for filename in CONTROL_MODEL_FILES:
+            if (control_dir / filename).exists():
+                _add(results, "PASS", f"Control artifact present: {CONTROL_MODEL_DIR / filename}")
+            else:
+                _add(results, "FAIL", f"Missing control artifact: {CONTROL_MODEL_DIR / filename}")
+    else:
+        _add(results, "FAIL", f"Missing control model directory: {CONTROL_MODEL_DIR}")
 
     for tf in ("15m", "1h", "4h"):
         lead_candidates = [ROOT / "models" / f"lead_{tf}.xgb", ROOT / "models" / f"lead_{tf}.json"]

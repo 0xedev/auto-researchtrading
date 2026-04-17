@@ -22,6 +22,8 @@ import requests
 import pyarrow.parquet as pq
 from hmmlearn import hmm
 
+from market_regime import build_regime_frame
+
 # ---------------------------------------------------------------------------
 # Constants (fixed, do not modify)
 # ---------------------------------------------------------------------------
@@ -298,7 +300,10 @@ class BacktestResult:
     bars_processed: int = 0
     total_bars: int = 0
     equity_curve: list = field(default_factory=list)
+    equity_timestamps: list = field(default_factory=list)
+    bar_regimes: list = field(default_factory=list)
     trade_log: list = field(default_factory=list)
+    trade_context_log: list = field(default_factory=list)
 
 # ---------------------------------------------------------------------------
 # Data download
@@ -950,8 +955,21 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
     bars_per_year = 365.25 * 24 * 3600 / bar_interval_sec
     bars_per_funding = 8 * 3600 / bar_interval_sec  # bars in 8h funding period
     equity_curve = [INITIAL_CAPITAL]
+    equity_timestamps = [timestamps[0]]
+    regime_frame = build_regime_frame(data)
+    if not regime_frame.empty:
+        regime_ts = regime_frame["timestamp"].astype(np.int64).values
+        regime_frame["timestamp"] = np.where(regime_ts > 1e11, regime_ts // 1000, regime_ts)
+    regime_map = {
+        int(row.timestamp): (row.regime, row.regime_family)
+        for row in regime_frame.itertuples(index=False)
+    }
+    current_regime = "Sideways"
+    current_regime_family = "sideways"
+    bar_regimes = [current_regime]
     bar_returns = []
     trade_log = []
+    trade_context_log = []
     total_volume = 0.0
     prev_equity = INITIAL_CAPITAL
     timed_out = False
@@ -967,6 +985,8 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
             break
 
         portfolio.timestamp = ts
+        if ts in regime_map:
+            current_regime, current_regime_family = regime_map[ts]
 
         # Build bar data
         bar_data = {}
@@ -1081,6 +1101,18 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
                 if sig.symbol in portfolio.positions:
                     del portfolio.positions[sig.symbol]
                 trade_log.append(("close", sig.symbol, delta, exec_price, pnl))
+                trade_context_log.append(
+                    {
+                        "event": "close",
+                        "symbol": sig.symbol,
+                        "delta": float(delta),
+                        "exec_price": float(exec_price),
+                        "pnl": float(pnl),
+                        "timestamp": int(ts),
+                        "regime": current_regime,
+                        "regime_family": current_regime_family,
+                    }
+                )
             else:
                 if current_pos == 0:
                     # Opening new position
@@ -1088,6 +1120,18 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
                     portfolio.positions[sig.symbol] = sig.target_position
                     portfolio.entry_prices[sig.symbol] = exec_price
                     trade_log.append(("open", sig.symbol, delta, exec_price, 0))
+                    trade_context_log.append(
+                        {
+                            "event": "open",
+                            "symbol": sig.symbol,
+                            "delta": float(delta),
+                            "exec_price": float(exec_price),
+                            "pnl": 0.0,
+                            "timestamp": int(ts),
+                            "regime": current_regime,
+                            "regime_family": current_regime_family,
+                        }
+                    )
                 else:
                     # Modifying position
                     old_notional = abs(current_pos)
@@ -1109,6 +1153,18 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
                             portfolio.entry_prices[sig.symbol] = new_entry
                     portfolio.positions[sig.symbol] = sig.target_position
                     trade_log.append(("modify", sig.symbol, delta, exec_price, 0))
+                    trade_context_log.append(
+                        {
+                            "event": "modify",
+                            "symbol": sig.symbol,
+                            "delta": float(delta),
+                            "exec_price": float(exec_price),
+                            "pnl": 0.0,
+                            "timestamp": int(ts),
+                            "regime": current_regime,
+                            "regime_family": current_regime_family,
+                        }
+                    )
 
         # Recalculate equity after trades
         unrealized_pnl = 0.0
@@ -1122,6 +1178,8 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
 
         current_equity = portfolio.cash + sum(abs(v) for v in portfolio.positions.values()) + unrealized_pnl
         equity_curve.append(current_equity)
+        equity_timestamps.append(ts)
+        bar_regimes.append(current_regime)
 
         # Hourly return
         if prev_equity > 0:
@@ -1192,7 +1250,10 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
         bars_processed=processed_bars,
         total_bars=len(timestamps),
         equity_curve=equity_curve,
+        equity_timestamps=equity_timestamps,
+        bar_regimes=bar_regimes,
         trade_log=trade_log,
+        trade_context_log=trade_context_log,
     )
 
 # ---------------------------------------------------------------------------

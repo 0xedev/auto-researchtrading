@@ -20,9 +20,11 @@ This repository is a trading research workspace with a fixed backtest engine, mo
 - `run_benchmarks.py` - reference strategy comparison
 - `analyze_results.py` - results analyzer and research-memory refresher
 - `verify_harness.py` - harness drift checker
-- `research_loop.py` - guided experiment-cycle runner
+
 - `RESEARCH_MEMORY.md` - lightweight guidance layer for the AI researcher
 - `models/MODELS.md` - current artifact map
+- `POSITIONING.md` - exact lane and product non-goals
+- `CONTROL_BASELINE.md` - frozen control and model-pin rules
 - `program.md` - current workflow and repo facts
 - `README.md` - user-facing repo overview
 
@@ -62,3 +64,4 @@ This repository is a trading research workspace with a fixed backtest engine, mo
 - The repository is research-first, not production-first.
 - Historical posts and threads are archive material; use the code and current docs as the source of truth.
 - Keep explanations aligned with the live audited branch, not the earlier autonomous-marketing narrative.
+- Treat `exp256_active` as the default pinned control unless the task explicitly involves baseline maintenance.
