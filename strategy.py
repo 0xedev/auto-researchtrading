@@ -477,7 +477,10 @@ class Strategy:
                 max_hold_bars = self._max_hold
 
                 if pos > 0:
-                    signal_decay_exit = age >= self._decay_age and (not bull_signal) and m15_long < 0.40
+                    long_decay_age = self._decay_age
+                    if market_regime_family == "sideways":
+                        long_decay_age = max(2, self._decay_age - 1)
+                    signal_decay_exit = age >= long_decay_age and (not bull_signal) and m15_long < 0.40
                     should_exit = (
                         age >= max_hold_bars
                         or bar.close < self.trailing_stops.get(symbol, 0)
