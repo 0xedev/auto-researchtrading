@@ -458,7 +458,7 @@ class Strategy:
             if not supportive_regime:
                 long_size *= 0.001
             if market_regime_family == "sideways":
-                long_size *= 0.85
+                long_size *= 0.55
 
             long_factor = max(0.05, min(1.0, 1.0 + 8.0 * mret_sum))
             short_factor = max(0.05, min(1.0, 1.0 - 8.0 * mret_sum))
