@@ -18,6 +18,7 @@ class Signal:
     symbol: str
     target_position: float
     order_type: str = "market"
+    tag: str = ""
 
 
 class Strategy:
@@ -487,14 +488,20 @@ class Strategy:
                         or signal_decay_exit
                     )
                     if should_exit:
-                        signals.append(Signal(symbol, 0.0))
+                        if age >= max_hold_bars:
+                            exit_tag = "close_long_max_hold"
+                        elif bar.close < self.trailing_stops.get(symbol, 0):
+                            exit_tag = "close_long_stop"
+                        else:
+                            exit_tag = "close_long_decay"
+                        signals.append(Signal(symbol, 0.0, tag=exit_tag))
                         self.position_ages[symbol] = 0
                     else:
                         desired = pos
                         if bull_signal and m15_long > 0.60 and abs(pos) + 1.0 < long_size:
                             desired = long_size
                         if abs(desired - pos) > 1.0:
-                            signals.append(Signal(symbol, desired))
+                            signals.append(Signal(symbol, desired, tag="add_long"))
                         self.trailing_stops[symbol] = max(self.trailing_stops.get(symbol, 0), bar.high - stop_dist)
                 else:
                     short_decay_age = max(2, self._decay_age - 1)
@@ -514,14 +521,20 @@ class Strategy:
                         or signal_decay_exit
                     )
                     if should_exit:
-                        signals.append(Signal(symbol, 0.0))
+                        if age >= short_max_hold_bars:
+                            exit_tag = "close_short_max_hold"
+                        elif bar.close > self.trailing_stops.get(symbol, 9e18):
+                            exit_tag = "close_short_stop"
+                        else:
+                            exit_tag = "close_short_decay"
+                        signals.append(Signal(symbol, 0.0, tag=exit_tag))
                         self.position_ages[symbol] = 0
                     else:
                         desired = pos
                         if bear_signal and m15_short > 0.65 and abs(pos) + 1.0 < short_size:
                             desired = -short_size
                         if abs(desired - pos) > 1.0:
-                            signals.append(Signal(symbol, desired))
+                            signals.append(Signal(symbol, desired, tag="add_short"))
                         self.trailing_stops[symbol] = min(self.trailing_stops.get(symbol, 9e18), bar.low + stop_dist)
                 continue
 
@@ -541,27 +554,27 @@ class Strategy:
             fund_scale = max(0.5, min(2.5, 1.0 - 3000.0 * funding))
             if bull_fortress and not prefer_short and not_falling_knife and not_hyper_vol and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short) and macro_bull_ok and long_gate_ok:
                 entry_size = long_size * self._entry_scale * vol_scale * rsi_scale * mret_scale * fund_scale * self._leverage_mult
-                signals.append(Signal(symbol, entry_size))
+                signals.append(Signal(symbol, entry_size, tag="entry_bull_fortress"))
                 self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
             elif bull_soft and not prefer_short and (not bear_soft or m15_long >= m15_short) and long_gate_ok:
                 entry_size = long_size * 0.5 * self._entry_scale * self._leverage_mult
-                signals.append(Signal(symbol, entry_size))
+                signals.append(Signal(symbol, entry_size, tag="entry_bull_soft"))
                 self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
             elif bear_fortress and (prefer_short or not bull_fortress) and short_gate_ok:
                 entry_size = short_size * self._entry_scale * self._leverage_mult
-                signals.append(Signal(symbol, -entry_size))
+                signals.append(Signal(symbol, -entry_size, tag="entry_bear_fortress"))
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
             elif bear_calibrated and short_gate_ok:
                 entry_size = short_size * 0.65 * self._entry_scale * self._leverage_mult
-                signals.append(Signal(symbol, -entry_size))
+                signals.append(Signal(symbol, -entry_size, tag="entry_bear_calibrated"))
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
             elif bear_soft and (prefer_short or not bull_soft) and short_gate_ok:
                 entry_size = short_size * 0.5 * self._entry_scale * self._leverage_mult
-                signals.append(Signal(symbol, -entry_size))
+                signals.append(Signal(symbol, -entry_size, tag="entry_bear_soft"))
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
 

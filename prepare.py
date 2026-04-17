@@ -1105,6 +1105,7 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
                     {
                         "event": "close",
                         "symbol": sig.symbol,
+                        "tag": getattr(sig, "tag", ""),
                         "delta": float(delta),
                         "exec_price": float(exec_price),
                         "pnl": float(pnl),
@@ -1124,6 +1125,7 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
                         {
                             "event": "open",
                             "symbol": sig.symbol,
+                            "tag": getattr(sig, "tag", ""),
                             "delta": float(delta),
                             "exec_price": float(exec_price),
                             "pnl": 0.0,
@@ -1157,6 +1159,7 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
                         {
                             "event": "modify",
                             "symbol": sig.symbol,
+                            "tag": getattr(sig, "tag", ""),
                             "delta": float(delta),
                             "exec_price": float(exec_price),
                             "pnl": 0.0,
