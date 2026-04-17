@@ -458,7 +458,7 @@ class Strategy:
             if not supportive_regime:
                 long_size *= 0.001
             if market_regime_family == "bull":
-                long_size *= 1.10
+                long_size *= 1.15
             if market_regime_family == "sideways":
                 long_size *= 0.55
 
