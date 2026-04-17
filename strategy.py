@@ -457,6 +457,8 @@ class Strategy:
             # exp374: 0.005 -> 0.001 (5x) — near-full gate, search for inflection.
             if not supportive_regime:
                 long_size *= 0.001
+            if market_regime_family == "sideways":
+                long_size *= 0.85
 
             long_factor = max(0.05, min(1.0, 1.0 + 8.0 * mret_sum))
             short_factor = max(0.05, min(1.0, 1.0 - 8.0 * mret_sum))
@@ -548,7 +550,7 @@ class Strategy:
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
             elif bear_calibrated and short_gate_ok:
-                entry_size = short_size * 0.5 * self._entry_scale * self._leverage_mult
+                entry_size = short_size * 0.65 * self._entry_scale * self._leverage_mult
                 signals.append(Signal(symbol, -entry_size))
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
