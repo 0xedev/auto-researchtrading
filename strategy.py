@@ -58,6 +58,16 @@ class Strategy:
         self.feature_profile = "price_only"
         self.short_conf_mode = os.environ.get("AUTOTRADER_SHORT_CONF_MODE")
         self.short_conf_calibrator = None
+        self.bear_short_blend = float(os.environ.get("AUTOTRADER_BEAR_SHORT_BLEND", "1.0"))
+        self.bear_short_decay_blend = float(
+            os.environ.get("AUTOTRADER_BEAR_SHORT_DECAY_BLEND", str(self.bear_short_blend))
+        )
+        self.bear_short_delta_cap = float(os.environ.get("AUTOTRADER_BEAR_SHORT_DELTA_CAP", "1.0"))
+        self.bear_short_size_bonus = float(os.environ.get("AUTOTRADER_BEAR_SHORT_SIZE_BONUS", "0.0"))
+        self.bear_short_size_edge = float(os.environ.get("AUTOTRADER_BEAR_SHORT_SIZE_EDGE", "0.0"))
+        self.sideways_structure_boost = float(os.environ.get("AUTOTRADER_SIDEWAYS_STRUCTURE_BOOST", "1.10"))
+        self.sideways_structure_boost_min = int(float(os.environ.get("AUTOTRADER_SIDEWAYS_STRUCTURE_BOOST_MIN", "1")))
+        self.sideways_structure_boost_max = int(float(os.environ.get("AUTOTRADER_SIDEWAYS_STRUCTURE_BOOST_MAX", "1")))
 
     def _parse_timeframe(self, tf: str) -> int:
         if tf == "15m":
@@ -155,6 +165,14 @@ class Strategy:
             ]
             table["short_conf_15m"] = table["short_conf_rank_15m"]
         return tables
+
+    def _blend_bear_short_conf(self, raw_value: float, bear_value: float, blend: float) -> float:
+        blend = max(0.0, min(1.0, float(blend)))
+        blended = (1.0 - blend) * float(raw_value) + blend * float(bear_value)
+        cap = max(0.0, float(self.bear_short_delta_cap))
+        if cap < 1.0:
+            blended = min(max(blended, float(raw_value) - cap), float(raw_value) + cap)
+        return float(blended)
 
     def _load_models(self):
         self.model_metadata = self._load_model_metadata()
@@ -568,8 +586,15 @@ class Strategy:
             m15_long = row.get("meta_long_15m", m15)
             m15_short_raw = row.get("meta_short_15m", m15)
             m15_short = row.get("short_conf_15m", m15_short_raw)
+            m15_short_decay = m15_short
+            bear_short_model = row.get("short_conf_bear_15m", m15_short)
             if self.short_conf_mode == "bear_model" and market_regime_family == "bear":
-                m15_short = row.get("short_conf_bear_15m", m15_short)
+                m15_short = self._blend_bear_short_conf(m15_short_raw, bear_short_model, self.bear_short_blend)
+                m15_short_decay = self._blend_bear_short_conf(
+                    m15_short_raw, bear_short_model, self.bear_short_decay_blend
+                )
+            short_gate_conf = m15_short if self.short_conf_mode == "raw" else m15_short_raw
+            bear_calibrated_gate = m15 if self.short_conf_mode == "raw" else m15_short_raw
             m1h = row["meta_1h"]
             m4h = row["meta_4h"]
             macro_event_flag = row.get("macro_event_flag", 0.0)
@@ -599,16 +624,16 @@ class Strategy:
             bear_conviction = row["bear_15m"] + 0.70 * m15_short + (0.05 if self._macro_bear else 0.0)
             prefer_short = bear_conviction > bull_conviction + (0.02 if self._macro_bear else 0.08)
             prefer_long = bull_conviction > bear_conviction + 0.05
-            bear_calibrated = market_regime_family == "bear" and bear_signal and m15 > 0.24 and rsi_8 > 35 and prefer_short
+            bear_calibrated = market_regime_family == "bear" and bear_signal and bear_calibrated_gate > 0.24 and rsi_8 > 35 and prefer_short
             bear_soft = (
                 short_regime_ok
                 and bear_signal
                 and supportive_regime
                 and supportive_regime_4h
-                and m15_short > 0.42
+                and short_gate_conf > 0.42
                 and row["bear_15m"] > row["bull_15m"] + 0.02
             )
-            bear_fortress = short_regime_ok and ((bear_signal and m15_short > 0.24 and rsi_8 > 35) or raw_bear_fortress)
+            bear_fortress = short_regime_ok and ((bear_signal and short_gate_conf > 0.24 and rsi_8 > 35) or raw_bear_fortress)
             sideways_structure_score = 0
             liquidity_sweep = row.get("liquidity_sweep", 0.0)
             msb_status = row.get("msb_status", 0.0)
@@ -635,8 +660,15 @@ class Strategy:
                 sideways_structure_score += 1
             else:
                 sideways_structure_score -= 1
-            strong_sideways_structure = sideways_structure_score >= 2
-            sideways_bull_fortress_scale = 1.10 if (market_regime_family == "sideways" and bull_fortress and strong_sideways_structure) else 1.0
+            structure_boost_ok = (
+                self.sideways_structure_boost > 1.0
+                and self.sideways_structure_boost_min <= sideways_structure_score <= self.sideways_structure_boost_max
+            )
+            sideways_bull_fortress_scale = (
+                self.sideways_structure_boost
+                if (market_regime_family == "sideways" and bull_fortress and structure_boost_ok)
+                else 1.0
+            )
 
             def signal_metadata(tag: str, size_reason: str = "", exit_reason: str = "") -> dict:
                 return {
@@ -690,6 +722,15 @@ class Strategy:
                 short_size *= 1.10
             elif prefer_long:
                 long_size *= 1.05
+            if (
+                self.short_conf_mode == "bear_model"
+                and market_regime_family == "bear"
+                and self.bear_short_size_bonus > 0.0
+                and bear_short_model > m15_short_raw + self.bear_short_size_edge
+                and prefer_short
+            ):
+                short_size *= 1.0 + self.bear_short_size_bonus
+            short_size = min(short_size, equity)
 
             if pos != 0:
                 age = self.position_ages.get(symbol, 0) + 1
@@ -729,7 +770,7 @@ class Strategy:
                         age >= short_decay_age
                         and (
                             (not bear_signal)
-                            or m15_short < 0.45
+                            or m15_short_decay < 0.45
                             or row["bear_15m"] < row["bull_15m"] + 0.01
                         )
                         and not raw_bear_fortress
@@ -750,7 +791,7 @@ class Strategy:
                         self.position_ages[symbol] = 0
                     else:
                         desired = pos
-                        if bear_signal and m15_short > 0.65 and abs(pos) + 1.0 < short_size:
+                        if bear_signal and short_gate_conf > 0.65 and abs(pos) + 1.0 < short_size:
                             desired = -short_size
                         if abs(desired - pos) > 1.0:
                             signals.append(Signal(symbol, desired, tag="add_short", metadata=signal_metadata("add_short", size_reason="short_conviction_add")))
