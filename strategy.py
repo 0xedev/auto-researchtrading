@@ -201,6 +201,14 @@ class Strategy:
                 table["atr_val"] = df_feat["atr_14"].values
                 table["market_ret"] = df_feat["market_ret"].values
                 table["rsi_8"] = df_feat["rsi_8"].values
+                table["rsi_24"] = df_feat["rsi_24"].values
+                table["atr_pct"] = df_feat["atr_pct"].values
+                table["liquidity_sweep"] = df_feat["liquidity_sweep"].values
+                table["msb_status"] = df_feat["msb_status"].values
+                table["fvg_detected"] = df_feat["fvg_detected"].values
+                table["ob_dist"] = df_feat["ob_dist"].values
+                table["ema_200_dist"] = df_feat["ema_200_dist"].values
+                table["dist_to_vwap"] = df_feat["dist_to_vwap"].values
 
             tables[symbol] = table.sort_values("timestamp").reset_index(drop=True)
 
@@ -280,7 +288,22 @@ class Strategy:
             main_bear_col = f"bear_{self.timeframe_arg}"
             main_meta_col = f"meta_{self.timeframe_arg}"
 
-            base = main_df[["timestamp", "atr_val", "market_ret", "rsi_8"]].copy()
+            base = main_df[
+                [
+                    "timestamp",
+                    "atr_val",
+                    "market_ret",
+                    "rsi_8",
+                    "rsi_24",
+                    "atr_pct",
+                    "liquidity_sweep",
+                    "msb_status",
+                    "fvg_detected",
+                    "ob_dist",
+                    "ema_200_dist",
+                    "dist_to_vwap",
+                ]
+            ].copy()
             base["bull_15m"] = main_df[main_bull_col].fillna(0).values if main_bull_col in main_df else 0.0
             base["bear_15m"] = main_df[main_bear_col].fillna(0).values if main_bear_col in main_df else 0.0
             base["meta_15m"] = (
@@ -435,6 +458,36 @@ class Strategy:
                 and row["bear_15m"] > row["bull_15m"] + 0.02
             )
             bear_fortress = short_regime_ok and ((bear_signal and m15_short > 0.24 and rsi_8 > 35) or raw_bear_fortress)
+            sideways_bull_fortress_scale = 1.0
+            if market_regime_family == "sideways" and bull_fortress:
+                structure_score = 0
+                liquidity_sweep = row.get("liquidity_sweep", 0.0)
+                msb_status = row.get("msb_status", 0.0)
+                fvg_detected = row.get("fvg_detected", 0.0)
+                ema_200_dist = row.get("ema_200_dist", 0.0)
+                dist_to_vwap = row.get("dist_to_vwap", 0.0)
+                if liquidity_sweep > 0:
+                    structure_score += 1
+                elif liquidity_sweep < 0:
+                    structure_score -= 1
+                if msb_status > 0:
+                    structure_score += 1
+                elif msb_status < 0:
+                    structure_score -= 1
+                if fvg_detected > 0:
+                    structure_score += 1
+                elif fvg_detected < 0:
+                    structure_score -= 1
+                if ema_200_dist > 0:
+                    structure_score += 1
+                else:
+                    structure_score -= 1
+                if dist_to_vwap <= 0:
+                    structure_score += 1
+                else:
+                    structure_score -= 1
+                if structure_score >= 2:
+                    sideways_bull_fortress_scale = 1.10
 
             if supportive_regime:
                 meta_factor = max(0.0, min(1.0, (meta_score - 0.25) / 0.60))
@@ -554,6 +607,8 @@ class Strategy:
             fund_scale = max(0.5, min(2.5, 1.0 - 3000.0 * funding))
             if bull_fortress and not prefer_short and not_falling_knife and not_hyper_vol and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short) and macro_bull_ok and long_gate_ok:
                 entry_size = long_size * self._entry_scale * vol_scale * rsi_scale * mret_scale * fund_scale * self._leverage_mult
+                if market_regime_family == "sideways":
+                    entry_size *= sideways_bull_fortress_scale
                 signals.append(Signal(symbol, entry_size, tag="entry_bull_fortress"))
                 self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
