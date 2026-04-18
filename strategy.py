@@ -458,36 +458,34 @@ class Strategy:
                 and row["bear_15m"] > row["bull_15m"] + 0.02
             )
             bear_fortress = short_regime_ok and ((bear_signal and m15_short > 0.24 and rsi_8 > 35) or raw_bear_fortress)
-            sideways_bull_fortress_scale = 1.0
-            if market_regime_family == "sideways" and bull_fortress:
-                structure_score = 0
-                liquidity_sweep = row.get("liquidity_sweep", 0.0)
-                msb_status = row.get("msb_status", 0.0)
-                fvg_detected = row.get("fvg_detected", 0.0)
-                ema_200_dist = row.get("ema_200_dist", 0.0)
-                dist_to_vwap = row.get("dist_to_vwap", 0.0)
-                if liquidity_sweep > 0:
-                    structure_score += 1
-                elif liquidity_sweep < 0:
-                    structure_score -= 1
-                if msb_status > 0:
-                    structure_score += 1
-                elif msb_status < 0:
-                    structure_score -= 1
-                if fvg_detected > 0:
-                    structure_score += 1
-                elif fvg_detected < 0:
-                    structure_score -= 1
-                if ema_200_dist > 0:
-                    structure_score += 1
-                else:
-                    structure_score -= 1
-                if dist_to_vwap <= 0:
-                    structure_score += 1
-                else:
-                    structure_score -= 1
-                if structure_score >= 2:
-                    sideways_bull_fortress_scale = 1.10
+            sideways_structure_score = 0
+            liquidity_sweep = row.get("liquidity_sweep", 0.0)
+            msb_status = row.get("msb_status", 0.0)
+            fvg_detected = row.get("fvg_detected", 0.0)
+            ema_200_dist = row.get("ema_200_dist", 0.0)
+            dist_to_vwap = row.get("dist_to_vwap", 0.0)
+            if liquidity_sweep > 0:
+                sideways_structure_score += 1
+            elif liquidity_sweep < 0:
+                sideways_structure_score -= 1
+            if msb_status > 0:
+                sideways_structure_score += 1
+            elif msb_status < 0:
+                sideways_structure_score -= 1
+            if fvg_detected > 0:
+                sideways_structure_score += 1
+            elif fvg_detected < 0:
+                sideways_structure_score -= 1
+            if ema_200_dist > 0:
+                sideways_structure_score += 1
+            else:
+                sideways_structure_score -= 1
+            if dist_to_vwap <= 0:
+                sideways_structure_score += 1
+            else:
+                sideways_structure_score -= 1
+            strong_sideways_structure = sideways_structure_score >= 2
+            sideways_bull_fortress_scale = 1.10 if (market_regime_family == "sideways" and bull_fortress and strong_sideways_structure) else 1.0
 
             if supportive_regime:
                 meta_factor = max(0.0, min(1.0, (meta_score - 0.25) / 0.60))
