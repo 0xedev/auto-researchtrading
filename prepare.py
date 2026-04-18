@@ -22,6 +22,7 @@ import requests
 import pyarrow.parquet as pq
 from hmmlearn import hmm
 
+from external_context import CONTEXT_COLUMNS, build_context_features
 from market_regime import build_regime_frame
 
 # ---------------------------------------------------------------------------
@@ -123,7 +124,7 @@ CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "autotrader")
 DATA_DIR = os.path.join(CACHE_DIR, "data")
 
 # Quantitative Feature Columns
-FEATURE_COLS = [
+BASE_FEATURE_COLS = [
     'ret_1h', 'ret_4h', 'ret_12h', 'ret_24h', 'ret_48h', 
     'rsi_8', 'rsi_24', 'macd_hist', 'macd_line', 
     'bb_width', 'ema_200_dist', 'vol_24h', 'atr_pct', 
@@ -132,6 +133,18 @@ FEATURE_COLS = [
     'rel_ret_1h', 'rel_ret_4h', 'rel_bb_width',
     'fvg_detected', 'msb_status', 'ob_dist', 'frac_diff_close'
 ]
+
+CONTEXT_FEATURE_COLS = list(CONTEXT_COLUMNS)
+FEATURE_PROFILES = {
+    "price_only": BASE_FEATURE_COLS,
+    "price_context": BASE_FEATURE_COLS + CONTEXT_FEATURE_COLS,
+}
+# Backward-compatible default control profile.
+FEATURE_COLS = list(BASE_FEATURE_COLS)
+
+
+def get_feature_cols(feature_profile: str = "price_only") -> list[str]:
+    return list(FEATURE_PROFILES.get(feature_profile, FEATURE_COLS))
 
 def get_frac_diff_weights(d, size):
     """Calculates weights for fractional differentiation."""
@@ -152,7 +165,7 @@ def apply_frac_diff(series, d, threshold=1e-5):
         res.append(np.dot(weights.T, window)[0][0])
     return pd.Series(res, index=series.index)
 
-def calculate_features(df, timeframe="1h"):
+def calculate_features(df, timeframe="1h", symbol=None, feature_profile="price_only"):
     """Vectorized feature calculation for a single symbol dataframe."""
     df = df.copy()
     close = df['close']
@@ -252,6 +265,14 @@ def calculate_features(df, timeframe="1h"):
     # This will be populated by the strategy/backtester using the saved HMM model
     df['macro_state'] = 0 
 
+    context_frame = build_context_features(
+        df["timestamp"],
+        symbol=symbol,
+        asset_class=ASSET_CLASS.get(symbol, 0) if symbol is not None else 0,
+    )
+    for col in CONTEXT_COLUMNS:
+        df[col] = context_frame[col].values if col in context_frame else 0.0
+
     # 15. Sanitization
     df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
     
@@ -276,6 +297,8 @@ class Signal:
     symbol: str
     target_position: float   # target USD notional (signed: +long, -short)
     order_type: str = "market"
+    tag: str = ""
+    metadata: dict = field(default_factory=dict)
 
 @dataclass
 class PortfolioState:
@@ -368,10 +391,11 @@ def get_n_trees_depth(timeframe):
     depth = {"1h": 12, "4h": 14, "15m": 12}.get(timeframe, 12)
     return n_trees, depth
 
-def prepare_dataset(timeframe, split_name):
+def prepare_dataset(timeframe, split_name, feature_profile="price_only"):
     # This logic is now shared by the trainer
     data_dict = load_data(split=split_name, resample_4h=(timeframe == "4h"))
-    all_features, all_y, all_y_meta, all_states = [], [], [], []
+    feature_cols = get_feature_cols(feature_profile)
+    all_features, all_y, all_y_meta, all_states, all_sample_meta = [], [], [], [], []
     
     # Pre-calculate Market Regime (Systemic Beta)
     print("Pre-calculating Market Regime Context...")
@@ -379,8 +403,17 @@ def prepare_dataset(timeframe, split_name):
     market_rets = []
     for s, df in data_dict.items():
         if len(df) < 300: continue
-        market_vols.append(calculate_features(df, timeframe=timeframe)['bb_width'])
+        market_vols.append(calculate_features(df, timeframe=timeframe, symbol=s)['bb_width'])
         market_rets.append(df['close'].pct_change())
+
+    regime_frame = build_regime_frame(data_dict)
+    if not regime_frame.empty:
+        regime_ts = regime_frame["timestamp"].astype(np.int64).values
+        regime_frame["timestamp"] = np.where(regime_ts > 1e11, regime_ts // 1000, regime_ts)
+    regime_family_map = {
+        int(row.timestamp): row.regime_family
+        for row in regime_frame.itertuples(index=False)
+    }
     
     m_vol = pd.concat(market_vols, axis=1).median(axis=1).fillna(0)
     m_ret = pd.concat(market_rets, axis=1).median(axis=1).fillna(0)
@@ -425,7 +458,7 @@ def prepare_dataset(timeframe, split_name):
         global_states = None
 
     for symbol, df in data_dict.items():
-        df_feat = calculate_features(df, timeframe=timeframe)
+        df_feat = calculate_features(df, timeframe=timeframe, symbol=symbol, feature_profile=feature_profile)
         if len(df_feat) < 300: continue
         
         if global_states is not None and len(global_states) == len(df_feat):
@@ -445,20 +478,41 @@ def prepare_dataset(timeframe, split_name):
 
         meta = get_triple_barrier_labels(df_feat, timeframe)
 
-        valid_mask = ~(df_feat[FEATURE_COLS].isna().any(axis=1) | forward_ret.isna() | np.isinf(forward_ret))
+        valid_mask = ~(df_feat[feature_cols].isna().any(axis=1) | forward_ret.isna() | np.isinf(forward_ret))
         
-        sliced_X = df_feat[FEATURE_COLS][valid_mask].values[50:-100]
+        sliced_X = df_feat[feature_cols][valid_mask].values[50:-100]
         sliced_y = labels[valid_mask][50:-100]
         sliced_meta = meta[valid_mask][50:-100]
         sliced_states = df_feat['macro_state'][valid_mask][50:-100].values
+        ts_series = pd.to_numeric(df_feat["timestamp"], errors="coerce").fillna(0).astype(np.int64)
+        ts_series = np.where(ts_series > 10**11, ts_series // 1000, ts_series)
+        sliced_timestamps = ts_series[valid_mask][50:-100]
+        sliced_regimes = [regime_family_map.get(int(ts), "unknown") for ts in sliced_timestamps]
 
-        all_features.append(pd.DataFrame(sliced_X, columns=FEATURE_COLS))
+        all_features.append(pd.DataFrame(sliced_X, columns=feature_cols))
         all_y.append(sliced_y)
         all_y_meta.append(sliced_meta)
         all_states.append(sliced_states)
+        all_sample_meta.append(
+            pd.DataFrame(
+                {
+                    "symbol": symbol,
+                    "timestamp": sliced_timestamps,
+                    "regime_family": sliced_regimes,
+                }
+            )
+        )
 
-    if not all_features: return None, None, None, None, None
-    return pd.concat(all_features), np.concatenate(all_y), np.concatenate(all_y_meta), np.concatenate(all_states), FEATURE_COLS
+    if not all_features:
+        return None, None, None, None, None, None
+    return (
+        pd.concat(all_features),
+        np.concatenate(all_y),
+        np.concatenate(all_y_meta),
+        np.concatenate(all_states),
+        pd.concat(all_sample_meta).reset_index(drop=True),
+        feature_cols,
+    )
 
 # Binance symbol mapping
 BINANCE_SYMBOL_MAP = {
@@ -1101,19 +1155,19 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
                 if sig.symbol in portfolio.positions:
                     del portfolio.positions[sig.symbol]
                 trade_log.append(("close", sig.symbol, delta, exec_price, pnl))
-                trade_context_log.append(
-                    {
-                        "event": "close",
-                        "symbol": sig.symbol,
-                        "tag": getattr(sig, "tag", ""),
-                        "delta": float(delta),
-                        "exec_price": float(exec_price),
-                        "pnl": float(pnl),
-                        "timestamp": int(ts),
-                        "regime": current_regime,
-                        "regime_family": current_regime_family,
-                    }
-                )
+                close_ctx = {
+                    "event": "close",
+                    "symbol": sig.symbol,
+                    "tag": getattr(sig, "tag", ""),
+                    "delta": float(delta),
+                    "exec_price": float(exec_price),
+                    "pnl": float(pnl),
+                    "timestamp": int(ts),
+                    "regime": current_regime,
+                    "regime_family": current_regime_family,
+                }
+                close_ctx.update(getattr(sig, "metadata", {}) or {})
+                trade_context_log.append(close_ctx)
             else:
                 if current_pos == 0:
                     # Opening new position
@@ -1121,19 +1175,19 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
                     portfolio.positions[sig.symbol] = sig.target_position
                     portfolio.entry_prices[sig.symbol] = exec_price
                     trade_log.append(("open", sig.symbol, delta, exec_price, 0))
-                    trade_context_log.append(
-                        {
-                            "event": "open",
-                            "symbol": sig.symbol,
-                            "tag": getattr(sig, "tag", ""),
-                            "delta": float(delta),
-                            "exec_price": float(exec_price),
-                            "pnl": 0.0,
-                            "timestamp": int(ts),
-                            "regime": current_regime,
-                            "regime_family": current_regime_family,
-                        }
-                    )
+                    open_ctx = {
+                        "event": "open",
+                        "symbol": sig.symbol,
+                        "tag": getattr(sig, "tag", ""),
+                        "delta": float(delta),
+                        "exec_price": float(exec_price),
+                        "pnl": 0.0,
+                        "timestamp": int(ts),
+                        "regime": current_regime,
+                        "regime_family": current_regime_family,
+                    }
+                    open_ctx.update(getattr(sig, "metadata", {}) or {})
+                    trade_context_log.append(open_ctx)
                 else:
                     # Modifying position
                     old_notional = abs(current_pos)
@@ -1155,19 +1209,19 @@ def run_backtest(strategy, data: dict, bar_interval_sec: int = 3600) -> Backtest
                             portfolio.entry_prices[sig.symbol] = new_entry
                     portfolio.positions[sig.symbol] = sig.target_position
                     trade_log.append(("modify", sig.symbol, delta, exec_price, 0))
-                    trade_context_log.append(
-                        {
-                            "event": "modify",
-                            "symbol": sig.symbol,
-                            "tag": getattr(sig, "tag", ""),
-                            "delta": float(delta),
-                            "exec_price": float(exec_price),
-                            "pnl": 0.0,
-                            "timestamp": int(ts),
-                            "regime": current_regime,
-                            "regime_family": current_regime_family,
-                        }
-                    )
+                    modify_ctx = {
+                        "event": "modify",
+                        "symbol": sig.symbol,
+                        "tag": getattr(sig, "tag", ""),
+                        "delta": float(delta),
+                        "exec_price": float(exec_price),
+                        "pnl": 0.0,
+                        "timestamp": int(ts),
+                        "regime": current_regime,
+                        "regime_family": current_regime_family,
+                    }
+                    modify_ctx.update(getattr(sig, "metadata", {}) or {})
+                    trade_context_log.append(modify_ctx)
 
         # Recalculate equity after trades
         unrealized_pnl = 0.0

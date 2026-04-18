@@ -4,10 +4,14 @@ import argparse
 import joblib
 import os
 import time
+import json
+from pathlib import Path
 import xgboost as xgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.utils.class_weight import compute_sample_weight
+from sklearn.linear_model import LogisticRegression
+from sklearn.isotonic import IsotonicRegression
 from joblib import Parallel, delayed
 from hmmlearn import hmm
 
@@ -33,11 +37,43 @@ def build_model(n_trees, depth, learning_rate):
     )
 
 
-def validate_directional_models(long_model, short_model, long_meta_model, short_meta_model, X_val, y_val):
-    long_probs = long_model.predict_proba(X_val[FEATURE_COLS])[:, 1]
-    short_probs = short_model.predict_proba(X_val[FEATURE_COLS])[:, 1]
-    long_meta_probs = long_meta_model.predict_proba(X_val[FEATURE_COLS])[:, 1]
-    short_meta_probs = short_meta_model.predict_proba(X_val[FEATURE_COLS])[:, 1]
+def _output_dir(model_set: str | None) -> Path:
+    base = Path("models")
+    if model_set:
+        base = base / model_set
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def _save_model(model, out_dir: Path, filename: str) -> None:
+    model.save_model(str(out_dir / filename))
+
+
+def _write_metadata(out_dir: Path, metadata: dict) -> None:
+    (out_dir / "metadata.json").write_text(json.dumps(metadata, indent=2, sort_keys=True))
+
+
+def _fit_short_calibrator(mode: str, raw_probs: np.ndarray, labels: np.ndarray):
+    raw_probs = np.asarray(raw_probs, dtype=float)
+    labels = np.asarray(labels, dtype=int)
+    if mode == "raw":
+        return None
+    if mode == "platt":
+        calibrator = LogisticRegression(random_state=42, max_iter=1000)
+        calibrator.fit(raw_probs.reshape(-1, 1), labels)
+        return calibrator
+    if mode == "isotonic":
+        calibrator = IsotonicRegression(out_of_bounds="clip")
+        calibrator.fit(raw_probs, labels)
+        return calibrator
+    return None
+
+
+def validate_directional_models(long_model, short_model, long_meta_model, short_meta_model, X_val, y_val, feature_cols):
+    long_probs = long_model.predict_proba(X_val[feature_cols])[:, 1]
+    short_probs = short_model.predict_proba(X_val[feature_cols])[:, 1]
+    long_meta_probs = long_meta_model.predict_proba(X_val[feature_cols])[:, 1]
+    short_meta_probs = short_meta_model.predict_proba(X_val[feature_cols])[:, 1]
 
     lead_pred = np.where(
         (long_probs > short_probs) & (long_probs > 0.5),
@@ -137,21 +173,33 @@ def train_macro_hmm():
     print(f"Successfully saved HMM and Scaler ({X_scaled.shape}) to models/ using data before {VAL_START}")
 
 
-def train(timeframe, specialists=True):
+def train(timeframe, specialists=True, feature_profile="price_only", model_set=None, short_calibration_mode="raw", train_bear_short_meta=False):
     print(f"Training Cross-Sectional Sniper (Classifier) for {timeframe} bars...")
-    X, y, y_meta, states, features = prepare_dataset(timeframe, "train")
+    X, y, y_meta, states, sample_meta, features = prepare_dataset(timeframe, "train", feature_profile=feature_profile)
     
     if X is None or len(X) < 1000:
         print("Insufficient data for training.")
         return
         
-    X_train, X_val, y_train, y_val, y_meta_train, y_meta_val, s_train, s_val = train_test_split(
-        X, y, y_meta, states, test_size=0.2, shuffle=False
+    X_train, X_val, y_train, y_val, y_meta_train, y_meta_val, s_train, s_val, meta_train, meta_val = train_test_split(
+        X, y, y_meta, states, sample_meta, test_size=0.2, shuffle=False
     )
 
     n_trees = args.n_trees if args.n_trees else 250
     depth = args.depth if args.depth else {"1h": 14, "4h": 16, "15m": 12}.get(timeframe, 14)
-    os.makedirs("models", exist_ok=True)
+    out_dir = _output_dir(model_set)
+
+    metadata = {
+        "model_set": model_set or "root",
+        "timeframe": timeframe,
+        "feature_profile": feature_profile,
+        "feature_columns": list(features),
+        "short_confidence": {
+            "mode": short_calibration_mode if timeframe == "15m" else "raw",
+            "calibrator_artifact": None,
+            "bear_short_artifact": None,
+        },
+    }
 
     if specialists:
         print("Training Regime-Specific Specialists (Medallion Strategy)...")
@@ -168,7 +216,7 @@ def train(timeframe, specialists=True):
             y_s = y_train[mask_train]
             ym_s = y_meta_train[mask_train]
             
-            X_v = X_val[mask_val][FEATURE_COLS]
+            X_v = X_val[mask_val][features]
             y_v = y_val[mask_val]
             ym_v = y_meta_val[mask_val]
             
@@ -181,7 +229,7 @@ def train(timeframe, specialists=True):
             else:
                 model.set_params(early_stopping_rounds=None)
                 model.fit(X_s, y_s, sample_weight=w_s)
-            model.save_model(f"models/lead_{timeframe}_s{state}.json")
+            _save_model(model, out_dir, f"lead_{timeframe}_s{state}.json")
             
             # 2. Meta Model
             meta_target = (ym_s == 1).astype(int)
@@ -194,7 +242,7 @@ def train(timeframe, specialists=True):
             else:
                 meta_model.set_params(early_stopping_rounds=None)
                 meta_model.fit(X_s, meta_target, sample_weight=w_meta)
-            meta_model.save_model(f"models/meta_{timeframe}_s{state}.json")
+            _save_model(meta_model, out_dir, f"meta_{timeframe}_s{state}.json")
     
     # Also train a "Global" fallback model
 
@@ -207,59 +255,88 @@ def train(timeframe, specialists=True):
 
         print("Training Stage 1A: Long Lead (15m)...")
         long_model = build_model(n_trees, depth, 0.05)
-        long_model.fit(X_train, long_target, eval_set=[(X_val[FEATURE_COLS], (y_val == 1).astype(int))], verbose=False)
+        long_model.fit(X_train, long_target, eval_set=[(X_val[features], (y_val == 1).astype(int))], verbose=False)
 
         print("Training Stage 1B: Short Lead (15m)...")
         short_model = build_model(n_trees, depth, 0.05)
-        short_model.fit(X_train, short_target, eval_set=[(X_val[FEATURE_COLS], (y_val == 2).astype(int))], verbose=False)
+        short_model.fit(X_train, short_target, eval_set=[(X_val[features], (y_val == 2).astype(int))], verbose=False)
 
         print("Training Stage 2A: Long Meta (15m)...")
         long_meta_model = build_model(n_trees, depth - 2, 0.03)
-        long_meta_model.fit(X_train, long_meta_target, eval_set=[(X_val[FEATURE_COLS], ((y_val == 1) & (y_meta_val == 1)).astype(int))], verbose=False)
+        long_meta_model.fit(X_train, long_meta_target, eval_set=[(X_val[features], ((y_val == 1) & (y_meta_val == 1)).astype(int))], verbose=False)
 
         print("Training Stage 2B: Short Meta (15m)...")
         short_meta_model = build_model(n_trees, depth - 2, 0.03)
-        short_meta_model.fit(X_train, short_meta_target, eval_set=[(X_val[FEATURE_COLS], ((y_val == 2) & (y_meta_val == 1)).astype(int))], verbose=False)
+        short_meta_model.fit(X_train, short_meta_target, eval_set=[(X_val[features], ((y_val == 2) & (y_meta_val == 1)).astype(int))], verbose=False)
 
-        long_model.save_model("models/lead_long_15m.xgb")
-        short_model.save_model("models/lead_short_15m.xgb")
-        long_meta_model.save_model("models/meta_long_15m.xgb")
-        short_meta_model.save_model("models/meta_short_15m.xgb")
+        _save_model(long_model, out_dir, "lead_long_15m.xgb")
+        _save_model(short_model, out_dir, "lead_short_15m.xgb")
+        _save_model(long_meta_model, out_dir, "meta_long_15m.xgb")
+        _save_model(short_meta_model, out_dir, "meta_short_15m.xgb")
+
+        if train_bear_short_meta:
+            bear_mask_train = meta_train["regime_family"].eq("bear").values
+            bear_mask_val = meta_val["regime_family"].eq("bear").values
+            if bear_mask_train.sum() >= 200 and bear_mask_val.sum() >= 50:
+                print("Training Stage 2C: Bear-Specific Short Meta (15m)...")
+                bear_short_meta_model = build_model(n_trees, depth - 2, 0.03)
+                bear_short_meta_model.fit(
+                    X_train.loc[bear_mask_train, features],
+                    short_meta_target[bear_mask_train],
+                    eval_set=[(X_val.loc[bear_mask_val, features], ((y_val == 2) & (y_meta_val == 1)).astype(int)[bear_mask_val])],
+                    verbose=False,
+                )
+                _save_model(bear_short_meta_model, out_dir, "meta_short_bear_15m.xgb")
+                metadata["short_confidence"]["bear_short_artifact"] = "meta_short_bear_15m.xgb"
+            else:
+                print("Skipping bear-specific short meta: insufficient bear-family samples.")
 
         # Keep the aggregate 15m artifacts around for fallback compatibility.
-        long_model.save_model("models/lead_15m.xgb")
-        long_meta_model.save_model("models/meta_15m.xgb")
+        _save_model(long_model, out_dir, "lead_15m.xgb")
+        _save_model(long_meta_model, out_dir, "meta_15m.xgb")
+
+        if short_calibration_mode in {"platt", "isotonic"}:
+            val_short_target = ((y_val == 2) & (y_meta_val == 1)).astype(int)
+            raw_short_probs = short_meta_model.predict_proba(X_val[features])[:, 1]
+            calibrator = _fit_short_calibrator(short_calibration_mode, raw_short_probs, val_short_target)
+            if calibrator is not None:
+                artifact_name = f"short_conf_15m_{short_calibration_mode}.joblib"
+                joblib.dump(calibrator, out_dir / artifact_name)
+                metadata["short_confidence"]["calibrator_artifact"] = artifact_name
+        elif short_calibration_mode == "rank":
+            metadata["short_confidence"]["calibrator_artifact"] = None
 
         base_wr, sniper_wr = validate_directional_models(
-            long_model, short_model, long_meta_model, short_meta_model, X_val, y_val
+            long_model, short_model, long_meta_model, short_meta_model, X_val, y_val, features
         )
 
-        os.makedirs(os.path.expanduser("~/.cache/autotrader"), exist_ok=True)
-        long_model.save_model(os.path.expanduser("~/.cache/autotrader/model_long_15m.xgb"))
-        short_model.save_model(os.path.expanduser("~/.cache/autotrader/model_short_15m.xgb"))
-        long_meta_model.save_model(os.path.expanduser("~/.cache/autotrader/meta_model_long_15m.xgb"))
-        short_meta_model.save_model(os.path.expanduser("~/.cache/autotrader/meta_model_short_15m.xgb"))
-        long_model.save_model(os.path.expanduser("~/.cache/autotrader/model_15m.xgb"))
-        long_meta_model.save_model(os.path.expanduser("~/.cache/autotrader/meta_model_15m.xgb"))
+        if not model_set:
+            os.makedirs(os.path.expanduser("~/.cache/autotrader"), exist_ok=True)
+            long_model.save_model(os.path.expanduser("~/.cache/autotrader/model_long_15m.xgb"))
+            short_model.save_model(os.path.expanduser("~/.cache/autotrader/model_short_15m.xgb"))
+            long_meta_model.save_model(os.path.expanduser("~/.cache/autotrader/meta_model_long_15m.xgb"))
+            short_meta_model.save_model(os.path.expanduser("~/.cache/autotrader/meta_model_short_15m.xgb"))
+            long_model.save_model(os.path.expanduser("~/.cache/autotrader/model_15m.xgb"))
+            long_meta_model.save_model(os.path.expanduser("~/.cache/autotrader/meta_model_15m.xgb"))
     else:
         print(f"Training Primary XGBClassifier (n={n_trees}, d={depth})...")
         print(f"Training Stage 1: Directional Lead ({timeframe})...")
         model = build_model(n_trees, depth, 0.05)
         # Global fallback uses full validation set for early stopping
-        model.fit(X_train, y_train, eval_set=[(X_val[FEATURE_COLS], y_val)], verbose=False)
+        model.fit(X_train, y_train, eval_set=[(X_val[features], y_val)], verbose=False)
 
         print(f"Training Stage 2: Meta-Labeling ({timeframe})...")
         meta_target = (y_meta_train == 1).astype(int)
         meta_val_target = (y_meta_val == 1).astype(int)
         meta_model = build_model(n_trees, depth - 2, 0.03)
-        meta_model.fit(X_train, meta_target, eval_set=[(X_val[FEATURE_COLS], meta_val_target)], verbose=False)
+        meta_model.fit(X_train, meta_target, eval_set=[(X_val[features], meta_val_target)], verbose=False)
 
-        model.save_model(f"models/lead_{timeframe}.json")
-        meta_model.save_model(f"models/meta_{timeframe}.json")
+        _save_model(model, out_dir, f"lead_{timeframe}.json")
+        _save_model(meta_model, out_dir, f"meta_{timeframe}.json")
 
         # Validation / Meta-Diagnostics
-        val_preds = model.predict(X_val[FEATURE_COLS])
-        val_meta_probs = meta_model.predict_proba(X_val[FEATURE_COLS])[:, 1]
+        val_preds = model.predict(X_val[features])
+        val_meta_probs = meta_model.predict_proba(X_val[features])[:, 1]
 
         is_trend_pred = (val_preds != 0)
         base_wr = accuracy_score(y_val[is_trend_pred], val_preds[is_trend_pred]) if any(is_trend_pred) else 0.0
@@ -267,8 +344,9 @@ def train(timeframe, specialists=True):
         sniper_mask = is_trend_pred & (val_meta_probs > 0.65)
         sniper_wr = accuracy_score(y_val[sniper_mask], val_preds[sniper_mask]) if any(sniper_mask) else 0.0
 
-        model.save_model(os.path.expanduser(f"~/.cache/autotrader/model_{timeframe}.json"))
-        meta_model.save_model(os.path.expanduser(f"~/.cache/autotrader/meta_model_{timeframe}.json"))
+        if not model_set:
+            model.save_model(os.path.expanduser(f"~/.cache/autotrader/model_{timeframe}.json"))
+            meta_model.save_model(os.path.expanduser(f"~/.cache/autotrader/meta_model_{timeframe}.json"))
     
     print("\n" + "="*60)
     print(f"  VALIDATION RESULTS: {timeframe.upper()} SNIPER")
@@ -278,6 +356,7 @@ def train(timeframe, specialists=True):
     
     if sniper_wr > 0.60:
         print("<< SNIPER TARGET REACHED >>")
+    _write_metadata(out_dir, metadata)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train dual XGB sniper")
@@ -285,9 +364,20 @@ if __name__ == "__main__":
     parser.add_argument("--n_trees", type=int, default=100)
     parser.add_argument("--depth", type=int, default=12)
     parser.add_argument("--train_hmm", action="store_true", help="Also retrain the macro HMM")
+    parser.add_argument("--feature-profile", type=str, default="price_only", choices=["price_only", "price_context"])
+    parser.add_argument("--model-set", type=str, default=None, help="Optional models/<name>/ output directory")
+    parser.add_argument("--short-calibration-mode", type=str, default="raw", choices=["raw", "platt", "isotonic", "rank", "bear_model"])
+    parser.add_argument("--train-bear-short-meta", action="store_true",
+                        help="For 15m, train an additional bear-family short meta model artifact")
     args = parser.parse_args()
     
     if args.train_hmm:
         train_macro_hmm()
         
-    train(args.timeframe)
+    train(
+        args.timeframe,
+        feature_profile=args.feature_profile,
+        model_set=args.model_set,
+        short_calibration_mode=args.short_calibration_mode,
+        train_bear_short_meta=args.train_bear_short_meta,
+    )

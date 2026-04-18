@@ -115,6 +115,21 @@ From [train_model.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/tra
 
 Because the root directory may contain both older `.xgb` and newer `.json` files, verify which files are present before assuming which artifact the strategy will actually load.
 
+## New Metadata And Short-Confidence Artifacts
+
+Training now also supports model-set metadata plus short-confidence artifacts:
+
+- `metadata.json`
+  - feature profile (`price_only` or `price_context`)
+  - short-confidence mode (`raw`, `platt`, `isotonic`, `rank`, or `bear_model`)
+  - calibrator artifact name when present
+  - bear-only short artifact name when present
+- `short_conf_15m_platt.joblib`
+- `short_conf_15m_isotonic.joblib`
+- `meta_short_bear_15m.xgb`
+
+The live strategy reads a single normalized short-confidence field from these artifacts when configured, while preserving raw `meta_short_15m` for diagnostics and control comparisons.
+
 ## Practical Notes
 
 - The default 1h strategy currently relies most on root 1h directional probabilities and 1h/4h meta gating.

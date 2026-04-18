@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass
 from typing import List
 
+import joblib
 import numpy as np
 import pandas as pd
 import xgboost as xgb
@@ -19,6 +20,7 @@ class Signal:
     target_position: float
     order_type: str = "market"
     tag: str = ""
+    metadata: dict | None = None
 
 
 class Strategy:
@@ -43,6 +45,7 @@ class Strategy:
         self.short_models = {}
         self.long_meta_models = {}
         self.short_meta_models = {}
+        self.bear_short_meta_models = {}
         self.symbol_caches = {}
         self.bar_counts = {}
         self.models_loaded = False
@@ -51,6 +54,10 @@ class Strategy:
         self._market_ret_buf = []
         self._macro_bear = False
         self.regime_family_by_ts = {}
+        self.model_metadata = {}
+        self.feature_profile = "price_only"
+        self.short_conf_mode = os.environ.get("AUTOTRADER_SHORT_CONF_MODE")
+        self.short_conf_calibrator = None
 
     def _parse_timeframe(self, tf: str) -> int:
         if tf == "15m":
@@ -78,7 +85,83 @@ class Strategy:
                     return path
         return None
 
+    def _load_model_metadata(self) -> dict:
+        metadata_path = self._resolve_model_path("metadata.json")
+        if not metadata_path:
+            return {}
+        try:
+            return pd.read_json(metadata_path, typ="series").to_dict()
+        except Exception:
+            try:
+                import json
+                with open(metadata_path, "r", encoding="utf-8") as fh:
+                    return json.load(fh)
+            except Exception:
+                return {}
+
+    def _resolve_feature_frame(self, model, df_feat: pd.DataFrame) -> pd.DataFrame:
+        booster = model.get_booster()
+        feature_names = booster.feature_names or FEATURE_COLS
+        return df_feat.reindex(columns=feature_names, fill_value=0.0)
+
+    def _load_short_calibrator(self):
+        if self.short_conf_mode not in {"platt", "isotonic"}:
+            return None
+        short_meta = self.model_metadata.get("short_confidence", {}) if isinstance(self.model_metadata, dict) else {}
+        artifact = short_meta.get("calibrator_artifact")
+        if not artifact:
+            artifact = f"short_conf_15m_{self.short_conf_mode}.joblib"
+        path = self._resolve_model_path(artifact)
+        if not path:
+            return None
+        try:
+            return joblib.load(path)
+        except Exception:
+            return None
+
+    def _apply_short_calibration(self, probs: np.ndarray) -> np.ndarray:
+        probs = np.asarray(probs, dtype=float)
+        if self.short_conf_mode == "raw" or self.short_conf_calibrator is None:
+            return probs
+        if self.short_conf_mode == "platt":
+            return self.short_conf_calibrator.predict_proba(probs.reshape(-1, 1))[:, 1]
+        if self.short_conf_mode == "isotonic":
+            return np.asarray(self.short_conf_calibrator.predict(probs), dtype=float)
+        return probs
+
+    def _apply_cross_sectional_short_ranks(self, tables):
+        if not tables:
+            return tables
+        merged = []
+        for symbol, table in tables.items():
+            if "short_conf_raw_15m" not in table.columns:
+                continue
+            subset = table[["timestamp", "short_conf_raw_15m"]].copy()
+            subset["symbol"] = symbol
+            merged.append(subset)
+        if not merged:
+            return tables
+        rank_df = pd.concat(merged, ignore_index=True)
+        rank_df["short_conf_rank_15m"] = rank_df.groupby("timestamp")["short_conf_raw_15m"].rank(pct=True, method="average")
+        rank_map = {
+            (row.symbol, int(row.timestamp)): float(row.short_conf_rank_15m)
+            for row in rank_df.itertuples(index=False)
+        }
+        for symbol, table in tables.items():
+            if "short_conf_raw_15m" not in table.columns:
+                continue
+            table["short_conf_rank_15m"] = [
+                rank_map.get((symbol, int(ts)), 0.0) for ts in table["timestamp"].values
+            ]
+            table["short_conf_15m"] = table["short_conf_rank_15m"]
+        return tables
+
     def _load_models(self):
+        self.model_metadata = self._load_model_metadata()
+        short_conf_meta = self.model_metadata.get("short_confidence", {}) if isinstance(self.model_metadata, dict) else {}
+        if not self.short_conf_mode:
+            self.short_conf_mode = short_conf_meta.get("mode", "raw")
+        self.feature_profile = self.model_metadata.get("feature_profile", "price_only") if isinstance(self.model_metadata, dict) else "price_only"
         loaded_paths = {}
         for tf in ["15m", "1h", "4h"]:
             path_map = {
@@ -88,6 +171,7 @@ class Strategy:
                 "short": self._resolve_model_path(f"lead_short_{tf}.xgb", f"lead_short_{tf}.json"),
                 "long_meta": self._resolve_model_path(f"meta_long_{tf}.xgb", f"meta_long_{tf}.json"),
                 "short_meta": self._resolve_model_path(f"meta_short_{tf}.xgb", f"meta_short_{tf}.json"),
+                "bear_short_meta": self._resolve_model_path(f"meta_short_bear_{tf}.xgb", f"meta_short_bear_{tf}.json"),
             }
 
             if path_map["lead"]:
@@ -120,10 +204,17 @@ class Strategy:
                 self.short_meta_models[tf].load_model(path_map["short_meta"])
                 loaded_paths[f"{tf}:short_meta"] = path_map["short_meta"]
 
+            if path_map["bear_short_meta"]:
+                self.bear_short_meta_models[tf] = xgb.XGBClassifier()
+                self.bear_short_meta_models[tf].load_model(path_map["bear_short_meta"])
+                loaded_paths[f"{tf}:bear_short_meta"] = path_map["bear_short_meta"]
+
+        self.short_conf_calibrator = self._load_short_calibrator()
         self.models_loaded = True
         print(f"LOADED MODEL SET: {DEFAULT_MODEL_SET}")
         for key in sorted(loaded_paths):
             print(f"  {key:<14} {loaded_paths[key]}")
+        print(f"  short_conf_mode {self.short_conf_mode}")
 
     def _build_prediction_tables(self, data_dict, timeframe: str, include_state: bool = False):
         if not data_dict:
@@ -132,7 +223,7 @@ class Strategy:
         all_vols = {}
         all_rets = {}
         for symbol, df in data_dict.items():
-            feat = calculate_features(df, timeframe=timeframe)
+            feat = calculate_features(df, timeframe=timeframe, symbol=symbol, feature_profile="price_context")
             all_vols[symbol] = feat["bb_width"]
             all_rets[symbol] = df["close"].pct_change()
 
@@ -141,31 +232,46 @@ class Strategy:
 
         tables = {}
         for symbol, df in data_dict.items():
-            df_feat = calculate_features(df, timeframe=timeframe)
+            df_feat = calculate_features(df, timeframe=timeframe, symbol=symbol, feature_profile="price_context")
             df_feat["market_vol"] = m_vol
             df_feat["market_ret"] = m_ret
             market_ret_4h = m_ret.rolling(4, min_periods=1).sum().fillna(0.0)
             df_feat["rel_ret_1h"] = df_feat["ret_1h"] - df_feat["market_ret"]
             df_feat["rel_ret_4h"] = df_feat["ret_4h"] - market_ret_4h
             df_feat["rel_bb_width"] = df_feat["bb_width"] - df_feat["market_vol"]
-            X = df_feat[FEATURE_COLS]
 
             use_directional = (
                 timeframe == "15m" and timeframe in self.long_models and timeframe in self.short_models
             )
 
             if use_directional:
-                bull = self.long_models[timeframe].predict_proba(X)[:, 1]
-                bear = self.short_models[timeframe].predict_proba(X)[:, 1]
+                bull = self.long_models[timeframe].predict_proba(
+                    self._resolve_feature_frame(self.long_models[timeframe], df_feat)
+                )[:, 1]
+                bear = self.short_models[timeframe].predict_proba(
+                    self._resolve_feature_frame(self.short_models[timeframe], df_feat)
+                )[:, 1]
                 meta_long = (
-                    self.long_meta_models[timeframe].predict_proba(X)[:, 1]
+                    self.long_meta_models[timeframe].predict_proba(
+                        self._resolve_feature_frame(self.long_meta_models[timeframe], df_feat)
+                    )[:, 1]
                     if timeframe in self.long_meta_models
-                    else np.zeros(len(X))
+                    else np.zeros(len(df_feat))
                 )
-                meta_short = (
-                    self.short_meta_models[timeframe].predict_proba(X)[:, 1]
+                meta_short_raw = (
+                    self.short_meta_models[timeframe].predict_proba(
+                        self._resolve_feature_frame(self.short_meta_models[timeframe], df_feat)
+                    )[:, 1]
                     if timeframe in self.short_meta_models
-                    else np.zeros(len(X))
+                    else np.zeros(len(df_feat))
+                )
+                meta_short = self._apply_short_calibration(meta_short_raw)
+                bear_meta_short = (
+                    self.bear_short_meta_models[timeframe].predict_proba(
+                        self._resolve_feature_frame(self.bear_short_meta_models[timeframe], df_feat)
+                    )[:, 1]
+                    if timeframe in self.bear_short_meta_models
+                    else np.zeros(len(df_feat))
                 )
                 table = pd.DataFrame(
                     {
@@ -174,24 +280,33 @@ class Strategy:
                         f"bear_{timeframe}": bear,
                         f"meta_{timeframe}": np.maximum(meta_long, meta_short),
                         f"meta_long_{timeframe}": meta_long,
-                        f"meta_short_{timeframe}": meta_short,
+                        f"meta_short_{timeframe}": meta_short_raw,
+                        f"short_conf_raw_{timeframe}": meta_short_raw,
+                        f"short_conf_{timeframe}": meta_short,
+                        f"short_conf_bear_{timeframe}": bear_meta_short,
                     }
                 )
             else:
-                probs = self.models[timeframe].predict_proba(X) if timeframe in self.models else None
+                probs = (
+                    self.models[timeframe].predict_proba(self._resolve_feature_frame(self.models[timeframe], df_feat))
+                    if timeframe in self.models
+                    else None
+                )
                 meta = (
-                    self.meta_models[timeframe].predict_proba(X)[:, 1]
+                    self.meta_models[timeframe].predict_proba(
+                        self._resolve_feature_frame(self.meta_models[timeframe], df_feat)
+                    )[:, 1]
                     if timeframe in self.meta_models
-                    else np.zeros(len(X))
+                    else np.zeros(len(df_feat))
                 )
                 table = pd.DataFrame(
                     {
                         "timestamp": df["timestamp"].values,
                         f"bull_{timeframe}": (
-                            probs[:, 1] if probs is not None and probs.shape[1] > 1 else np.zeros(len(X))
+                            probs[:, 1] if probs is not None and probs.shape[1] > 1 else np.zeros(len(df_feat))
                         ),
                         f"bear_{timeframe}": (
-                            probs[:, 2] if probs is not None and probs.shape[1] > 2 else np.zeros(len(X))
+                            probs[:, 2] if probs is not None and probs.shape[1] > 2 else np.zeros(len(df_feat))
                         ),
                         f"meta_{timeframe}": meta,
                     }
@@ -209,8 +324,14 @@ class Strategy:
                 table["ob_dist"] = df_feat["ob_dist"].values
                 table["ema_200_dist"] = df_feat["ema_200_dist"].values
                 table["dist_to_vwap"] = df_feat["dist_to_vwap"].values
+                table["macro_event_flag"] = df_feat["macro_event_flag"].values
+                table["context_sentiment"] = df_feat["context_sentiment"].values
+                table["major_market_event_flag"] = df_feat["major_market_event_flag"].values
 
             tables[symbol] = table.sort_values("timestamp").reset_index(drop=True)
+
+        if timeframe == "15m" and self.short_conf_mode == "rank":
+            tables = self._apply_cross_sectional_short_ranks(tables)
 
         return tables
 
@@ -302,6 +423,9 @@ class Strategy:
                     "ob_dist",
                     "ema_200_dist",
                     "dist_to_vwap",
+                    "macro_event_flag",
+                    "context_sentiment",
+                    "major_market_event_flag",
                 ]
             ].copy()
             base["bull_15m"] = main_df[main_bull_col].fillna(0).values if main_bull_col in main_df else 0.0
@@ -320,6 +444,21 @@ class Strategy:
                 main_df["meta_short_15m"].fillna(0).values
                 if self.timeframe_arg == "15m" and "meta_short_15m" in main_df
                 else base["meta_15m"].copy()
+            )
+            base["short_conf_15m"] = (
+                main_df["short_conf_15m"].fillna(0).values
+                if self.timeframe_arg == "15m" and "short_conf_15m" in main_df
+                else base["meta_short_15m"].copy()
+            )
+            base["short_conf_raw_15m"] = (
+                main_df["short_conf_raw_15m"].fillna(0).values
+                if self.timeframe_arg == "15m" and "short_conf_raw_15m" in main_df
+                else base["meta_short_15m"].copy()
+            )
+            base["short_conf_bear_15m"] = (
+                main_df["short_conf_bear_15m"].fillna(0).values
+                if self.timeframe_arg == "15m" and "short_conf_bear_15m" in main_df
+                else 0.0
             )
             base["meta_1h"] = (
                 main_df[main_meta_col].fillna(0).values
@@ -356,6 +495,12 @@ class Strategy:
                     base["meta_long_15m"] = merged_15m["meta_long_15m"].fillna(base["meta_long_15m"])
                 if "meta_short_15m" in merged_15m:
                     base["meta_short_15m"] = merged_15m["meta_short_15m"].fillna(base["meta_short_15m"])
+                if "short_conf_15m" in merged_15m:
+                    base["short_conf_15m"] = merged_15m["short_conf_15m"].fillna(base["short_conf_15m"])
+                if "short_conf_raw_15m" in merged_15m:
+                    base["short_conf_raw_15m"] = merged_15m["short_conf_raw_15m"].fillna(base["short_conf_raw_15m"])
+                if "short_conf_bear_15m" in merged_15m:
+                    base["short_conf_bear_15m"] = merged_15m["short_conf_bear_15m"].fillna(base["short_conf_bear_15m"])
 
             if symbol in aux_1h_tables:
                 aux_1h_cols = ["timestamp", "meta_1h"]
@@ -421,9 +566,15 @@ class Strategy:
             rsi_8 = row.get("rsi_8", 50.0)
             market_regime_family = self.regime_family_by_ts.get(int(row["timestamp"]), "unknown")
             m15_long = row.get("meta_long_15m", m15)
-            m15_short = row.get("meta_short_15m", m15)
+            m15_short_raw = row.get("meta_short_15m", m15)
+            m15_short = row.get("short_conf_15m", m15_short_raw)
+            if self.short_conf_mode == "bear_model" and market_regime_family == "bear":
+                m15_short = row.get("short_conf_bear_15m", m15_short)
             m1h = row["meta_1h"]
             m4h = row["meta_4h"]
+            macro_event_flag = row.get("macro_event_flag", 0.0)
+            context_sentiment = row.get("context_sentiment", 0.0)
+            major_market_event_flag = row.get("major_market_event_flag", 0.0)
 
             active_meta = [m for m in (max(m15_long, m15_short), m1h, m4h) if m > 0]
             meta_score = float(np.mean(active_meta)) if active_meta else 0.0
@@ -487,6 +638,23 @@ class Strategy:
             strong_sideways_structure = sideways_structure_score >= 2
             sideways_bull_fortress_scale = 1.10 if (market_regime_family == "sideways" and bull_fortress and strong_sideways_structure) else 1.0
 
+            def signal_metadata(tag: str, size_reason: str = "", exit_reason: str = "") -> dict:
+                return {
+                    "signal_tag": tag,
+                    "signal_regime_family": market_regime_family,
+                    "meta_score": float(meta_score),
+                    "m15_long": float(m15_long),
+                    "m15_short_raw": float(m15_short_raw),
+                    "short_conf_15m": float(m15_short),
+                    "short_conf_mode": self.short_conf_mode,
+                    "structure_score": int(sideways_structure_score),
+                    "macro_event_flag": float(macro_event_flag),
+                    "context_sentiment": float(context_sentiment),
+                    "major_market_event_flag": float(major_market_event_flag),
+                    "size_reason": size_reason,
+                    "exit_reason": exit_reason,
+                }
+
             if supportive_regime:
                 meta_factor = max(0.0, min(1.0, (meta_score - 0.25) / 0.60))
                 risk_pct = 0.03 + 0.23 * meta_factor
@@ -545,14 +713,14 @@ class Strategy:
                             exit_tag = "close_long_stop"
                         else:
                             exit_tag = "close_long_decay"
-                        signals.append(Signal(symbol, 0.0, tag=exit_tag))
+                        signals.append(Signal(symbol, 0.0, tag=exit_tag, metadata=signal_metadata(exit_tag, exit_reason=exit_tag)))
                         self.position_ages[symbol] = 0
                     else:
                         desired = pos
                         if bull_signal and m15_long > 0.60 and abs(pos) + 1.0 < long_size:
                             desired = long_size
                         if abs(desired - pos) > 1.0:
-                            signals.append(Signal(symbol, desired, tag="add_long"))
+                            signals.append(Signal(symbol, desired, tag="add_long", metadata=signal_metadata("add_long", size_reason="trend_strength_add")))
                         self.trailing_stops[symbol] = max(self.trailing_stops.get(symbol, 0), bar.high - stop_dist)
                 else:
                     short_decay_age = max(2, self._decay_age - 1)
@@ -578,14 +746,14 @@ class Strategy:
                             exit_tag = "close_short_stop"
                         else:
                             exit_tag = "close_short_decay"
-                        signals.append(Signal(symbol, 0.0, tag=exit_tag))
+                        signals.append(Signal(symbol, 0.0, tag=exit_tag, metadata=signal_metadata(exit_tag, exit_reason=exit_tag)))
                         self.position_ages[symbol] = 0
                     else:
                         desired = pos
                         if bear_signal and m15_short > 0.65 and abs(pos) + 1.0 < short_size:
                             desired = -short_size
                         if abs(desired - pos) > 1.0:
-                            signals.append(Signal(symbol, desired, tag="add_short"))
+                            signals.append(Signal(symbol, desired, tag="add_short", metadata=signal_metadata("add_short", size_reason="short_conviction_add")))
                         self.trailing_stops[symbol] = min(self.trailing_stops.get(symbol, 9e18), bar.low + stop_dist)
                 continue
 
@@ -607,27 +775,27 @@ class Strategy:
                 entry_size = long_size * self._entry_scale * vol_scale * rsi_scale * mret_scale * fund_scale * self._leverage_mult
                 if market_regime_family == "sideways":
                     entry_size *= sideways_bull_fortress_scale
-                signals.append(Signal(symbol, entry_size, tag="entry_bull_fortress"))
+                signals.append(Signal(symbol, entry_size, tag="entry_bull_fortress", metadata=signal_metadata("entry_bull_fortress", size_reason="bull_fortress_core")))
                 self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
             elif bull_soft and not prefer_short and (not bear_soft or m15_long >= m15_short) and long_gate_ok:
                 entry_size = long_size * 0.5 * self._entry_scale * self._leverage_mult
-                signals.append(Signal(symbol, entry_size, tag="entry_bull_soft"))
+                signals.append(Signal(symbol, entry_size, tag="entry_bull_soft", metadata=signal_metadata("entry_bull_soft", size_reason="bull_soft_half")))
                 self.trailing_stops[symbol] = bar.low - stop_dist
                 self.position_ages[symbol] = 0
             elif bear_fortress and (prefer_short or not bull_fortress) and short_gate_ok:
                 entry_size = short_size * self._entry_scale * self._leverage_mult
-                signals.append(Signal(symbol, -entry_size, tag="entry_bear_fortress"))
+                signals.append(Signal(symbol, -entry_size, tag="entry_bear_fortress", metadata=signal_metadata("entry_bear_fortress", size_reason="bear_fortress_core")))
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
             elif bear_calibrated and short_gate_ok:
                 entry_size = short_size * 0.65 * self._entry_scale * self._leverage_mult
-                signals.append(Signal(symbol, -entry_size, tag="entry_bear_calibrated"))
+                signals.append(Signal(symbol, -entry_size, tag="entry_bear_calibrated", metadata=signal_metadata("entry_bear_calibrated", size_reason="calibrated_bear_short")))
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
             elif bear_soft and (prefer_short or not bull_soft) and short_gate_ok:
                 entry_size = short_size * 0.5 * self._entry_scale * self._leverage_mult
-                signals.append(Signal(symbol, -entry_size, tag="entry_bear_soft"))
+                signals.append(Signal(symbol, -entry_size, tag="entry_bear_soft", metadata=signal_metadata("entry_bear_soft", size_reason="bear_soft_half")))
                 self.trailing_stops[symbol] = bar.high + stop_dist
                 self.position_ages[symbol] = 0
 

@@ -64,6 +64,12 @@ uv run train_model.py --timeframe 1h
 uv run train_model.py --timeframe 4h
 uv run train_model.py --timeframe 15m
 
+# Train a tagged experimental model set with short-confidence plumbing
+uv run train_model.py --timeframe 15m --model-set exp_short_platt --short-calibration-mode platt --train-bear-short-meta
+
+# Run the shadow paper-trading engine with persisted state
+uv run shadow_trade.py --timeframe 1h --split 2026q1 --state-path shadow_state.json --log-path shadow_trade_log.jsonl --max-days 5
+
 # Retrain the macro HMM as well
 uv run train_model.py --timeframe 1h --train_hmm
 
@@ -158,6 +164,10 @@ These are audit thresholds, not guarantees that a branch is good enough to ship.
 - beta to `SP500` using the parquet benchmark when present, with daily FRED fallback
 - annualized alpha vs `SP500`
 - excess return vs `SP500`
+- lane attribution by entry tag
+- confidence / structure / hold-time bucket diagnostics
+- short-confidence base-rate vs realized bear-trade distribution
+- event-conditioned attribution using deterministic context features
 
 ## Workflow
 
@@ -168,10 +178,12 @@ For day-to-day research:
 3. Refresh data if needed with `prepare.py`
 4. Retrain models if the experiment needs new artifacts
 5. Change `strategy.py`
-6. Run `uv run backtest.py --timeframe 1h` or use `uv run research_loop.py --timeframe 1h --description "<idea>"`
+6. Run `uv run backtest.py --timeframe 1h --no-log`
 7. Run `uv run evaluate.py --timeframe 1h --label <label>`
    - optional clean post-research check: `uv run evaluate.py --timeframe 1h --split 2026q1 --label <label>`
 8. Compare against `run_benchmarks.py`
+
+`research_loop.py` is retained as historical automation infrastructure, but the active workflow is manual experimentation plus explicit `results.tsv` logging.
 
 `backtest.py` also appends a summary row to `results.tsv`.
 

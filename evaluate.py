@@ -70,7 +70,7 @@ def _load_and_run(timeframe, split, data=None):
     if hasattr(strat, "pre_calculate_signals"):
         strat.pre_calculate_signals(data, split_name=split)
     res = run_backtest(strat, data, bar_interval_sec=TIMEFRAME_SECS[timeframe])
-    return res, data
+    return res, data, strat
 
 
 def _pass_fail(label, value, target, lower_is_better=False):
@@ -241,7 +241,7 @@ def run_primary_eval(timeframe, label, split):
     }.get(split_base, "PRIMARY EVAL")
     print(f"  {header}  [{label}]  ({start} → {end})")
     print(f"{'='*60}")
-    res, data = _load_and_run(timeframe, split)
+    res, data, strat = _load_and_run(timeframe, split)
     dur = res.duration_days if res.duration_days > 0 else 1
     trades_per_day = res.num_trades / dur
     score = compute_score(res)
@@ -260,7 +260,7 @@ def run_primary_eval(timeframe, label, split):
     _pass_fail("Max DD %",      res.max_drawdown_pct,BENCHMARKS["max_drawdown_pct"], lower_is_better=True)
     metrics = _compute_institutional_metrics(res, data)
     _print_institutional_metrics(metrics)
-    return res, data, score, metrics
+    return res, data, strat, score, metrics
 
 
 # ─────────────────────────────────────────────────────────────
@@ -442,6 +442,216 @@ def run_regime_trade_attribution(result, label):
             print(f"  {family:<12} {side:<8} {int(count):>8d}")
 
 
+def _cache_frame(strat):
+    if strat is None or not getattr(strat, "symbol_caches", None):
+        return pd.DataFrame()
+    frames = []
+    for symbol, rows in strat.symbol_caches.items():
+        if not rows:
+            continue
+        df = pd.DataFrame(rows)
+        df["symbol"] = symbol
+        frames.append(df)
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def _completed_trade_frame(result, timeframe):
+    rows = result.trade_context_log or []
+    if not rows:
+        return pd.DataFrame()
+    active = {}
+    completed = []
+    for row in rows:
+        event = row.get("event")
+        symbol = row.get("symbol")
+        if event == "open":
+            active[symbol] = dict(row)
+        elif event == "close" and symbol in active:
+            entry = active.pop(symbol)
+            exit_row = dict(row)
+            hold_bars = max(
+                1,
+                int(round((exit_row.get("timestamp", 0) - entry.get("timestamp", 0)) / TIMEFRAME_SECS[timeframe])),
+            )
+            completed.append(
+                {
+                    "symbol": symbol,
+                    "side": "long" if entry.get("delta", 0.0) > 0 else "short",
+                    "entry_tag": entry.get("tag", ""),
+                    "exit_tag": exit_row.get("tag", ""),
+                    "pnl": float(exit_row.get("pnl", 0.0)),
+                    "entry_timestamp": int(entry.get("timestamp", 0)),
+                    "exit_timestamp": int(exit_row.get("timestamp", 0)),
+                    "hold_bars": hold_bars,
+                    "entry_regime_family": entry.get("signal_regime_family", entry.get("regime_family", "unknown")),
+                    "entry_meta_score": float(entry.get("meta_score", 0.0)),
+                    "entry_m15_long": float(entry.get("m15_long", 0.0)),
+                    "entry_m15_short_raw": float(entry.get("m15_short_raw", 0.0)),
+                    "entry_short_conf_15m": float(entry.get("short_conf_15m", 0.0)),
+                    "entry_structure_score": float(entry.get("structure_score", 0.0)),
+                    "entry_macro_event_flag": float(entry.get("macro_event_flag", 0.0)),
+                    "entry_context_sentiment": float(entry.get("context_sentiment", 0.0)),
+                    "entry_major_market_event_flag": float(entry.get("major_market_event_flag", 0.0)),
+                    "entry_size_reason": entry.get("size_reason", ""),
+                }
+            )
+    return pd.DataFrame(completed)
+
+
+def _bucketize(values: pd.Series, bins, labels):
+    if values.empty:
+        return pd.Series(dtype="object")
+    return pd.cut(values.astype(float), bins=bins, labels=labels, include_lowest=True)
+
+
+def _print_bucket_table(df, bucket_col, title):
+    if df.empty or bucket_col not in df:
+        return
+    grouped = (
+        df.groupby(bucket_col, observed=False)
+        .agg(
+            closes=("pnl", "count"),
+            win_rate_pct=("pnl", lambda s: 100.0 * float((s > 0).mean())),
+            net_pnl=("pnl", "sum"),
+            avg_pnl=("pnl", "mean"),
+        )
+        .reset_index()
+    )
+    if grouped.empty:
+        return
+    print(f"\n  {title}")
+    print(f"  {'Bucket':<18} {'Closes':>8} {'Win%':>8} {'Net PnL':>12} {'Avg PnL':>10}")
+    print(f"  {'-'*62}")
+    for row in grouped.itertuples(index=False):
+        print(
+            f"  {str(getattr(row, bucket_col)):<18} {int(row.closes):>8d} "
+            f"{row.win_rate_pct:>7.1f}% {row.net_pnl:>12.2f} {row.avg_pnl:>10.2f}"
+        )
+
+
+def run_lane_diagnostics(result, strat, timeframe, label):
+    print(f"\n{'='*60}")
+    print(f"  LANE DIAGNOSTICS  [{label}]")
+    print(f"{'='*60}")
+
+    opens = pd.DataFrame([row for row in result.trade_context_log if row.get("event") == "open"])
+    completed = _completed_trade_frame(result, timeframe)
+    cache_df = _cache_frame(strat)
+
+    if not opens.empty:
+        opens["side"] = np.where(opens["delta"] > 0, "long", "short")
+        opens["abs_notional"] = opens["delta"].abs()
+        print("  Trade Origins")
+        print(f"  {'Lane':<24} {'Side':<8} {'Opens':>8} {'Avg Notional':>14}")
+        print(f"  {'-'*58}")
+        grouped = (
+            opens.groupby(["tag", "side"])
+            .agg(opens=("event", "count"), avg_notional=("abs_notional", "mean"))
+            .reset_index()
+        )
+        for row in grouped.sort_values("opens", ascending=False).itertuples(index=False):
+            print(f"  {row.tag:<24} {row.side:<8} {int(row.opens):>8d} {row.avg_notional:>14.2f}")
+
+    if completed.empty:
+        print("  No completed trades available for lane diagnostics.")
+        return
+
+    print("\n  Lane PnL")
+    print(f"  {'Lane':<24} {'Closes':>8} {'Win%':>8} {'Net PnL':>12} {'Avg PnL':>10}")
+    print(f"  {'-'*66}")
+    lane_grouped = (
+        completed.groupby("entry_tag")
+        .agg(
+            closes=("pnl", "count"),
+            win_rate_pct=("pnl", lambda s: 100.0 * float((s > 0).mean())),
+            net_pnl=("pnl", "sum"),
+            avg_pnl=("pnl", "mean"),
+        )
+        .reset_index()
+    )
+    for row in lane_grouped.sort_values("net_pnl", ascending=False).itertuples(index=False):
+        print(
+            f"  {row.entry_tag:<24} {int(row.closes):>8d} "
+            f"{row.win_rate_pct:>7.1f}% {row.net_pnl:>12.2f} {row.avg_pnl:>10.2f}"
+        )
+
+    bull_trades = completed[completed["entry_tag"] == "entry_bull_fortress"].copy()
+    bear_trades = completed[completed["entry_tag"] == "entry_bear_calibrated"].copy()
+    if not bull_trades.empty:
+        bull_trades["long_conf_bucket"] = _bucketize(
+            bull_trades["entry_m15_long"],
+            bins=[-1e-9, 0.35, 0.45, 0.55, 1.01],
+            labels=["<=0.35", "0.35-0.45", "0.45-0.55", "0.55+"],
+        )
+        bull_trades["structure_bucket"] = _bucketize(
+            bull_trades["entry_structure_score"],
+            bins=[-10, 0, 1, 2, 10],
+            labels=["<=0", "1", "2", ">=3"],
+        )
+        bull_trades["hold_bucket"] = _bucketize(
+            bull_trades["hold_bars"],
+            bins=[0, 1, 2, 4, 9999],
+            labels=["1", "2", "3-4", "5+"],
+        )
+        _print_bucket_table(bull_trades, "long_conf_bucket", "Bull Fortress By m15 Long Confidence")
+        _print_bucket_table(bull_trades, "structure_bucket", "Bull Fortress By Structure Score")
+        _print_bucket_table(bull_trades, "hold_bucket", "Bull Fortress By Hold Bars")
+
+    if not bear_trades.empty:
+        bear_trades["short_conf_bucket"] = _bucketize(
+            bear_trades["entry_short_conf_15m"],
+            bins=[-1e-9, 0.10, 0.20, 0.30, 1.01],
+            labels=["<=0.10", "0.10-0.20", "0.20-0.30", "0.30+"],
+        )
+        bear_trades["hold_bucket"] = _bucketize(
+            bear_trades["hold_bars"],
+            bins=[0, 1, 2, 4, 9999],
+            labels=["1", "2", "3-4", "5+"],
+        )
+        _print_bucket_table(bear_trades, "short_conf_bucket", "Bear Calibrated By Short Confidence")
+        _print_bucket_table(bear_trades, "hold_bucket", "Bear Calibrated By Hold Bars")
+
+    if not cache_df.empty and "short_conf_15m" in cache_df.columns:
+        cache_df["short_conf_bucket"] = _bucketize(
+            cache_df["short_conf_15m"],
+            bins=[-1e-9, 0.10, 0.20, 0.30, 1.01],
+            labels=["<=0.10", "0.10-0.20", "0.20-0.30", "0.30+"],
+        )
+        bar_mix = cache_df["short_conf_bucket"].value_counts(sort=False)
+        bear_open_mix = pd.Series(dtype=int)
+        if not opens.empty:
+            bear_open_mix = (
+                opens[opens["tag"].eq("entry_bear_calibrated")]
+                .get("short_conf_15m", pd.Series(dtype=float))
+            )
+            if not bear_open_mix.empty:
+                bear_open_mix = _bucketize(
+                    bear_open_mix,
+                    bins=[-1e-9, 0.10, 0.20, 0.30, 1.01],
+                    labels=["<=0.10", "0.10-0.20", "0.20-0.30", "0.30+"],
+                ).value_counts(sort=False)
+        print("\n  Short Confidence Base Rate vs Realized Bear Trades")
+        print(f"  {'Bucket':<12} {'Bars':>10} {'Bear Opens':>12}")
+        print(f"  {'-'*38}")
+        for bucket in bar_mix.index:
+            print(
+                f"  {str(bucket):<12} {int(bar_mix.get(bucket, 0)):>10d} "
+                f"{int(bear_open_mix.get(bucket, 0)) if hasattr(bear_open_mix, 'get') else 0:>12d}"
+            )
+
+    event_df = completed.copy()
+    event_df["macro_flag"] = np.where(event_df["entry_macro_event_flag"] > 0, "macro_event", "normal")
+    event_df["market_event_flag"] = np.where(event_df["entry_major_market_event_flag"] != 0, "major_event", "normal")
+    event_df["sentiment_bucket"] = _bucketize(
+        event_df["entry_context_sentiment"],
+        bins=[-1.1, -0.33, 0.33, 1.1],
+        labels=["negative", "neutral", "positive"],
+    )
+    _print_bucket_table(event_df, "macro_flag", "Completed Trades By Macro Event Day")
+    _print_bucket_table(event_df, "market_event_flag", "Completed Trades By Major Market Event Flag")
+    _print_bucket_table(event_df, "sentiment_bucket", "Completed Trades By Context Sentiment")
+
+
 # ─────────────────────────────────────────────────────────────
 # 5. Monte Carlo
 # ─────────────────────────────────────────────────────────────
@@ -548,7 +758,7 @@ if __name__ == "__main__":
     print(f"{'#'*60}")
     t0 = time.time()
 
-    oos_res, oos_data, oos_score, primary_metrics = run_primary_eval(tf, lbl, split)
+    oos_res, oos_data, oos_strat, oos_score, primary_metrics = run_primary_eval(tf, lbl, split)
 
     # Fee Stress
     run_fee_stress(tf, split, oos_data, lbl)
@@ -560,6 +770,7 @@ if __name__ == "__main__":
     if not args.skip_regime:
         run_regime_breakdown(tf, split, oos_data, lbl)
     run_regime_trade_attribution(oos_res, lbl)
+    run_lane_diagnostics(oos_res, oos_strat, tf, lbl)
 
     # Monte Carlo
     mc_result = None
