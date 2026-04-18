@@ -71,9 +71,9 @@ class Strategy:
         self.sideways_structure_penalty = float(os.environ.get("AUTOTRADER_SIDEWAYS_STRUCTURE_PENALTY", "1.0"))
         self.sideways_structure_penalty_min = int(float(os.environ.get("AUTOTRADER_SIDEWAYS_STRUCTURE_PENALTY_MIN", "999")))
         self.sideways_structure_penalty_max = int(float(os.environ.get("AUTOTRADER_SIDEWAYS_STRUCTURE_PENALTY_MAX", "999")))
-        self.sideways_conf_penalty = float(os.environ.get("AUTOTRADER_SIDEWAYS_CONF_PENALTY", "1.0"))
-        self.sideways_conf_penalty_min = float(os.environ.get("AUTOTRADER_SIDEWAYS_CONF_PENALTY_MIN", "999.0"))
-        self.sideways_conf_penalty_max = float(os.environ.get("AUTOTRADER_SIDEWAYS_CONF_PENALTY_MAX", "999.0"))
+        self.sideways_conf_penalty = float(os.environ.get("AUTOTRADER_SIDEWAYS_CONF_PENALTY", "0.95"))
+        self.sideways_conf_penalty_min = float(os.environ.get("AUTOTRADER_SIDEWAYS_CONF_PENALTY_MIN", "0.29"))
+        self.sideways_conf_penalty_max = float(os.environ.get("AUTOTRADER_SIDEWAYS_CONF_PENALTY_MAX", "0.33"))
 
     def _parse_timeframe(self, tf: str) -> int:
         if tf == "15m":
