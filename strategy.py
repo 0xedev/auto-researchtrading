@@ -68,6 +68,12 @@ class Strategy:
         self.sideways_structure_boost = float(os.environ.get("AUTOTRADER_SIDEWAYS_STRUCTURE_BOOST", "1.10"))
         self.sideways_structure_boost_min = int(float(os.environ.get("AUTOTRADER_SIDEWAYS_STRUCTURE_BOOST_MIN", "1")))
         self.sideways_structure_boost_max = int(float(os.environ.get("AUTOTRADER_SIDEWAYS_STRUCTURE_BOOST_MAX", "1")))
+        self.sideways_structure_penalty = float(os.environ.get("AUTOTRADER_SIDEWAYS_STRUCTURE_PENALTY", "1.0"))
+        self.sideways_structure_penalty_min = int(float(os.environ.get("AUTOTRADER_SIDEWAYS_STRUCTURE_PENALTY_MIN", "999")))
+        self.sideways_structure_penalty_max = int(float(os.environ.get("AUTOTRADER_SIDEWAYS_STRUCTURE_PENALTY_MAX", "999")))
+        self.sideways_conf_penalty = float(os.environ.get("AUTOTRADER_SIDEWAYS_CONF_PENALTY", "1.0"))
+        self.sideways_conf_penalty_min = float(os.environ.get("AUTOTRADER_SIDEWAYS_CONF_PENALTY_MIN", "999.0"))
+        self.sideways_conf_penalty_max = float(os.environ.get("AUTOTRADER_SIDEWAYS_CONF_PENALTY_MAX", "999.0"))
 
     def _parse_timeframe(self, tf: str) -> int:
         if tf == "15m":
@@ -664,11 +670,23 @@ class Strategy:
                 self.sideways_structure_boost > 1.0
                 and self.sideways_structure_boost_min <= sideways_structure_score <= self.sideways_structure_boost_max
             )
+            structure_penalty_ok = (
+                self.sideways_structure_penalty < 1.0
+                and self.sideways_structure_penalty_min <= sideways_structure_score <= self.sideways_structure_penalty_max
+            )
+            conf_penalty_ok = (
+                self.sideways_conf_penalty < 1.0
+                and self.sideways_conf_penalty_min <= m15_long <= self.sideways_conf_penalty_max
+            )
             sideways_bull_fortress_scale = (
                 self.sideways_structure_boost
                 if (market_regime_family == "sideways" and bull_fortress and structure_boost_ok)
                 else 1.0
             )
+            if market_regime_family == "sideways" and bull_fortress and structure_penalty_ok:
+                sideways_bull_fortress_scale *= self.sideways_structure_penalty
+            if market_regime_family == "sideways" and bull_fortress and conf_penalty_ok:
+                sideways_bull_fortress_scale *= self.sideways_conf_penalty
 
             def signal_metadata(tag: str, size_reason: str = "", exit_reason: str = "") -> dict:
                 return {
