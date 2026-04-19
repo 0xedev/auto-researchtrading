@@ -25,6 +25,16 @@ class ShadowReportTests(unittest.TestCase):
                     equity=10300.0,
                     last_timestamp=1713484800,
                     total_volume=3100.0,
+                    runtime_config={
+                        "source": "shadow_config.example.json",
+                        "timeframe": "1h",
+                        "split": "2026q1",
+                        "max_days": 5,
+                        "risk": {"max_leverage": 3.0, "max_symbol_notional_pct": 0.15},
+                        "paths": {"kill_switch_path": "shadow_kill_switch.json"},
+                        "operator": {"recent_actions": 5},
+                    },
+                    last_kill_switch={"halt_new_orders": True},
                 ),
             )
 
@@ -64,9 +74,14 @@ class ShadowReportTests(unittest.TestCase):
             self.assertEqual(summary["log_stats"]["action_counts"]["open"], 1)
             self.assertEqual(summary["log_stats"]["action_counts"]["close"], 1)
             self.assertEqual(summary["log_stats"]["signal_counts"]["entry_bull_fortress"], 1)
+            self.assertTrue(summary["kill_switch"]["halt_new_orders"])
+            self.assertEqual(summary["runtime_config"]["timeframe"], "1h")
+            self.assertGreaterEqual(len(summary["alerts"]), 1)
 
             dashboard = render_shadow_dashboard(summary)
             self.assertIn("# Shadow Trading Dashboard", dashboard)
+            self.assertIn("## Control Plane", dashboard)
+            self.assertIn("## Alerts", dashboard)
             self.assertIn("## Open Positions", dashboard)
             self.assertIn("entry_bull_fortress", dashboard)
             self.assertIn("close_short_max_hold", dashboard)

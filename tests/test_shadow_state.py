@@ -17,6 +17,8 @@ class ShadowStateTests(unittest.TestCase):
                 last_timestamp=1234567890,
                 total_volume=75.0,
                 strategy_state={"position_ages": {"BTC": 2}},
+                runtime_config={"split": "2026q1"},
+                last_kill_switch={"halt_new_orders": True},
             )
             save_shadow_state(path, original)
             loaded = load_shadow_state(path)
@@ -24,6 +26,8 @@ class ShadowStateTests(unittest.TestCase):
             self.assertEqual(loaded.positions, original.positions)
             self.assertEqual(loaded.entry_prices, original.entry_prices)
             self.assertEqual(loaded.strategy_state, original.strategy_state)
+            self.assertEqual(loaded.runtime_config, original.runtime_config)
+            self.assertEqual(loaded.last_kill_switch, original.last_kill_switch)
 
 
 if __name__ == "__main__":

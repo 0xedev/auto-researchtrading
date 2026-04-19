@@ -1,0 +1,19 @@
+{
+  "timeframe": "1h",
+  "split": "2026q1",
+  "max_days": 5,
+  "risk": {
+    "max_leverage": 3.0,
+    "max_symbol_notional_pct": 0.35
+  },
+  "paths": {
+    "state_path": "shadow_state.json",
+    "log_path": "shadow_trade_log.jsonl",
+    "dashboard_path": "shadow_dashboard.md",
+    "summary_json_path": "shadow_summary.json",
+    "kill_switch_path": "shadow_kill_switch.json"
+  },
+  "operator": {
+    "recent_actions": 12
+  }
+}

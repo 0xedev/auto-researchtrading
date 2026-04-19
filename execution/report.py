@@ -41,6 +41,11 @@ def summarize_shadow_run(
 
     gross_exposure = float(sum(abs(v) for v in state.positions.values()))
     gross_leverage = gross_exposure / state.equity if state.equity > 0 else 0.0
+    runtime_config = dict(state.runtime_config or {})
+    risk_config = dict(runtime_config.get("risk", {}) or {})
+    kill_switch = dict(state.last_kill_switch or {})
+    max_leverage = float(risk_config.get("max_leverage", 0.0) or 0.0)
+    max_symbol_notional_pct = float(risk_config.get("max_symbol_notional_pct", 0.0) or 0.0)
 
     action_counts = Counter()
     signal_counts = Counter()
@@ -112,6 +117,55 @@ def summarize_shadow_run(
         for symbol, stats in sorted(symbol_stats.items(), key=lambda item: item[1]["realized_pnl"], reverse=True)
     ]
 
+    alerts = []
+    if kill_switch.get("halt_new_orders"):
+        alerts.append(
+            {
+                "severity": "warning",
+                "code": "halt_new_orders",
+                "message": "Kill switch is active and halting new orders.",
+            }
+        )
+    if max_leverage:
+        if gross_leverage >= max_leverage:
+            alerts.append(
+                {
+                    "severity": "critical",
+                    "code": "max_leverage_breached",
+                    "message": f"Gross leverage {gross_leverage:.3f} is above configured max leverage {max_leverage:.3f}.",
+                }
+            )
+        elif gross_leverage >= 0.9 * max_leverage:
+            alerts.append(
+                {
+                    "severity": "warning",
+                    "code": "max_leverage_near",
+                    "message": f"Gross leverage {gross_leverage:.3f} is near the configured max leverage {max_leverage:.3f}.",
+                }
+            )
+
+    symbol_cap = state.equity * max_symbol_notional_pct if state.equity > 0 and max_symbol_notional_pct > 0 else 0.0
+    if symbol_cap:
+        for symbol, notional in sorted(state.positions.items(), key=lambda item: abs(item[1]), reverse=True):
+            usage = abs(notional) / symbol_cap if symbol_cap else 0.0
+            if usage >= 0.9:
+                alerts.append(
+                    {
+                        "severity": "warning",
+                        "code": "symbol_cap_near",
+                        "message": f"{symbol} uses {usage:.1%} of the configured per-symbol notional cap.",
+                    }
+                )
+
+    if action_counts.get("rejected", 0):
+        alerts.append(
+            {
+                "severity": "info",
+                "code": "rejections_present",
+                "message": f"Shadow log contains {action_counts['rejected']} rejected actions to review.",
+            }
+        )
+
     return {
         "portfolio": {
             "equity": float(state.equity),
@@ -133,6 +187,12 @@ def summarize_shadow_run(
             "regime_counts": dict(regime_counts),
             "decision_reason_counts": dict(decision_reason_counts),
         },
+        "runtime_config": runtime_config,
+        "kill_switch": {
+            "halt_new_orders": bool(kill_switch.get("halt_new_orders")),
+            "raw": kill_switch,
+        },
+        "alerts": alerts,
         "symbol_pnl": symbol_pnl,
         "recent_actions": list(reversed(recent_actions)),
     }
@@ -153,9 +213,53 @@ def render_shadow_dashboard(summary: dict) -> str:
         f"- Last Timestamp: `{portfolio.get('last_timestamp_iso', 'n/a')}`",
         f"- Total Volume: `{portfolio.get('total_volume', 0.0):,.2f}`",
         "",
-        "## Open Positions",
+        "## Control Plane",
         "",
     ]
+
+    runtime_config = summary.get("runtime_config", {})
+    risk_config = runtime_config.get("risk", {})
+    paths = runtime_config.get("paths", {})
+    operator = runtime_config.get("operator", {})
+    kill_switch = summary.get("kill_switch", {})
+    if runtime_config:
+        lines.extend(
+            [
+                f"- Config Source: `{runtime_config.get('source', 'defaults')}`",
+                f"- Timeframe: `{runtime_config.get('timeframe', 'n/a')}`",
+                f"- Split: `{runtime_config.get('split', 'n/a')}`",
+                f"- Max Days: `{runtime_config.get('max_days', 'all')}`",
+                f"- Max Leverage: `{risk_config.get('max_leverage', 0.0):.3f}`",
+                f"- Max Symbol Notional %: `{risk_config.get('max_symbol_notional_pct', 0.0):.3f}`",
+                f"- Recent Actions Window: `{operator.get('recent_actions', 0)}`",
+                f"- Kill Switch Path: `{paths.get('kill_switch_path', 'n/a')}`",
+                f"- Halt New Orders: `{kill_switch.get('halt_new_orders', False)}`",
+            ]
+        )
+    else:
+        lines.append("- No runtime config snapshot recorded.")
+
+    lines.extend(
+        [
+            "",
+            "## Alerts",
+            "",
+        ]
+    )
+    alerts = summary.get("alerts", [])
+    if alerts:
+        for alert in alerts:
+            lines.append(f"- `{alert.get('severity', 'info')}` `{alert.get('code', 'unknown')}`: {alert.get('message', '')}")
+    else:
+        lines.append("- No active alerts.")
+
+    lines.extend(
+        [
+            "",
+        "## Open Positions",
+        "",
+        ]
+    )
 
     positions = summary.get("open_positions", [])
     if positions:

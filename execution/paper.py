@@ -22,6 +22,26 @@ class ShadowRiskConfig:
     state_path: str = "shadow_state.json"
     log_path: str = "shadow_trade_log.jsonl"
     kill_switch_path: str | None = None
+    config_source: str = "defaults"
+    operator_settings: dict = field(default_factory=dict)
+
+    def snapshot(self, timeframe: str, split: str, max_days: int | None = None) -> dict:
+        return {
+            "source": self.config_source,
+            "timeframe": timeframe,
+            "split": split,
+            "max_days": max_days,
+            "risk": {
+                "max_leverage": float(self.max_leverage),
+                "max_symbol_notional_pct": float(self.max_symbol_notional_pct),
+            },
+            "paths": {
+                "state_path": self.state_path,
+                "log_path": self.log_path,
+                "kill_switch_path": self.kill_switch_path,
+            },
+            "operator": dict(self.operator_settings or {}),
+        }
 
 
 @dataclass
@@ -33,6 +53,8 @@ class ShadowState:
     last_timestamp: int = 0
     total_volume: float = 0.0
     strategy_state: dict = field(default_factory=dict)
+    runtime_config: dict = field(default_factory=dict)
+    last_kill_switch: dict = field(default_factory=dict)
 
 
 def load_shadow_state(path: str | Path) -> ShadowState:
@@ -48,6 +70,8 @@ def load_shadow_state(path: str | Path) -> ShadowState:
         last_timestamp=int(payload.get("last_timestamp", 0)),
         total_volume=float(payload.get("total_volume", 0.0)),
         strategy_state=payload.get("strategy_state", {}) or {},
+        runtime_config=payload.get("runtime_config", {}) or {},
+        last_kill_switch=payload.get("last_kill_switch", {}) or {},
     )
 
 
@@ -204,6 +228,7 @@ def run_shadow_session(timeframe: str, split: str, risk_config: ShadowRiskConfig
     strategy.pre_calculate_signals(data, split_name=split)
 
     state = load_shadow_state(risk_config.state_path)
+    state.runtime_config = risk_config.snapshot(timeframe=timeframe, split=split, max_days=max_days)
     if state.strategy_state:
         strategy.trailing_stops = state.strategy_state.get("trailing_stops", {})
         strategy.position_ages = {k: int(v) for k, v in state.strategy_state.get("position_ages", {}).items()}
@@ -285,6 +310,7 @@ def run_shadow_session(timeframe: str, split: str, risk_config: ShadowRiskConfig
         _mark_to_market(portfolio, bar_data)
         signals = strategy.on_bar(bar_data, portfolio) or []
         kill_switch = _load_kill_switch(risk_config.kill_switch_path)
+        state.last_kill_switch = kill_switch
         halt_new_orders = bool(kill_switch.get("halt_new_orders"))
 
         for signal in signals:
@@ -358,4 +384,6 @@ def run_shadow_session(timeframe: str, split: str, risk_config: ShadowRiskConfig
         "open_positions": len(state.positions),
         "state_path": risk_config.state_path,
         "log_path": risk_config.log_path,
+        "config_source": state.runtime_config.get("source", risk_config.config_source),
+        "halt_new_orders": bool(state.last_kill_switch.get("halt_new_orders")),
     }

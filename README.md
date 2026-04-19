@@ -70,6 +70,12 @@ uv run train_model.py --timeframe 15m --model-set exp_short_platt --short-calibr
 # Run the shadow paper-trading engine with persisted state plus dashboard outputs
 uv run shadow_trade.py --timeframe 1h --split 2026q1 --state-path shadow_state.json --log-path shadow_trade_log.jsonl --dashboard-path shadow_dashboard.md --summary-json-path shadow_summary.json --max-days 5
 
+# Or run the same flow from an explicit operator config
+uv run shadow_trade.py --config-path shadow_config.example.json
+
+# Automation-friendly mode that keeps only the final result JSON on stdout
+uv run shadow_trade.py --config-path shadow_config.example.json --json-only
+
 # Retrain the macro HMM as well
 uv run train_model.py --timeframe 1h --train_hmm
 
@@ -193,6 +199,13 @@ The shadow execution surface now emits:
 - `shadow_state.json`: restart-safe portfolio and strategy state
 - `shadow_dashboard.md`: operator-facing markdown dashboard with positions, action mix, signal mix, regime mix, and recent decisions
 - `shadow_summary.json`: machine-readable run summary for downstream automation or notification layers
+- `shadow_config.example.json`: example config for risk limits, output paths, and operator settings
+
+The shadow dashboard now also includes:
+
+- runtime config snapshot and control-plane settings
+- kill-switch status
+- operator alerts for leverage pressure, symbol-cap pressure, and rejected actions
 
 The new research infra is:
 
