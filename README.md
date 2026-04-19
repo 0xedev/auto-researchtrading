@@ -67,8 +67,8 @@ uv run train_model.py --timeframe 15m
 # Train a tagged experimental model set with short-confidence plumbing
 uv run train_model.py --timeframe 15m --model-set exp_short_platt --short-calibration-mode platt --train-bear-short-meta
 
-# Run the shadow paper-trading engine with persisted state
-uv run shadow_trade.py --timeframe 1h --split 2026q1 --state-path shadow_state.json --log-path shadow_trade_log.jsonl --max-days 5
+# Run the shadow paper-trading engine with persisted state plus dashboard outputs
+uv run shadow_trade.py --timeframe 1h --split 2026q1 --state-path shadow_state.json --log-path shadow_trade_log.jsonl --dashboard-path shadow_dashboard.md --summary-json-path shadow_summary.json --max-days 5
 
 # Retrain the macro HMM as well
 uv run train_model.py --timeframe 1h --train_hmm
@@ -186,6 +186,13 @@ For day-to-day research:
 `research_loop.py` is retained as historical automation infrastructure, but the active workflow is manual experimentation plus explicit `results.tsv` logging.
 
 `backtest.py` also appends a summary row to `results.tsv`.
+
+The shadow execution surface now emits:
+
+- `shadow_trade_log.jsonl`: structured order / decision log with rationale fields
+- `shadow_state.json`: restart-safe portfolio and strategy state
+- `shadow_dashboard.md`: operator-facing markdown dashboard with positions, action mix, signal mix, regime mix, and recent decisions
+- `shadow_summary.json`: machine-readable run summary for downstream automation or notification layers
 
 The new research infra is:
 
