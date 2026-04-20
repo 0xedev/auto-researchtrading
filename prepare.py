@@ -61,24 +61,25 @@ BINANCE_15M_START = {
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
 HF_XAU_15M_URL = "https://huggingface.co/datasets/ZombitX64/xauusd-gold-price-historical-data-2004-2025/resolve/main/XAU_15m_data.jsonl"
 
-# Date splits (UTC timestamps) - 2025 Strictly Quarantined as OOS
-# Training:   2017-01-01 → 2022-06-30  (pre-crash baseline)
-# Validation: 2022-07-01 → 2024-06-30  (2 full years: bear, recovery, early bull)
-# Robustness: 2018-01-01 → 2024-06-30  (all meaningful crypto history)
-# OOS:        2025-01-01 → 2025-12-31  (full year of unseen data, now contaminated)
+# Date splits (UTC timestamps) - extended training window (clean break from 492-exp history)
+# Training:   2017-01-01 → 2024-06-30  (+2 years: sees 2022 bear, 2023 recovery, 2024 bull)
+# Validation: 2024-07-01 → 2025-09-30  (post-ATH + 2025 bear — fresh scoring window)
+# Robustness: 2018-01-01 → 2025-09-30  (all meaningful crypto history)
+# OOS:        2025-01-01 → 2025-12-31  (hardcoded, overlaps new val — contaminated reference)
+# Clean OOS:  2026-01-01 → 2026-03-31  (2026Q1 — primary production confidence gate)
 # Holdout:    2025-10-01 → 2025-12-31  *** NEVER TOUCH — true unseen test set ***
 #             This 3-month tail of 2025 was carved out AFTER the research loop.
 #             Do NOT run evaluate.py or iterate against it.  Use --holdout ONCE
 #             at final production sign-off only.
 TRAIN_START   = "2017-01-01"   # Default global start (overridden per-symbol below)
-TRAIN_END     = "2022-06-30"   # Pre-crash baseline
-VAL_START     = "2022-07-01"   # 2 full years: bear, recovery, early bull
-VAL_END       = "2024-06-30"   # Stops before OOS
-TEST_START    = "2022-07-01"   # Legacy alias for val (unused)
-TEST_END      = "2024-06-30"
+TRAIN_END     = "2024-06-30"   # Extended: sees 2022 bear, 2023 recovery, 2024 bull
+VAL_START     = "2024-07-01"   # Fresh window: post-ATH + 2025 bear
+VAL_END       = "2025-09-30"   # Stops before holdout
+TEST_START    = "2024-07-01"   # Legacy alias for val (unused)
+TEST_END      = "2025-09-30"
 DATA_END      = "2026-03-31"   # Extended to cover 2026 Q1 clean OOS window
 ROBUST_START  = "2018-01-01"
-ROBUST_END    = "2024-06-30"
+ROBUST_END    = "2025-09-30"
 HOLDOUT_START = "2025-10-01"   # *** NEVER TOUCH until production sign-off ***
 HOLDOUT_END   = "2025-12-31"   # 3-month tail of 2025, carved out post-research-loop
 
@@ -131,7 +132,8 @@ BASE_FEATURE_COLS = [
     'dist_to_high', 'dist_to_low', 'vol_ratio_24h', 'asset_class',
     'dist_to_vwap', 'vol_ema_50', 'market_vol', 'market_ret',
     'rel_ret_1h', 'rel_ret_4h', 'rel_bb_width',
-    'fvg_detected', 'msb_status', 'ob_dist', 'frac_diff_close'
+    'fvg_detected', 'msb_status', 'ob_dist', 'frac_diff_close',
+    'range_position', 'vol_trend_8h', 'funding_roc_4h'
 ]
 
 CORE_CONTEXT_FEATURE_COLS = [
@@ -228,7 +230,8 @@ def calculate_features(df, timeframe="1h", symbol=None, feature_profile="price_o
     df['donchian_low_20'] = low.rolling(20).min()
     df['dist_to_high'] = (df['donchian_high_20'] - close) / close
     df['dist_to_low'] = (close - df['donchian_low_20']) / close
-    
+    df['range_position'] = df['dist_to_low'] / (df['dist_to_high'] + df['dist_to_low'] + 1e-8)
+
     # 7. Macro Regime (EMA 200)
     ema_200 = close.ewm(span=200, adjust=False).mean()
     df['ema_200_dist'] = (close - ema_200) / close
@@ -237,6 +240,8 @@ def calculate_features(df, timeframe="1h", symbol=None, feature_profile="price_o
     df['vol_ratio_24h'] = df['volume'] / df['volume'].rolling(24).mean().replace(0, 1e-10)
     df['vol_24h'] = df['volume'].rolling(24).mean()
     df['vol_ema_50'] = df['volume'].ewm(span=50, adjust=False).mean()
+    vol_ratio_ema4 = df['vol_ratio_24h'].ewm(span=4).mean()
+    df['vol_trend_8h'] = (df['vol_ratio_24h'] - vol_ratio_ema4).fillna(0.0)
     
     # 9. VWAP (Approximate via typical price)
     tp = (high + low + close) / 3
@@ -272,6 +277,10 @@ def calculate_features(df, timeframe="1h", symbol=None, feature_profile="price_o
     # 13. Fractional Differentiation (Stationary Memory)
     # d=0.4 is the industry sweet spot for crypto ADF stationarity
     df['frac_diff_close'] = apply_frac_diff(close, d=0.4)
+
+    # 14a. Funding rate momentum (rate-of-change, orthogonal to funding level used in strategy)
+    _funding = df["funding_rate"] if "funding_rate" in df.columns else pd.Series(0.0, index=df.index)
+    df["funding_roc_4h"] = _funding.diff(4).fillna(0.0)
 
     # 14. Macro Regime (HMM Slot)
     # This will be populated by the strategy/backtester using the saved HMM model

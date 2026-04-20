@@ -355,6 +355,7 @@ class Strategy:
                 table["ob_dist"] = df_feat["ob_dist"].values
                 table["ema_200_dist"] = df_feat["ema_200_dist"].values
                 table["dist_to_vwap"] = df_feat["dist_to_vwap"].values
+                table["vol_trend_8h"] = df_feat["vol_trend_8h"].values if "vol_trend_8h" in df_feat.columns else 0.0
                 table["macro_event_flag"] = df_feat["macro_event_flag"].values
                 table["context_sentiment"] = df_feat["context_sentiment"].values
                 table["major_market_event_flag"] = df_feat["major_market_event_flag"].values
