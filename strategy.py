@@ -63,6 +63,7 @@ class Strategy:
             os.environ.get("AUTOTRADER_BEAR_SHORT_DECAY_BLEND", str(self.bear_short_blend))
         )
         self.bear_short_delta_cap = float(os.environ.get("AUTOTRADER_BEAR_SHORT_DELTA_CAP", "1.0"))
+        self.bear_short_negative_scale = float(os.environ.get("AUTOTRADER_BEAR_SHORT_NEGATIVE_SCALE", "1.0"))
         self.bear_short_size_bonus = float(os.environ.get("AUTOTRADER_BEAR_SHORT_SIZE_BONUS", "0.0"))
         self.bear_short_size_edge = float(os.environ.get("AUTOTRADER_BEAR_SHORT_SIZE_EDGE", "0.0"))
         self.sideways_structure_boost = float(os.environ.get("AUTOTRADER_SIDEWAYS_STRUCTURE_BOOST", "1.10"))
@@ -174,10 +175,16 @@ class Strategy:
 
     def _blend_bear_short_conf(self, raw_value: float, bear_value: float, blend: float) -> float:
         blend = max(0.0, min(1.0, float(blend)))
-        blended = (1.0 - blend) * float(raw_value) + blend * float(bear_value)
+        raw_value = float(raw_value)
+        bear_value = float(bear_value)
+        delta = bear_value - raw_value
+        if delta < 0:
+            neg_scale = max(0.0, min(1.0, float(self.bear_short_negative_scale)))
+            bear_value = raw_value + delta * neg_scale
+        blended = (1.0 - blend) * raw_value + blend * bear_value
         cap = max(0.0, float(self.bear_short_delta_cap))
         if cap < 1.0:
-            blended = min(max(blended, float(raw_value) - cap), float(raw_value) + cap)
+            blended = min(max(blended, raw_value - cap), raw_value + cap)
         return float(blended)
 
     def _load_models(self):

@@ -106,6 +106,20 @@ def _build_bear_short_target(default_target: np.ndarray, sample_meta: pd.DataFra
         )
         return enhanced.astype(int)
 
+    if mode == "relative_tail_core":
+        rel_q = np.quantile(rel_forward[positive_mask], 0.45)
+        scaled_q = np.quantile(scaled_forward[positive_mask], 0.45)
+        stress_q = np.quantile(stress[positive_mask], 0.65)
+        enhanced = (
+            positive_mask
+            & (
+                (rel_forward <= rel_q)
+                | (scaled_forward <= scaled_q)
+                | (stress >= stress_q)
+            )
+        )
+        return enhanced.astype(int)
+
     return default_target
 
 
@@ -428,7 +442,7 @@ if __name__ == "__main__":
         "--bear-short-target-mode",
         type=str,
         default="default",
-        choices=["default", "relative_tail"],
+        choices=["default", "relative_tail", "relative_tail_core"],
         help="For 15m bear-short artifact, choose the target construction mode",
     )
     args = parser.parse_args()
