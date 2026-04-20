@@ -16,7 +16,7 @@ from joblib import Parallel, delayed
 from hmmlearn import hmm
 
 from prepare import (
-    calculate_features, load_data, prepare_dataset, 
+    calculate_features, load_data, prepare_dataset,
     get_n_trees_depth, run_backtest, compute_score,
     TRAIN_START, TEST_END, VAL_START, VAL_END,
     SYMBOLS, SYMBOLS_15M, ASSET_CLASS, SYMBOL_TRAIN_START, FEATURE_COLS
@@ -67,6 +67,46 @@ def _fit_short_calibrator(mode: str, raw_probs: np.ndarray, labels: np.ndarray):
         calibrator.fit(raw_probs, labels)
         return calibrator
     return None
+
+
+def _build_bear_short_target(default_target: np.ndarray, sample_meta: pd.DataFrame, mode: str) -> np.ndarray:
+    default_target = np.asarray(default_target, dtype=int)
+    if mode == "default":
+        return default_target
+
+    meta = sample_meta.reset_index(drop=True).copy()
+    bear_mask = meta["regime_family"].eq("bear").values
+    if bear_mask.sum() == 0:
+        return default_target
+
+    rel_forward = pd.to_numeric(meta.get("relative_forward_ret", 0.0), errors="coerce").fillna(0.0).values
+    scaled_forward = pd.to_numeric(meta.get("scaled_forward_ret", 0.0), errors="coerce").fillna(0.0).values
+    sentiment_shock = pd.to_numeric(meta.get("context_sentiment_shock", 0.0), errors="coerce").fillna(0.0).values
+    market_event = pd.to_numeric(meta.get("major_market_event_flag", 0.0), errors="coerce").fillna(0.0).values
+    stress = pd.to_numeric(meta.get("cross_asset_stress", 0.0), errors="coerce").fillna(0.0).values
+
+    positive_mask = bear_mask & (default_target == 1)
+    if positive_mask.sum() < 200:
+        return default_target
+
+    if mode == "relative_tail":
+        rel_q = np.quantile(rel_forward[positive_mask], 0.45)
+        scaled_q = np.quantile(scaled_forward[positive_mask], 0.45)
+        shock_q = np.quantile(sentiment_shock[positive_mask], 0.35)
+        stress_q = np.quantile(stress[positive_mask], 0.60)
+        enhanced = (
+            positive_mask
+            & (
+                (rel_forward <= rel_q)
+                | (scaled_forward <= scaled_q)
+                | (market_event < 0)
+                | (sentiment_shock <= shock_q)
+                | (stress >= stress_q)
+            )
+        )
+        return enhanced.astype(int)
+
+    return default_target
 
 
 def validate_directional_models(long_model, short_model, long_meta_model, short_meta_model, X_val, y_val, feature_cols):
@@ -173,7 +213,15 @@ def train_macro_hmm():
     print(f"Successfully saved HMM and Scaler ({X_scaled.shape}) to models/ using data before {VAL_START}")
 
 
-def train(timeframe, specialists=True, feature_profile="price_only", model_set=None, short_calibration_mode="raw", train_bear_short_meta=False):
+def train(
+    timeframe,
+    specialists=True,
+    feature_profile="price_only",
+    model_set=None,
+    short_calibration_mode="raw",
+    train_bear_short_meta=False,
+    bear_short_target_mode="default",
+):
     print(f"Training Cross-Sectional Sniper (Classifier) for {timeframe} bars...")
     X, y, y_meta, states, sample_meta, features = prepare_dataset(timeframe, "train", feature_profile=feature_profile)
     
@@ -198,6 +246,7 @@ def train(timeframe, specialists=True, feature_profile="price_only", model_set=N
             "mode": short_calibration_mode if timeframe == "15m" else "raw",
             "calibrator_artifact": None,
             "bear_short_artifact": None,
+            "bear_short_target_mode": bear_short_target_mode if timeframe == "15m" else "default",
         },
     }
 
@@ -278,12 +327,18 @@ def train(timeframe, specialists=True, feature_profile="price_only", model_set=N
             bear_mask_train = meta_train["regime_family"].eq("bear").values
             bear_mask_val = meta_val["regime_family"].eq("bear").values
             if bear_mask_train.sum() >= 200 and bear_mask_val.sum() >= 50:
+                bear_short_target_train = _build_bear_short_target(short_meta_target, meta_train, bear_short_target_mode)
+                bear_short_target_val = _build_bear_short_target(
+                    ((y_val == 2) & (y_meta_val == 1)).astype(int),
+                    meta_val,
+                    bear_short_target_mode,
+                )
                 print("Training Stage 2C: Bear-Specific Short Meta (15m)...")
                 bear_short_meta_model = build_model(n_trees, depth - 2, 0.03)
                 bear_short_meta_model.fit(
                     X_train.loc[bear_mask_train, features],
-                    short_meta_target[bear_mask_train],
-                    eval_set=[(X_val.loc[bear_mask_val, features], ((y_val == 2) & (y_meta_val == 1)).astype(int)[bear_mask_val])],
+                    bear_short_target_train[bear_mask_train],
+                    eval_set=[(X_val.loc[bear_mask_val, features], bear_short_target_val[bear_mask_val])],
                     verbose=False,
                 )
                 _save_model(bear_short_meta_model, out_dir, "meta_short_bear_15m.xgb")
@@ -364,11 +419,18 @@ if __name__ == "__main__":
     parser.add_argument("--n_trees", type=int, default=100)
     parser.add_argument("--depth", type=int, default=12)
     parser.add_argument("--train_hmm", action="store_true", help="Also retrain the macro HMM")
-    parser.add_argument("--feature-profile", type=str, default="price_only", choices=["price_only", "price_context"])
+    parser.add_argument("--feature-profile", type=str, default="price_only", choices=["price_only", "price_context", "price_context_plus"])
     parser.add_argument("--model-set", type=str, default=None, help="Optional models/<name>/ output directory")
     parser.add_argument("--short-calibration-mode", type=str, default="raw", choices=["raw", "platt", "isotonic", "rank", "bear_model"])
     parser.add_argument("--train-bear-short-meta", action="store_true",
                         help="For 15m, train an additional bear-family short meta model artifact")
+    parser.add_argument(
+        "--bear-short-target-mode",
+        type=str,
+        default="default",
+        choices=["default", "relative_tail"],
+        help="For 15m bear-short artifact, choose the target construction mode",
+    )
     args = parser.parse_args()
     
     if args.train_hmm:
@@ -380,4 +442,5 @@ if __name__ == "__main__":
         model_set=args.model_set,
         short_calibration_mode=args.short_calibration_mode,
         train_bear_short_meta=args.train_bear_short_meta,
+        bear_short_target_mode=args.bear_short_target_mode,
     )

@@ -134,10 +134,22 @@ BASE_FEATURE_COLS = [
     'fvg_detected', 'msb_status', 'ob_dist', 'frac_diff_close'
 ]
 
-CONTEXT_FEATURE_COLS = list(CONTEXT_COLUMNS)
+CORE_CONTEXT_FEATURE_COLS = [
+    "macro_event_flag",
+    "context_sentiment",
+    "major_market_event_flag",
+]
+EXTENDED_CONTEXT_FEATURE_COLS = [
+    "macro_event_intensity",
+    "context_sentiment_shock",
+    "major_market_event_intensity",
+    "cross_asset_stress",
+]
+CONTEXT_FEATURE_COLS = list(CORE_CONTEXT_FEATURE_COLS)
 FEATURE_PROFILES = {
     "price_only": BASE_FEATURE_COLS,
     "price_context": BASE_FEATURE_COLS + CONTEXT_FEATURE_COLS,
+    "price_context_plus": BASE_FEATURE_COLS + CORE_CONTEXT_FEATURE_COLS + EXTENDED_CONTEXT_FEATURE_COLS,
 }
 # Backward-compatible default control profile.
 FEATURE_COLS = list(BASE_FEATURE_COLS)
@@ -475,6 +487,13 @@ def prepare_dataset(timeframe, split_name, feature_profile="price_only"):
         df_feat['rel_bb_width'] = df_feat['bb_width'] - df_feat['market_vol']
         
         labels, forward_ret = get_directional_labels(df_feat, timeframe)
+        vol = df_feat["close"].pct_change().rolling(24).std().replace(0, np.nan)
+        horizon_map = {"15m": 8, "1h": 4, "4h": 4}
+        horizon = horizon_map.get(timeframe, 4)
+        market_forward_ret = (1 + m_ret).rolling(horizon).apply(np.prod, raw=True).shift(-horizon + 1) - 1
+        market_forward_ret = market_forward_ret.reindex(df_feat.index).fillna(0.0)
+        scaled_forward_ret = (forward_ret / (vol * np.sqrt(horizon))).replace([np.inf, -np.inf], 0).fillna(0.0)
+        relative_forward_ret = (forward_ret - market_forward_ret).replace([np.inf, -np.inf], 0).fillna(0.0)
 
         meta = get_triple_barrier_labels(df_feat, timeframe)
 
@@ -499,6 +518,17 @@ def prepare_dataset(timeframe, split_name, feature_profile="price_only"):
                     "symbol": symbol,
                     "timestamp": sliced_timestamps,
                     "regime_family": sliced_regimes,
+                    "forward_ret": forward_ret[valid_mask][50:-100].values,
+                    "scaled_forward_ret": scaled_forward_ret[valid_mask][50:-100].values,
+                    "market_forward_ret": market_forward_ret[valid_mask][50:-100].values,
+                    "relative_forward_ret": relative_forward_ret[valid_mask][50:-100].values,
+                    "context_sentiment": df_feat["context_sentiment"][valid_mask][50:-100].values,
+                    "context_sentiment_shock": df_feat["context_sentiment_shock"][valid_mask][50:-100].values,
+                    "macro_event_flag": df_feat["macro_event_flag"][valid_mask][50:-100].values,
+                    "macro_event_intensity": df_feat["macro_event_intensity"][valid_mask][50:-100].values,
+                    "major_market_event_flag": df_feat["major_market_event_flag"][valid_mask][50:-100].values,
+                    "major_market_event_intensity": df_feat["major_market_event_intensity"][valid_mask][50:-100].values,
+                    "cross_asset_stress": df_feat["cross_asset_stress"][valid_mask][50:-100].values,
                 }
             )
         )

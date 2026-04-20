@@ -594,13 +594,13 @@ class Strategy:
             m15_short = row.get("short_conf_15m", m15_short_raw)
             m15_short_decay = m15_short
             bear_short_model = row.get("short_conf_bear_15m", m15_short)
-            if self.short_conf_mode == "bear_model" and market_regime_family == "bear":
+            if self.short_conf_mode in {"bear_model", "bear_overlay"} and market_regime_family == "bear":
                 m15_short = self._blend_bear_short_conf(m15_short_raw, bear_short_model, self.bear_short_blend)
                 m15_short_decay = self._blend_bear_short_conf(
                     m15_short_raw, bear_short_model, self.bear_short_decay_blend
                 )
-            short_gate_conf = m15_short if self.short_conf_mode == "raw" else m15_short_raw
-            bear_calibrated_gate = m15 if self.short_conf_mode == "raw" else m15_short_raw
+            short_gate_conf = m15_short if self.short_conf_mode in {"raw", "bear_overlay"} else m15_short_raw
+            bear_calibrated_gate = m15 if self.short_conf_mode in {"raw", "bear_overlay"} else m15_short_raw
             m1h = row["meta_1h"]
             m4h = row["meta_4h"]
             macro_event_flag = row.get("macro_event_flag", 0.0)
@@ -741,7 +741,7 @@ class Strategy:
             elif prefer_long:
                 long_size *= 1.05
             if (
-                self.short_conf_mode == "bear_model"
+                self.short_conf_mode in {"bear_model", "bear_overlay"}
                 and market_regime_family == "bear"
                 and self.bear_short_size_bonus > 0.0
                 and bear_short_model > m15_short_raw + self.bear_short_size_edge

@@ -18,6 +18,10 @@ CONTEXT_COLUMNS = [
     "macro_event_flag",
     "context_sentiment",
     "major_market_event_flag",
+    "macro_event_intensity",
+    "context_sentiment_shock",
+    "major_market_event_intensity",
+    "cross_asset_stress",
 ]
 
 
@@ -181,6 +185,27 @@ def _build_sentiment_series(day_index: pd.DatetimeIndex, asset_class: int | None
     return sentiment.reindex(day_index, method="ffill").fillna(0.0)
 
 
+def _build_cross_asset_stress_series(day_index: pd.DatetimeIndex, asset_class: int | None) -> pd.Series:
+    vix = _load_fred_series("VIXCLS")
+    if vix.empty:
+        vix_component = pd.Series(0.0, index=day_index)
+    else:
+        vix_component = ((vix - 20.0) / 10.0).clip(-1.5, 1.5)
+        vix_component = vix_component.reindex(day_index, method="ffill").fillna(0.0)
+
+    if asset_class == 0:
+        sentiment = _load_fng_series()
+        if sentiment.empty:
+            sentiment_component = pd.Series(0.0, index=day_index)
+        else:
+            sentiment_component = (-sentiment).reindex(day_index, method="ffill").fillna(0.0)
+        stress = 0.55 * vix_component + 0.45 * sentiment_component
+    else:
+        stress = vix_component
+
+    return stress.clip(-2.0, 2.0)
+
+
 def build_context_features(timestamps, symbol: str | None = None, asset_class: int | None = None) -> pd.DataFrame:
     ts = _normalize_timestamps(timestamps)
     if len(ts) == 0:
@@ -191,12 +216,20 @@ def build_context_features(timestamps, symbol: str | None = None, asset_class: i
     macro_events = _build_macro_event_series(unique_days)
     sentiment = _build_sentiment_series(unique_days, asset_class)
     market_events = _build_major_event_series(unique_days, symbol, asset_class)
+    macro_event_intensity = macro_events.rolling(3, min_periods=1).sum().clip(0.0, 3.0)
+    major_event_intensity = market_events.rolling(3, min_periods=1).sum().clip(-3.0, 3.0)
+    sentiment_shock = sentiment.diff().fillna(0.0).clip(-1.5, 1.5)
+    cross_asset_stress = _build_cross_asset_stress_series(unique_days, asset_class)
 
     base = pd.DataFrame(
         {
             "macro_event_flag": macro_events,
             "context_sentiment": sentiment.reindex(unique_days).fillna(0.0),
             "major_market_event_flag": market_events,
+            "macro_event_intensity": macro_event_intensity.reindex(unique_days).fillna(0.0),
+            "context_sentiment_shock": sentiment_shock.reindex(unique_days).fillna(0.0),
+            "major_market_event_intensity": major_event_intensity.reindex(unique_days).fillna(0.0),
+            "cross_asset_stress": cross_asset_stress.reindex(unique_days).fillna(0.0),
         },
         index=unique_days,
     )
