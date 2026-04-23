@@ -233,6 +233,8 @@ def run_v2_backtest(
     secondary_metrics = _secondary_metrics(equity_series, bundle_name)
     score = prepare.compute_score(result)
     trades_per_day = (result.num_trades / result.duration_days) if result.duration_days > 0 else 0.0
+    top_sleeves = summary.get("sleeve_concentration", [])[:3]
+    top_share = max([float(row.get("pnl_share", 0.0) or 0.0) for row in top_sleeves], default=0.0)
     return {
         "bundle": bundle_name,
         "model_set": model_set,
@@ -246,6 +248,7 @@ def run_v2_backtest(
             "score uses the legacy bar-level Sharpe composite from prepare.compute_score; "
             "prefer daily_sharpe and daily_sortino for V2 credibility checks"
         ),
+        "top_share": float(top_share),
         "short_share": float(
             sum(
                 1
@@ -255,7 +258,7 @@ def run_v2_backtest(
             / max(1, sum(1 for row in log_rows if row.get("action") == "open"))
         ),
         "summary": summary,
-        "top_sleeves": summary.get("sleeve_concentration", [])[:3],
+        "top_sleeves": top_sleeves,
         "log_rows": log_rows,
     }
 

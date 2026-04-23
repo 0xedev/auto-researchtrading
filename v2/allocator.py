@@ -73,17 +73,20 @@ class PortfolioAllocator:
                 continue
 
             target_pct = self.config.tier_a_notional_pct if tier == "A" else self.config.tier_b_notional_pct
-            target_pct *= max(float(signal.metadata.get("portfolio_weight", 1.0) or 1.0), 0.0)
+            effective_weight = self._portfolio_weight(signal)
+            target_pct *= effective_weight
             target_notional = equity * target_pct * signal.side
 
             if abs(target_notional) > equity * self.config.max_per_symbol_pct:
                 target_notional = equity * self.config.max_per_symbol_pct * signal.side
 
-            if sleeve_notional[signal.sleeve] + abs(target_notional) > equity * self.config.max_per_sleeve_pct:
+            sleeve_cap_pct = self.config.sleeve_cap_overrides.get(signal.sleeve, self.config.max_per_sleeve_pct)
+            if sleeve_notional[signal.sleeve] + abs(target_notional) > equity * sleeve_cap_pct:
                 rejections.append({"symbol": signal.symbol, "sleeve": signal.sleeve, "reason": "sleeve_cap"})
                 continue
 
-            if cluster_notional[signal.cluster] + abs(target_notional) > equity * self.config.max_per_cluster_pct:
+            cluster_cap_pct = self.config.cluster_cap_overrides.get(signal.cluster, self.config.max_per_cluster_pct)
+            if cluster_notional[signal.cluster] + abs(target_notional) > equity * cluster_cap_pct:
                 rejections.append({"symbol": signal.symbol, "sleeve": signal.sleeve, "reason": "cluster_cap"})
                 continue
 
@@ -97,6 +100,7 @@ class PortfolioAllocator:
 
             signal.target_notional = float(target_notional)
             signal.metadata["allocation_tier"] = tier
+            signal.metadata["allocator_weight"] = float(effective_weight)
             signal.metadata["allocator_score"] = float(self._score(signal))
             signal.metadata["allocator_effective_score"] = float(
                 self._effective_score(
@@ -144,9 +148,17 @@ class PortfolioAllocator:
         return "C"
 
     @staticmethod
-    def _score(signal: SleeveSignal) -> float:
+    def _manifest_weight(signal: SleeveSignal) -> float:
+        return max(float(signal.metadata.get("portfolio_weight", 1.0) or 1.0), 0.0)
+
+    def _portfolio_weight(self, signal: SleeveSignal) -> float:
+        base_weight = self._manifest_weight(signal)
+        override_weight = max(float(self.config.sleeve_weight_overrides.get(signal.sleeve, 1.0) or 1.0), 0.0)
+        return base_weight * override_weight
+
+    def _score(self, signal: SleeveSignal) -> float:
         edge = max(signal.expected_edge_bps, 0.0)
-        weight = max(float(signal.metadata.get("portfolio_weight", 1.0) or 1.0), 0.0)
+        weight = self._portfolio_weight(signal)
         return edge * max(signal.confidence, 0.0) * weight
 
     @staticmethod

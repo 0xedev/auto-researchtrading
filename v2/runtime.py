@@ -109,6 +109,7 @@ class V2SignalEngine:
                     "bundle": self.bundle_name,
                     "sleeve": sleeve_name,
                     "family": manifest.family,
+                    "strategy_cluster": manifest.cluster,
                     "market_cluster": getattr(row, "market_cluster", "other"),
                     "base_close": close,
                     "base_volume": float(getattr(row, "base_volume", 0.0)),
@@ -133,7 +134,7 @@ class V2SignalEngine:
                         target_notional=0.0,
                         regime_context=str(getattr(row, "regime_family", "unknown")),
                         reason_tag=reason_tag,
-                        cluster=str(getattr(row, "market_cluster", "other")),
+                        cluster=str(manifest.cluster),
                         timestamp=int(timestamp),
                         metadata=metadata,
                     )

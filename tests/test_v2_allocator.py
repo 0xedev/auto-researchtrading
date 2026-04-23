@@ -118,6 +118,50 @@ class V2AllocatorTests(unittest.TestCase):
         self.assertAlmostEqual(abs(by_symbol["BTC"].target_notional), 12_000.0)
         self.assertAlmostEqual(abs(by_symbol["ETH"].target_notional), 5_000.0)
 
+    def test_allocator_applies_sleeve_weight_override(self):
+        config = PortfolioConfig(
+            max_per_sleeve_pct=1.0,
+            max_per_cluster_pct=1.0,
+            max_per_symbol_pct=1.0,
+            tier_a_confidence=0.7,
+            tier_b_confidence=0.6,
+            tier_a_notional_pct=0.1,
+            tier_b_notional_pct=0.05,
+            sleeve_weight_overrides={"post_extension_snapback": 0.5},
+        )
+        allocator = PortfolioAllocator(config)
+        snap = SleeveSignal("bundle", "post_extension_snapback", "ETH", 1, 0.75, 30.0, 12.0, 0.0, 0.0, "sideways", "post_extension_snapback", "crypto_majors", 1, metadata={"portfolio_weight": 1.0})
+        rs = SleeveSignal("bundle", "cross_asset_relative_strength", "BTC", 1, 0.75, 30.0, 12.0, 0.0, 0.0, "bull", "cross_asset_relative_strength", "crypto_majors", 1, metadata={"portfolio_weight": 1.0})
+        allocated, _ = allocator.allocate([snap, rs], current_positions={}, equity=100_000.0)
+
+        by_symbol = {signal.symbol: signal for signal in allocated}
+        self.assertAlmostEqual(by_symbol["ETH"].metadata["allocator_weight"], 0.5)
+        self.assertAlmostEqual(abs(by_symbol["ETH"].target_notional), 5_000.0)
+        self.assertAlmostEqual(abs(by_symbol["BTC"].target_notional), 10_000.0)
+
+    def test_allocator_applies_sleeve_and_cluster_cap_overrides(self):
+        config = PortfolioConfig(
+            max_per_sleeve_pct=1.0,
+            max_per_cluster_pct=1.0,
+            max_per_symbol_pct=0.2,
+            tier_a_confidence=0.7,
+            tier_b_confidence=0.6,
+            tier_a_notional_pct=0.1,
+            tier_b_notional_pct=0.05,
+            sleeve_cap_overrides={"post_extension_snapback": 0.10},
+            cluster_cap_overrides={"crypto_majors": 0.12},
+        )
+        allocator = PortfolioAllocator(config)
+        signals = [
+            SleeveSignal("bundle", "post_extension_snapback", "BTC", 1, 0.80, 30.0, 12.0, 0.0, 0.0, "sideways", "post_extension_snapback", "crypto_majors", 1),
+            SleeveSignal("bundle", "post_extension_snapback", "ETH", 1, 0.79, 29.0, 12.0, 0.0, 0.0, "sideways", "post_extension_snapback", "crypto_majors", 1),
+            SleeveSignal("bundle", "cross_asset_relative_strength", "SOL", 1, 0.78, 28.0, 12.0, 0.0, 0.0, "bull", "cross_asset_relative_strength", "crypto_beta", 1),
+        ]
+        allocated, rejected = allocator.allocate(signals, current_positions={}, equity=100_000.0)
+
+        self.assertEqual(len([row for row in allocated if row.sleeve == "post_extension_snapback"]), 1)
+        self.assertTrue(any(row["reason"] in {"sleeve_cap", "cluster_cap"} for row in rejected))
+
 
 if __name__ == "__main__":
     unittest.main()

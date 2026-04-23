@@ -8,6 +8,7 @@ from v2.backtest import (
     _secondary_metrics,
     _series_from_curve,
     append_v2_results_row,
+    backtest_to_dict,
     build_v2_backtest_result,
     next_v2_results_id,
 )
@@ -83,8 +84,29 @@ class V2BacktestTests(unittest.TestCase):
             )
             self.assertEqual(run_id, "v2exp2")
             contents = target.read_text(encoding="utf-8")
-            self.assertIn("v2exp2", contents)
-            self.assertIn("fresh v2 run", contents)
+        self.assertIn("v2exp2", contents)
+        self.assertIn("fresh v2 run", contents)
+
+    def test_backtest_to_dict_preserves_top_share(self):
+        backtest = {
+            "score": 1.23,
+            "status": "CANDIDATE",
+            "top_share": 0.294,
+            "result": prepare.BacktestResult(
+                sharpe=2.0,
+                total_return_pct=5.0,
+                max_drawdown_pct=1.0,
+                num_trades=10,
+                win_rate_pct=70.0,
+                profit_factor=2.5,
+                annual_turnover=100.0,
+                duration_days=5.0,
+                bars_processed=120,
+                total_bars=120,
+            ),
+        }
+        payload = backtest_to_dict(backtest)
+        self.assertAlmostEqual(payload["top_share"], 0.294)
 
 
 if __name__ == "__main__":

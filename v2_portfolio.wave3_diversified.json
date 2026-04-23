@@ -1,0 +1,38 @@
+{
+  "active_sleeves": [],
+  "dashboard_path": "v2_shadow_dashboard.md",
+  "kill_switch_path": "shadow_kill_switch.json",
+  "log_path": "v2_shadow_log.jsonl",
+  "portfolio": {
+    "max_gross_leverage": 2.0,
+    "max_net_exposure_pct": 1.0,
+    "max_participation_rate": 0.03,
+    "max_per_cluster_pct": 0.32,
+    "cluster_cap_overrides": {
+      "mean_reversion": 0.28,
+      "relative_strength": 0.30
+    },
+    "max_new_positions_per_cluster": 4,
+    "max_per_sleeve_pct": 0.28,
+    "sleeve_cap_overrides": {
+      "cross_asset_relative_strength": 0.26,
+      "post_extension_snapback": 0.22,
+      "sideways_mean_reversion": 0.18
+    },
+    "max_new_positions_per_sleeve": 2,
+    "max_per_symbol_pct": 0.18,
+    "diversification_penalty": 0.22,
+    "sleeve_weight_overrides": {
+      "post_extension_snapback": 0.82,
+      "sideways_mean_reversion": 0.90
+    },
+    "short_min_share": 0.1,
+    "slippage_bps": 2.0,
+    "tier_a_confidence": 0.68,
+    "tier_a_notional_pct": 0.12,
+    "tier_b_confidence": 0.58,
+    "tier_b_notional_pct": 0.06
+  },
+  "state_path": "v2_shadow_state.json",
+  "summary_json_path": "v2_shadow_summary.json"
+}

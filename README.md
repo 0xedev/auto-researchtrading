@@ -108,6 +108,10 @@ uv run v2_evaluate.py --bundle bundle_intraday_core --model-set v2_probe --sleev
 # Note: score still uses the legacy bar-level composite; daily_sharpe/daily_sortino are the cleaner V2 credibility checks
 uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_probe --split val --portfolio-config v2_portfolio.example.json --json
 
+# Run the same V2 backtest with a reproducible diversified wave3 policy that
+# uses sleeve/cluster overrides to reduce concentration in the allocator
+uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_wave3_orth --split val --portfolio-config v2_portfolio.wave3_diversified.json
+
 # Retrain the macro HMM as well
 uv run train_model.py --timeframe 1h --train_hmm
 
@@ -254,7 +258,8 @@ The parallel V2 research layer now adds:
 - `v2_evaluate.py`: scores candidate sleeves or whole model sets on `val` and `2026q1`, supports optional rolling-window stability sweeps, can skip stress for faster research passes, and can update `v2_sleeve_registry.json`
 - `v2_backtest.py`: benchmark-style V2 replay with score, bar-level Sharpe, and daily-level Sharpe/Sortino so probe results are less likely to be over-interpreted
 - `v2_backtest.py`: runs a full-period V2 replay with benchmark-style Sharpe / DD / PF / trades-day metrics, concentration readouts, optional JSON output, and optional `results.tsv` logging
-- `v2_portfolio.example.json`: portfolio-level caps for sleeve, symbol, cluster, participation, and short-share controls
+- `v2_portfolio.example.json`: default portfolio-level caps for sleeve, symbol, strategy-cluster, participation, and short-share controls
+- `v2_portfolio.wave3_diversified.json`: reproducible wave3 diversification profile using sleeve weight overrides plus sleeve/cluster caps
 - `v2_sleeve_registry.json`: sleeve lifecycle tracking for candidate, paper-live, champion, and retired states
 
 The shadow dashboard now also includes:

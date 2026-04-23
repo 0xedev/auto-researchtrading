@@ -71,9 +71,12 @@ class PortfolioConfig:
     max_per_symbol_pct: float = 0.18
     max_per_sleeve_pct: float = 0.30
     max_per_cluster_pct: float = 0.35
+    sleeve_cap_overrides: dict[str, float] = field(default_factory=dict)
+    cluster_cap_overrides: dict[str, float] = field(default_factory=dict)
     max_new_positions_per_sleeve: int = 3
     max_new_positions_per_cluster: int = 4
     diversification_penalty: float = 0.15
+    sleeve_weight_overrides: dict[str, float] = field(default_factory=dict)
     tier_a_confidence: float = 0.68
     tier_b_confidence: float = 0.58
     tier_a_notional_pct: float = 0.12
