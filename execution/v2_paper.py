@@ -78,6 +78,11 @@ def _append_log(path: str | Path, record: dict) -> None:
         fh.write(json.dumps(record, default=_json_default, sort_keys=True) + "\n")
 
 
+def _execution_price(base_close: float, delta: float, slippage_bps: float) -> float:
+    slippage = base_close * slippage_bps / 10000.0
+    return base_close + slippage if delta > 0 else base_close - slippage
+
+
 def _mark_to_market(portfolio: PortfolioState, close_by_symbol: dict[str, float]) -> float:
     unrealized = 0.0
     for symbol, pos in portfolio.positions.items():
@@ -241,9 +246,12 @@ def run_v2_shadow_session(
             current = portfolio.positions.get(symbol, 0.0)
             if current == 0:
                 continue
-            price = close_by_symbol.get(symbol, portfolio.entry_prices.get(symbol, 0.0))
-            entry = portfolio.entry_prices.get(symbol, price)
-            realized = current * (price - entry) / entry if entry > 0 else 0.0
+            base_close = close_by_symbol.get(symbol, portfolio.entry_prices.get(symbol, 0.0))
+            exec_price = _execution_price(base_close, -current, portfolio_config.slippage_bps)
+            fee = abs(current) * prepare.TAKER_FEE
+            entry = portfolio.entry_prices.get(symbol, exec_price)
+            realized = current * (exec_price - entry) / entry if entry > 0 else 0.0
+            portfolio.cash -= fee
             portfolio.cash += abs(current) + realized
             portfolio.total_volume = getattr(portfolio, "total_volume", 0.0) + abs(current)
             portfolio.positions.pop(symbol, None)
@@ -262,6 +270,8 @@ def run_v2_shadow_session(
                     "cluster": meta.get("cluster", "other"),
                     "decision_reason": "max_hold",
                     "delta_notional": abs(current),
+                    "exec_price": exec_price,
+                    "fee": fee,
                     "realized_pnl": realized,
                     "portfolio_equity": portfolio.equity,
                 },
@@ -294,8 +304,7 @@ def run_v2_shadow_session(
                     )
                     continue
 
-                slippage = base_close * portfolio_config.slippage_bps / 10000.0
-                exec_price = base_close + slippage if delta > 0 else base_close - slippage
+                exec_price = _execution_price(base_close, delta, portfolio_config.slippage_bps)
                 fee = abs(delta) * prepare.TAKER_FEE
                 portfolio.total_volume = getattr(portfolio, "total_volume", 0.0) + abs(delta)
                 portfolio.cash -= fee

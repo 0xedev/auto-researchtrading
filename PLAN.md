@@ -18,7 +18,7 @@ What is already true:
 
 What is not true yet:
 - we do **not** have `5-8` live-quality independent sleeves
-- the current lead candidate does satisfy the `<=30%` sleeve concentration target on both the base and harsher stress full splits, but it still has not been proven through a longer paper-shadow run
+- the current lead candidate does satisfy the `<=30%` sleeve concentration target on the corrected base full splits, but no single policy currently clears both the corrected base and corrected stress bars together
 - V2 still does not use the legacy `backtest.py` engine, but it now has its own benchmark-style replay/backtest path
 - most historical V2 reads were still probe or rolling-window evaluations, so the new full-period backtest path now needs to become part of the normal research loop
 
@@ -30,27 +30,31 @@ Current practical stage label:
 - **Stage 5 early / partial:** challenger registry and rolling evaluation exist, but promotion cadence and portfolio champion workflow are not mature yet
 
 Latest V2 read worth tracking:
-- full 8-symbol benchmark-style replay on `v2_wave4_carry` with the quality-focused policy in [v2_portfolio.wave4_quality2.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_quality2.json):
-  - `val`: legacy score `16.39`, daily Sharpe `12.04`, PF `4.46`, return `854.95%`, trades/day `14.08`, short share `30.58%`, top sleeve concentration `29.15%`
-  - `2026q1`: legacy score `18.68`, daily Sharpe `14.10`, PF `4.63`, return `37.39%`, trades/day `15.93`, short share `31.47%`, top sleeve concentration `28.94%`
-- matching harsher stress replay on [v2_portfolio.wave4_stress_quality2.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_stress_quality2.json):
-  - `val`: daily Sharpe `10.99`, PF `4.09`, return `605.54%`, trades/day `12.91`, concentration `29.15%`
-  - `2026q1`: daily Sharpe `12.60`, PF `4.34`, return `32.99%`, trades/day `14.88`, concentration `28.18%`
-- conclusion: V2 now has its first full-split portfolio that clears the concentration target and also survives the stricter stress audit on both `val` and `2026q1`; the next blocker is no longer replay stress, but proving the candidate through paper-shadow and clearer replacement criteria versus the legacy line
+- corrected full 8-symbol replay after the max-hold friction fix:
+  - [v2_portfolio.wave4_quality2.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_quality2.json) is the strongest corrected base policy:
+    - `val`: legacy score `14.74`, daily Sharpe `11.04`, PF `4.26`, return `635.12%`, trades/day `14.37`, concentration `28.96%`
+    - `2026q1`: legacy score `15.31`, daily Sharpe `11.68`, PF `4.28`, return `28.84%`, trades/day `15.99`, concentration `28.86%`
+  - matching corrected stress replay on [v2_portfolio.wave4_stress_quality2.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_stress_quality2.json) failed PF on both splits:
+    - `val`: daily Sharpe `9.62`, PF `3.61`, concentration `30.00%`
+    - `2026q1`: daily Sharpe `9.30`, PF `3.56`, concentration `27.57%`
+  - [v2_portfolio.wave4_quality4.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_quality4.json) and [v2_portfolio.wave4_stress_quality4.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_stress_quality4.json) showed the opposite tradeoff:
+    - corrected stress passed on both splits
+    - corrected base concentration still missed the `<=30%` target by a hair
+- conclusion: the friction bug is fixed and the new indexed replay path makes full stress runs practical, but V2 is back to a near-miss state rather than a confirmed champion
 
 Current leading V2 candidate:
-- `v2_wave4_carry` with the quality-focused policy from [v2_portfolio.wave4_quality2.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_quality2.json)
-  - adds `funding_carry` and `post_event_mean_reversion` on top of the family-cluster-fixed `v2_wave3_orth`, then tightens cross-asset concentration, the dominant mean-reversion sleeve floors, and Tier-B sizing
-  - full 8-symbol replay:
-    - `val`: legacy score `16.39`, daily Sharpe `12.04`, PF `4.46`, return `854.95%`, trades/day `14.08`, short share `30.58%`, top sleeve concentration `29.15%`
-    - `2026q1`: legacy score `18.68`, daily Sharpe `14.10`, PF `4.63`, return `37.39%`, trades/day `15.93`, short share `31.47%`, top sleeve concentration `28.94%`
-  - full stress replay:
-    - `val`: daily Sharpe `10.99`, PF `4.09`, return `605.54%`, trades/day `12.91`, concentration `29.15%`
-    - `2026q1`: daily Sharpe `12.60`, PF `4.34`, return `32.99%`, trades/day `14.88`, concentration `28.18%`
+- `v2_wave4_carry` with the corrected base policy from [v2_portfolio.wave4_quality2.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_quality2.json)
+  - still looks like the strongest corrected base policy after the friction fix
+  - full corrected 8-symbol replay:
+    - `val`: legacy score `14.74`, daily Sharpe `11.04`, PF `4.26`, return `635.12%`, trades/day `14.37`, short share `30.56%`, top sleeve concentration `28.96%`
+    - `2026q1`: legacy score `15.31`, daily Sharpe `11.68`, PF `4.28`, return `28.84%`, trades/day `15.99`, short share `31.36%`, top sleeve concentration `28.86%`
+  - corrected stress replay:
+    - `val`: daily Sharpe `9.62`, PF `3.61`, concentration `30.00%`
+    - `2026q1`: daily Sharpe `9.30`, PF `3.56`, concentration `27.57%`
 - interpretation:
   - `funding_carry` remains the meaningful fourth pillar while `post_event_mean_reversion` is still mostly inert
-  - the stronger quality policy gave up some headline return but materially improved PF, drawdown control, and stressed durability
-  - this is the first V2 portfolio that passes the concentration target and the stricter replay stress audit on both full splits, so the alpha/replay side of the plan is materially closer to done
+  - the corrected friction bug materially reduced realized PF and return; that bug fix was important and changed the benchmark verdict
+  - no single policy currently clears corrected base concentration/PF and corrected stress PF together, so V2 remains a strong candidate rather than a promoted benchmark
 
 Useful research note:
 - `post_event_mean_reversion` currently looks more like a policy-gated sleeve than a bad model:
@@ -59,8 +63,9 @@ Useful research note:
   - the first event-floor test at `0.30` increased live event actions but did not move portfolio-level outcomes materially, so that is not the best next lever right now
 
 Immediate next focus:
-- run a longer paper-shadow validation pass on the quality2 policy with restart/kill-switch checks
-- compare the quality2 policy against the legacy control on explicit replacement criteria, not just standalone V2 strength
+- unify the corrected base and corrected stress bars in one policy instead of maintaining separate near-miss solutions
+- run a longer paper-shadow validation pass only after a single policy clears both corrected base and corrected stress bars
+- compare the corrected V2 candidate against the legacy control on explicit replacement criteria, not just standalone V2 strength
 - keep using the stricter V2 benchmark audit in `v2_evaluate.py`:
   - bar Sharpe
   - win rate
@@ -68,7 +73,7 @@ Immediate next focus:
   - max drawdown
   - trades/day
 - keep the confidence-override path available for later sleeve activation work, but do not spend the next loop on `post_event_mean_reversion` unless a better event-side hypothesis appears
-- optionally migrate the faster indexed replay path into a dedicated V2 stress CLI so this benchmark remains cheap enough for routine wave work
+- continue using the faster indexed replay path for routine wave work; the main blocker is policy fit now, not replay throughput
 
 ## Summary
 Build a **parallel V2 platform** beside the frozen `exp494` control. The goal is not “one better strategy,” but a **research-and-allocation machine** that manages **12-20 candidate alphas**, promotes **5-8 live sleeves**, supports **role-based timeframe bundles**, and compounds many weak-to-medium edges under strict risk and anti-overfitting controls.
