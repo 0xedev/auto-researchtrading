@@ -30,37 +30,33 @@ Current practical stage label:
 - **Stage 5 early / partial:** challenger registry and rolling evaluation exist, but promotion cadence and portfolio champion workflow are not mature yet
 
 Latest V2 read worth tracking:
-- full 8-symbol benchmark-style replay on `v2_wave1_priceonly`:
-  - `val`: return `738.19%`, daily Sharpe `12.39`, trades/day `12.05`, top sleeve concentration `42.7%`
-  - `2026q1`: return `27.00%`, daily Sharpe `12.87`, trades/day `11.45`, top sleeve concentration `43.6%`
-- conclusion: V2 clearly has real breadth and portfolio activity on a broader slice too, but concentration is still above the `30%` target and even the daily metrics remain optimistic enough that replay realism is still an open research risk
+- full 8-symbol benchmark-style replay on `v2_wave3_orth` after fixing allocator clustering to use strategy-family clusters from sleeve manifests:
+  - `val`: return `976.09%`, daily Sharpe `11.63`, trades/day `15.14`, short share `27.96%`, top sleeve concentration `31.0%`
+  - `2026q1`: return `36.27%`, daily Sharpe `14.80`, trades/day `16.82`, short share `34.16%`, top sleeve concentration `29.4%`
+- conclusion: the family-cluster fix was real and material; V2 now clears the concentration bar on `2026q1` and misses it on `val` by only about one point, so the problem has shifted from “broad concentration failure” to “final val cleanup + realism confirmation”
 
 Current leading V2 candidate:
 - `v2_wave3_orth`
   - adds `basis_dislocation`, `macro_beta_dispersion`, `macro_event_drift`, and `bear_stress_short` on top of `v2_wave2_pair`
-  - full 8-symbol `val` replay versus `v2_wave2_pair`:
-    - legacy score `14.38` vs `15.36`
-    - daily Sharpe `12.58` vs `12.58`
-    - return `1155.83%` vs `912.10%`
-    - trades/day `15.60` vs `13.27`
-    - short share `26.61%` vs `23.32%`
-    - top sleeve concentration `33.1%` vs `37.7%`
-  - full 8-symbol `2026q1` replay versus `v2_wave2_pair`:
-    - legacy score `17.81` vs `16.10`
-    - daily Sharpe `15.03` vs `12.93`
-    - return `37.96%` vs `27.80%`
-    - trades/day `17.15` vs `11.89`
-    - short share `32.96%` vs `21.64%`
-    - top sleeve concentration `31.4%` vs `42.4%`
+  - full 8-symbol replay after the strategy-family cluster fix:
+    - `val`: legacy score `15.00`, daily Sharpe `11.63`, return `976.09%`, trades/day `15.14`, short share `27.96%`, top sleeve concentration `31.0%`
+    - `2026q1`: legacy score `17.92`, daily Sharpe `14.80`, return `36.27%`, trades/day `16.82`, short share `34.16%`, top sleeve concentration `29.4%`
 - interpretation:
-  - `basis_dislocation` is the first new sleeve to look like a true second pillar instead of a small add-on
-  - the wave materially improves short participation and gets concentration very close to the `30%` target
-  - it is still not a V2 champion because concentration is not yet below target on both splits and replay realism still needs stress confirmation
+  - `basis_dislocation` remains the clearest new second pillar
+  - the allocator was previously under-diversifying because cluster penalties were keyed off symbol market buckets instead of alpha-family clusters
+  - after fixing that, the book rotated away from a single mean-reversion-dominated top sleeve and now has a plausible path to the concentration target without retraining every sleeve
+  - it is still not a V2 champion because `val` is just above the `30%` bar and replay realism still needs stress confirmation
+
+Promising follow-on branch:
+- `v2_wave4_carry`
+  - adds `funding_carry` and `post_event_mean_reversion` on top of `v2_wave3_orth`
+  - early full 8-symbol `2026q1` read: legacy score `17.64`, daily Sharpe `13.31`, return `39.74%`, trades/day `18.73`, short share `30.19%`, top sleeve concentration `27.0%`
+  - interpretation: wave4 is a live challenger because it further reduces concentration and lifts return density in `2026q1`, but it still needs a completed full `val` replay before it can displace wave3 as the lead candidate
 
 Immediate next focus:
-- stress-test `v2_wave3_orth` so the new breadth survives a less optimistic replay lens
-- close the last concentration gap below `30%` on both `val` and `2026q1`
-- keep strengthening the non-dominant sleeves that are now proving useful, especially carry and short clusters
+- finish a decision-grade `val` replay for `v2_wave4_carry`
+- finish a decision-grade diversified-policy replay for `v2_wave3_orth`
+- stress-test the best of those two candidates so the new breadth survives a less optimistic replay lens
 
 ## Summary
 Build a **parallel V2 platform** beside the frozen `exp494` control. The goal is not “one better strategy,” but a **research-and-allocation machine** that manages **12-20 candidate alphas**, promotes **5-8 live sleeves**, supports **role-based timeframe bundles**, and compounds many weak-to-medium edges under strict risk and anti-overfitting controls.
