@@ -418,6 +418,7 @@ def evaluate_model_set(
                 model_set=model_set,
                 active_sleeves=active_sleeves,
                 max_symbols=max_symbols,
+                confidence_overrides=portfolio_config.sleeve_min_confidence_overrides,
             )
             engine.prepare(split)
             engine_cache[split] = engine

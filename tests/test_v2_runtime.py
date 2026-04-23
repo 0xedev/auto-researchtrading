@@ -37,6 +37,35 @@ class V2RuntimeTests(unittest.TestCase):
         self.assertEqual(signal.metadata["strategy_cluster"], "mean_reversion")
         self.assertEqual(signal.metadata["market_cluster"], "crypto_majors")
 
+    def test_signals_respect_confidence_overrides(self):
+        engine = V2SignalEngine(
+            bundle_name="bundle_intraday_core",
+            model_set="unused",
+            active_sleeves=["post_event_mean_reversion"],
+            confidence_overrides={"post_event_mean_reversion": 0.30},
+        )
+        engine.sleeve_tables["post_event_mean_reversion"] = pd.DataFrame(
+            [
+                {
+                    "timestamp": 456,
+                    "symbol": "ETH",
+                    "confidence": 0.35,
+                    "side": -1,
+                    "base_close": 100.0,
+                    "base_clock_atr_pct_24h": 0.01,
+                    "holding_horizon_hours": 8.0,
+                    "reason_tag": "post_event_mean_reversion",
+                    "market_cluster": "crypto_majors",
+                    "regime_family": "event",
+                }
+            ]
+        )
+
+        signals = engine.signals_at_timestamp(456)
+
+        self.assertEqual(len(signals), 1)
+        self.assertAlmostEqual(signals[0].metadata["min_confidence"], 0.30)
+
 
 if __name__ == "__main__":
     unittest.main()

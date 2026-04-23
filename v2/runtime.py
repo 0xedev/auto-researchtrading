@@ -22,6 +22,7 @@ class V2SignalEngine:
         active_sleeves: list[str] | None = None,
         feature_profile: str = "price_context_plus",
         max_symbols: int | None = None,
+        confidence_overrides: dict[str, float] | None = None,
     ):
         self.bundle_name = bundle_name
         self.bundle = BUNDLE_MANIFESTS[bundle_name]
@@ -29,6 +30,7 @@ class V2SignalEngine:
         self.feature_profile = feature_profile
         self.max_symbols = max_symbols
         self.active_sleeves = active_sleeves or list(SLEEVE_MANIFESTS.keys())
+        self.confidence_overrides = dict(confidence_overrides or {})
         self.bundle_frame = pd.DataFrame()
         self.timestamps: list[int] = []
         self.sleeve_tables: dict[str, pd.DataFrame] = {}
@@ -88,7 +90,8 @@ class V2SignalEngine:
                 continue
             for row in rows.itertuples(index=False):
                 confidence = float(getattr(row, "confidence", 0.0))
-                if confidence < manifest.min_confidence:
+                min_confidence = float(self.confidence_overrides.get(sleeve_name, manifest.min_confidence))
+                if confidence < min_confidence:
                     continue
                 side = int(getattr(row, "side", 0))
                 if side == 0:
@@ -114,6 +117,7 @@ class V2SignalEngine:
                     "base_close": close,
                     "base_volume": float(getattr(row, "base_volume", 0.0)),
                     "allocator_confidence": confidence,
+                    "min_confidence": min_confidence,
                     "activation_rule": manifest.activation_rule,
                     "portfolio_weight": float(manifest.portfolio_weight),
                     "reentry_cooldown_hours": float(manifest.reentry_cooldown_hours),
