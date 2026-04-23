@@ -99,6 +99,8 @@ uv run v2_audit.py --bundle bundle_intraday_core --feature-profile price_only --
 uv run v2_shadow.py --bundle bundle_intraday_core --model-set v2_probe --split 2026q1 --portfolio-config v2_portfolio.example.json
 
 # Evaluate a V2 sleeve on val + 2026q1 plus capacity stress and optionally update the sleeve registry
+# The evaluator now reports both policy scores and benchmark-style replay metrics;
+# promotion gating uses bar_sharpe / win_rate / profit_factor / drawdown / trades-day, not raw return alone.
 uv run v2_evaluate.py --bundle bundle_intraday_core --model-set v2_probe --sleeve trend_pullback --portfolio-config v2_portfolio.example.json --update-registry --promote-if-pass
 
 # Run a lighter rolling stability sweep without stress to compare candidate behavior across multiple windows
@@ -115,6 +117,9 @@ uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_wave3_orth --
 # Run the leading wave4 benchmark with the light cross-asset trim that clears
 # the concentration target on both val and 2026q1
 uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_wave4_carry --split val --portfolio-config v2_portfolio.wave4_trim_rs.json
+
+# Run the same wave4 policy under the harsher stress lens used by v2_evaluate.py
+uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_wave4_carry --split val --portfolio-config v2_portfolio.wave4_trim_rs_stress.json
 
 # Retrain the macro HMM as well
 uv run train_model.py --timeframe 1h --train_hmm

@@ -18,7 +18,7 @@ What is already true:
 
 What is not true yet:
 - we do **not** have `5-8` live-quality independent sleeves
-- we do **not** yet satisfy the `<=30%` sleeve concentration target
+- the current lead candidate does satisfy the `<=30%` sleeve concentration target on the base full splits, but that has **not** yet been confirmed under stress / harsher replay assumptions
 - V2 still does not use the legacy `backtest.py` engine, but it now has its own benchmark-style replay/backtest path
 - most historical V2 reads were still probe or rolling-window evaluations, so the new full-period backtest path now needs to become part of the normal research loop
 
@@ -54,8 +54,16 @@ Useful research note:
 
 Immediate next focus:
 - stress-test the trimmed `v2_wave4_carry` benchmark so the new breadth survives a less optimistic replay lens
+- use the stricter V2 benchmark audit in `v2_evaluate.py`:
+  - bar Sharpe
+  - win rate
+  - profit factor
+  - max drawdown
+  - trades/day
+  instead of the older raw-return-only promotion lens
 - compare the trimmed wave4 benchmark against the current realism gates and shadow/capacity assumptions before any promotion language gets stronger
 - keep the confidence-override path available for later sleeve activation work, but do not spend the next loop on `post_event_mean_reversion` unless a better event-side hypothesis appears
+- if full 8-symbol stress replay remains too slow for routine research, add a faster dedicated stress harness rather than relying on the heaviest end-to-end evaluator path every time
 
 ## Summary
 Build a **parallel V2 platform** beside the frozen `exp494` control. The goal is not “one better strategy,” but a **research-and-allocation machine** that manages **12-20 candidate alphas**, promotes **5-8 live sleeves**, supports **role-based timeframe bundles**, and compounds many weak-to-medium edges under strict risk and anti-overfitting controls.

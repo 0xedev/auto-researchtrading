@@ -49,6 +49,11 @@ class V2EvaluationTests(unittest.TestCase):
             "generated_at": "2026-04-22T00:00:00+00:00",
             "base": {
                 "val": {
+                    "bar_sharpe": 4.2,
+                    "daily_sharpe": 3.4,
+                    "win_rate_pct": 61.0,
+                    "profit_factor": 4.6,
+                    "max_drawdown_pct": 6.0,
                     "raw_return_pct": 0.012,
                     "return_pct": 0.012,
                     "promotion_score": -0.688,
@@ -59,6 +64,11 @@ class V2EvaluationTests(unittest.TestCase):
                     "top_sleeve": "trend_1h_directional",
                 },
                 "2026q1": {
+                    "bar_sharpe": 3.9,
+                    "daily_sharpe": 3.1,
+                    "win_rate_pct": 60.5,
+                    "profit_factor": 4.2,
+                    "max_drawdown_pct": 5.0,
                     "raw_return_pct": 0.006,
                     "return_pct": 0.006,
                     "promotion_score": -0.694,
@@ -70,8 +80,28 @@ class V2EvaluationTests(unittest.TestCase):
                 },
             },
             "stress": {
-                "val": {"raw_return_pct": 0.003, "promotion_score": -0.697},
-                "2026q1": {"raw_return_pct": 0.001, "promotion_score": -0.699},
+                "val": {
+                    "bar_sharpe": 3.8,
+                    "daily_sharpe": 3.0,
+                    "win_rate_pct": 60.0,
+                    "profit_factor": 4.0,
+                    "max_drawdown_pct": 6.5,
+                    "shadow_ready": True,
+                    "trades_per_day": 1.2,
+                    "raw_return_pct": 0.003,
+                    "promotion_score": -0.697,
+                },
+                "2026q1": {
+                    "bar_sharpe": 3.6,
+                    "daily_sharpe": 2.9,
+                    "win_rate_pct": 60.0,
+                    "profit_factor": 4.0,
+                    "max_drawdown_pct": 6.0,
+                    "shadow_ready": True,
+                    "trades_per_day": 1.0,
+                    "raw_return_pct": 0.001,
+                    "promotion_score": -0.699,
+                },
             },
         }
         with patch("v2.evaluation.evaluate_model_set", return_value=evaluation):
@@ -83,15 +113,23 @@ class V2EvaluationTests(unittest.TestCase):
             )["summary"]
 
         self.assertTrue(summary["meets_gate"])
-        self.assertAlmostEqual(summary["validation_metric"], 0.012)
-        self.assertAlmostEqual(summary["oos_metric"], 0.006)
-        self.assertAlmostEqual(summary["stress_metric"], 0.001)
+        self.assertEqual(summary["metric_kind"], "bar_sharpe")
+        self.assertAlmostEqual(summary["validation_metric"], 4.2)
+        self.assertAlmostEqual(summary["oos_metric"], 3.9)
+        self.assertAlmostEqual(summary["stress_metric"], 3.6)
+        self.assertAlmostEqual(summary["validation_return_pct"], 0.012)
         self.assertAlmostEqual(summary["validation_promotion_score"], -0.688)
         self.assertFalse(summary["concentration_ready"])
+        self.assertTrue(summary["validation_audit"]["passed"])
 
     def test_evaluate_model_set_adds_portfolio_summary(self):
         trial_rows = [
             {
+                "bar_sharpe": 4.4,
+                "daily_sharpe": 3.6,
+                "win_rate_pct": 62.0,
+                "profit_factor": 4.8,
+                "max_drawdown_pct": 4.2,
                 "raw_return_pct": 0.012,
                 "return_pct": 0.012,
                 "promotion_score": 0.008,
@@ -103,6 +141,11 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "post_extension_snapback", "pnl_share": 0.28}],
             },
             {
+                "bar_sharpe": 4.1,
+                "daily_sharpe": 3.3,
+                "win_rate_pct": 61.0,
+                "profit_factor": 4.3,
+                "max_drawdown_pct": 4.5,
                 "raw_return_pct": 0.009,
                 "return_pct": 0.009,
                 "promotion_score": 0.005,
@@ -114,6 +157,12 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "trend_1h_directional", "pnl_share": 0.27}],
             },
             {
+                "bar_sharpe": 3.9,
+                "daily_sharpe": 3.1,
+                "win_rate_pct": 60.0,
+                "profit_factor": 4.0,
+                "max_drawdown_pct": 5.0,
+                "shadow_ready": True,
                 "raw_return_pct": 0.004,
                 "return_pct": 0.004,
                 "promotion_score": 0.001,
@@ -125,6 +174,12 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "post_extension_snapback", "pnl_share": 0.26}],
             },
             {
+                "bar_sharpe": 3.7,
+                "daily_sharpe": 3.0,
+                "win_rate_pct": 60.0,
+                "profit_factor": 4.0,
+                "max_drawdown_pct": 5.0,
+                "shadow_ready": True,
                 "raw_return_pct": 0.002,
                 "return_pct": 0.002,
                 "promotion_score": -0.001,
@@ -136,7 +191,10 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "trend_1h_directional", "pnl_share": 0.25}],
             },
         ]
-        with patch("v2.evaluation.run_shadow_trial", side_effect=trial_rows):
+        with patch("v2.evaluation.run_shadow_trial", side_effect=trial_rows), patch(
+            "v2.evaluation.V2SignalEngine"
+        ) as engine_cls:
+            engine_cls.return_value.prepare.return_value = None
             evaluation = evaluate_model_set(
                 bundle_name="bundle_intraday_core",
                 model_set="v2_test",
@@ -145,11 +203,14 @@ class V2EvaluationTests(unittest.TestCase):
 
         summary = evaluation["summary"]
         self.assertTrue(summary["meets_gate"])
-        self.assertAlmostEqual(summary["validation_metric"], 0.012)
-        self.assertAlmostEqual(summary["oos_metric"], 0.009)
-        self.assertAlmostEqual(summary["stress_metric"], 0.002)
+        self.assertEqual(summary["metric_kind"], "bar_sharpe")
+        self.assertAlmostEqual(summary["validation_metric"], 4.4)
+        self.assertAlmostEqual(summary["oos_metric"], 4.1)
+        self.assertAlmostEqual(summary["stress_metric"], 3.7)
+        self.assertAlmostEqual(summary["validation_return_pct"], 0.012)
         self.assertTrue(summary["concentration_ready"])
         self.assertEqual(summary["top_sleeves"][0]["sleeve"], "post_extension_snapback")
+        self.assertTrue(summary["validation_audit"]["passed"])
 
     def test_window_bounds_from_timestamps_downsamples_evenly(self):
         timestamps = [i * 24 * 3600 for i in range(10)]
@@ -166,6 +227,11 @@ class V2EvaluationTests(unittest.TestCase):
     def test_evaluate_model_set_adds_rolling_summary(self):
         base_trials = [
             {
+                "bar_sharpe": 4.1,
+                "daily_sharpe": 3.3,
+                "win_rate_pct": 61.0,
+                "profit_factor": 4.2,
+                "max_drawdown_pct": 5.0,
                 "raw_return_pct": 0.010,
                 "return_pct": 0.010,
                 "promotion_score": 0.004,
@@ -177,6 +243,11 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "sideways_mean_reversion", "pnl_share": 0.41}],
             },
             {
+                "bar_sharpe": 3.9,
+                "daily_sharpe": 3.1,
+                "win_rate_pct": 60.0,
+                "profit_factor": 4.0,
+                "max_drawdown_pct": 5.0,
                 "raw_return_pct": 0.005,
                 "return_pct": 0.005,
                 "promotion_score": 0.001,
@@ -188,6 +259,11 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "trend_1h_directional", "pnl_share": 0.33}],
             },
             {
+                "bar_sharpe": 4.0,
+                "daily_sharpe": 3.2,
+                "win_rate_pct": 60.5,
+                "profit_factor": 4.1,
+                "max_drawdown_pct": 5.0,
                 "raw_return_pct": 0.009,
                 "return_pct": 0.009,
                 "promotion_score": 0.003,
@@ -199,6 +275,11 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "trend_1h_directional", "pnl_share": 0.29}],
             },
             {
+                "bar_sharpe": 3.8,
+                "daily_sharpe": 3.0,
+                "win_rate_pct": 60.0,
+                "profit_factor": 4.0,
+                "max_drawdown_pct": 5.0,
                 "raw_return_pct": 0.004,
                 "return_pct": 0.004,
                 "promotion_score": 0.000,
@@ -212,6 +293,11 @@ class V2EvaluationTests(unittest.TestCase):
         ]
         rolling_trials = [
             {
+                "bar_sharpe": 3.8,
+                "daily_sharpe": 3.0,
+                "win_rate_pct": 60.0,
+                "profit_factor": 4.0,
+                "max_drawdown_pct": 5.0,
                 "raw_return_pct": 0.003,
                 "return_pct": 0.003,
                 "promotion_score": 0.001,
@@ -223,6 +309,11 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "sideways_mean_reversion", "pnl_share": 0.38}],
             },
             {
+                "bar_sharpe": 3.7,
+                "daily_sharpe": 2.9,
+                "win_rate_pct": 60.0,
+                "profit_factor": 4.0,
+                "max_drawdown_pct": 5.0,
                 "raw_return_pct": -0.001,
                 "return_pct": -0.001,
                 "promotion_score": -0.003,
@@ -234,6 +325,11 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "sideways_mean_reversion", "pnl_share": 0.45}],
             },
             {
+                "bar_sharpe": 3.8,
+                "daily_sharpe": 3.0,
+                "win_rate_pct": 60.0,
+                "profit_factor": 4.0,
+                "max_drawdown_pct": 5.0,
                 "raw_return_pct": 0.002,
                 "return_pct": 0.002,
                 "promotion_score": -0.001,
@@ -245,6 +341,11 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "trend_1h_directional", "pnl_share": 0.31}],
             },
             {
+                "bar_sharpe": 3.8,
+                "daily_sharpe": 3.0,
+                "win_rate_pct": 60.0,
+                "profit_factor": 4.0,
+                "max_drawdown_pct": 5.0,
                 "raw_return_pct": 0.001,
                 "return_pct": 0.001,
                 "promotion_score": -0.002,
@@ -256,6 +357,11 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "post_extension_snapback", "pnl_share": 0.30}],
             },
             {
+                "bar_sharpe": 3.9,
+                "daily_sharpe": 3.1,
+                "win_rate_pct": 60.0,
+                "profit_factor": 4.1,
+                "max_drawdown_pct": 5.0,
                 "raw_return_pct": 0.004,
                 "return_pct": 0.004,
                 "promotion_score": 0.001,
@@ -267,6 +373,11 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "trend_1h_directional", "pnl_share": 0.35}],
             },
             {
+                "bar_sharpe": 3.8,
+                "daily_sharpe": 3.0,
+                "win_rate_pct": 60.0,
+                "profit_factor": 4.0,
+                "max_drawdown_pct": 5.0,
                 "raw_return_pct": 0.002,
                 "return_pct": 0.002,
                 "promotion_score": -0.001,
@@ -278,6 +389,11 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "post_extension_snapback", "pnl_share": 0.29}],
             },
             {
+                "bar_sharpe": 3.9,
+                "daily_sharpe": 3.1,
+                "win_rate_pct": 60.0,
+                "profit_factor": 4.1,
+                "max_drawdown_pct": 5.0,
                 "raw_return_pct": 0.005,
                 "return_pct": 0.005,
                 "promotion_score": 0.001,
@@ -289,6 +405,11 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "trend_1h_directional", "pnl_share": 0.34}],
             },
             {
+                "bar_sharpe": 3.8,
+                "daily_sharpe": 3.0,
+                "win_rate_pct": 60.0,
+                "profit_factor": 4.0,
+                "max_drawdown_pct": 5.0,
                 "raw_return_pct": 0.003,
                 "return_pct": 0.003,
                 "promotion_score": 0.000,
@@ -303,7 +424,8 @@ class V2EvaluationTests(unittest.TestCase):
         with patch("v2.evaluation.run_shadow_trial", side_effect=base_trials + rolling_trials), patch(
             "v2.evaluation._rolling_window_bounds",
             return_value=[(1, 2), (3, 4)],
-        ):
+        ), patch("v2.evaluation.V2SignalEngine") as engine_cls:
+            engine_cls.return_value.prepare.return_value = None
             evaluation = evaluate_model_set(
                 bundle_name="bundle_intraday_core",
                 model_set="v2_test",
@@ -321,6 +443,11 @@ class V2EvaluationTests(unittest.TestCase):
     def test_evaluate_model_set_can_skip_stress(self):
         trial_rows = [
             {
+                "bar_sharpe": 4.0,
+                "daily_sharpe": 3.2,
+                "win_rate_pct": 61.0,
+                "profit_factor": 4.2,
+                "max_drawdown_pct": 4.5,
                 "raw_return_pct": 0.011,
                 "return_pct": 0.011,
                 "promotion_score": 0.006,
@@ -332,6 +459,11 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "trend_1h_directional", "pnl_share": 0.29}],
             },
             {
+                "bar_sharpe": 3.8,
+                "daily_sharpe": 3.0,
+                "win_rate_pct": 60.0,
+                "profit_factor": 4.0,
+                "max_drawdown_pct": 4.8,
                 "raw_return_pct": 0.007,
                 "return_pct": 0.007,
                 "promotion_score": 0.002,
@@ -343,7 +475,10 @@ class V2EvaluationTests(unittest.TestCase):
                 "sleeve_concentration": [{"sleeve": "post_extension_snapback", "pnl_share": 0.27}],
             },
         ]
-        with patch("v2.evaluation.run_shadow_trial", side_effect=trial_rows):
+        with patch("v2.evaluation.run_shadow_trial", side_effect=trial_rows), patch(
+            "v2.evaluation.V2SignalEngine"
+        ) as engine_cls:
+            engine_cls.return_value.prepare.return_value = None
             evaluation = evaluate_model_set(
                 bundle_name="bundle_intraday_core",
                 model_set="v2_test",

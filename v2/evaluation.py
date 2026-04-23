@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import tempfile
 from collections import Counter
 from datetime import datetime, timezone
@@ -16,6 +17,14 @@ from .features import timeframe_to_hours
 from .manifests import BUNDLE_MANIFESTS
 from .runtime import V2SignalEngine
 from .types import PortfolioConfig
+
+LEGACY_AUDIT_BENCHMARKS = {
+    "bar_sharpe": 3.5,
+    "win_rate_pct": 60.0,
+    "trades_per_day": 1.0,
+    "profit_factor": 4.0,
+    "max_drawdown_pct": 10.0,
+}
 
 
 def _read_jsonl(path: str | Path) -> list[dict]:
@@ -38,6 +47,75 @@ def _read_jsonl(path: str | Path) -> list[dict]:
 def _days_processed(bundle_name: str, bars_processed: int) -> float:
     base_hours = timeframe_to_hours(BUNDLE_MANIFESTS[bundle_name].base_tf)
     return max((bars_processed * base_hours) / 24.0, 1e-9)
+
+
+def _safe_metric(metrics: dict, key: str, default: float = 0.0) -> float:
+    value = metrics.get(key, default)
+    if value is None:
+        return float(default)
+    try:
+        value = float(value)
+    except Exception:
+        return float(default)
+    if math.isnan(value):
+        return float(default)
+    return float(value)
+
+
+def _build_metric_audit(metrics: dict) -> dict:
+    bar_sharpe = _safe_metric(metrics, "bar_sharpe")
+    daily_sharpe = _safe_metric(metrics, "daily_sharpe")
+    win_rate_pct = _safe_metric(metrics, "win_rate_pct")
+    trades_per_day = _safe_metric(metrics, "trades_per_day")
+    profit_factor = metrics.get("profit_factor")
+    if profit_factor is None:
+        profit_factor_value = 0.0
+    else:
+        try:
+            profit_factor_value = float(profit_factor)
+        except Exception:
+            profit_factor_value = 0.0
+        if math.isnan(profit_factor_value):
+            profit_factor_value = 0.0
+    max_drawdown_pct = _safe_metric(metrics, "max_drawdown_pct")
+    shadow_ready = bool(metrics.get("shadow_ready", False))
+
+    failures = []
+    if bar_sharpe < LEGACY_AUDIT_BENCHMARKS["bar_sharpe"]:
+        failures.append(
+            f"bar_sharpe<{LEGACY_AUDIT_BENCHMARKS['bar_sharpe']:.1f}"
+        )
+    if win_rate_pct < LEGACY_AUDIT_BENCHMARKS["win_rate_pct"]:
+        failures.append(
+            f"win_rate_pct<{LEGACY_AUDIT_BENCHMARKS['win_rate_pct']:.1f}"
+        )
+    if trades_per_day < LEGACY_AUDIT_BENCHMARKS["trades_per_day"]:
+        failures.append(
+            f"trades_per_day<{LEGACY_AUDIT_BENCHMARKS['trades_per_day']:.1f}"
+        )
+    if profit_factor_value < LEGACY_AUDIT_BENCHMARKS["profit_factor"]:
+        failures.append(
+            f"profit_factor<{LEGACY_AUDIT_BENCHMARKS['profit_factor']:.1f}"
+        )
+    if max_drawdown_pct >= LEGACY_AUDIT_BENCHMARKS["max_drawdown_pct"]:
+        failures.append(
+            f"max_drawdown_pct>={LEGACY_AUDIT_BENCHMARKS['max_drawdown_pct']:.1f}"
+        )
+    if not shadow_ready:
+        failures.append("shadow_ready=false")
+
+    return {
+        "passed": not failures,
+        "bar_sharpe": float(bar_sharpe),
+        "daily_sharpe": float(daily_sharpe),
+        "win_rate_pct": float(win_rate_pct),
+        "trades_per_day": float(trades_per_day),
+        "profit_factor": float(profit_factor_value),
+        "max_drawdown_pct": float(max_drawdown_pct),
+        "shadow_ready": bool(shadow_ready),
+        "thresholds": dict(LEGACY_AUDIT_BENCHMARKS),
+        "failures": failures,
+    }
 
 
 def _summarize_trial(bundle_name: str, result: dict, summary: dict, log_rows: list[dict]) -> dict:
@@ -156,15 +234,25 @@ def _build_portfolio_summary(evaluation: dict) -> dict:
     stress_val = stress_payload.get("val", {}) or {}
     stress_oos = stress_payload.get("2026q1", {}) or {}
     has_stress = bool(stress_payload)
+    val_audit = _build_metric_audit(val_metrics)
+    oos_audit = _build_metric_audit(oos_metrics)
+    stress_val_audit = _build_metric_audit(stress_val) if stress_val else {}
+    stress_oos_audit = _build_metric_audit(stress_oos) if stress_oos else {}
 
     val_return_metric = float(val_metrics.get("raw_return_pct", val_metrics.get("return_pct", 0.0)) or 0.0)
     oos_return_metric = float(oos_metrics.get("raw_return_pct", oos_metrics.get("return_pct", 0.0)) or 0.0)
     val_promotion_metric = float(val_metrics.get("promotion_score", val_metrics.get("score", 0.0)) or 0.0)
     oos_promotion_metric = float(oos_metrics.get("promotion_score", oos_metrics.get("score", 0.0)) or 0.0)
+    val_sharpe_metric = _safe_metric(val_metrics, "bar_sharpe")
+    oos_sharpe_metric = _safe_metric(oos_metrics, "bar_sharpe")
     if has_stress:
         stress_return_metric = min(
             float(stress_val.get("raw_return_pct", stress_val.get("return_pct", 0.0)) or 0.0),
             float(stress_oos.get("raw_return_pct", stress_oos.get("return_pct", 0.0)) or 0.0),
+        )
+        stress_sharpe_metric = min(
+            _safe_metric(stress_val, "bar_sharpe"),
+            _safe_metric(stress_oos, "bar_sharpe"),
         )
         stress_promotion_metric = min(
             float(stress_val.get("promotion_score", stress_val.get("score", 0.0)) or 0.0),
@@ -172,6 +260,7 @@ def _build_portfolio_summary(evaluation: dict) -> dict:
         )
     else:
         stress_return_metric = float(min(val_return_metric, oos_return_metric))
+        stress_sharpe_metric = float(min(val_sharpe_metric, oos_sharpe_metric))
         stress_promotion_metric = 0.0
     top_share = max(
         float(val_metrics.get("top_sleeve_share", 0.0) or 0.0),
@@ -206,18 +295,27 @@ def _build_portfolio_summary(evaluation: dict) -> dict:
         default=0.0,
     )
     meets_gate = (
-        val_return_metric >= 0.0
-        and oos_return_metric >= 0.0
-        and (stress_return_metric >= 0.0 if has_stress else True)
+        val_audit["passed"]
+        and oos_audit["passed"]
+        and ((stress_val_audit.get("passed", False) and stress_oos_audit.get("passed", False)) if has_stress else True)
         and concentration_ready
         and shadow_ready
-        and trades_per_day > 0.0
     )
     return {
         "meets_gate": bool(meets_gate),
-        "validation_metric": float(val_return_metric),
-        "oos_metric": float(oos_return_metric),
-        "stress_metric": float(stress_return_metric),
+        "metric_kind": "bar_sharpe",
+        "validation_metric": float(val_sharpe_metric),
+        "oos_metric": float(oos_sharpe_metric),
+        "stress_metric": float(stress_sharpe_metric),
+        "validation_return_pct": float(val_return_metric),
+        "oos_return_pct": float(oos_return_metric),
+        "stress_return_pct": float(stress_return_metric),
+        "validation_daily_sharpe": _safe_metric(val_metrics, "daily_sharpe"),
+        "oos_daily_sharpe": _safe_metric(oos_metrics, "daily_sharpe"),
+        "stress_daily_sharpe": min(
+            _safe_metric(stress_val, "daily_sharpe"),
+            _safe_metric(stress_oos, "daily_sharpe"),
+        ) if has_stress else min(_safe_metric(val_metrics, "daily_sharpe"), _safe_metric(oos_metrics, "daily_sharpe")),
         "validation_promotion_score": float(val_promotion_metric),
         "oos_promotion_score": float(oos_promotion_metric),
         "stress_promotion_score": float(stress_promotion_metric),
@@ -230,11 +328,17 @@ def _build_portfolio_summary(evaluation: dict) -> dict:
         "rolling_positive_window_rate": float(rolling_positive_rate),
         "rolling_mean_return_pct": float(rolling_mean_return),
         "rolling_max_concentration_pct": float(rolling_max_concentration),
+        "validation_audit": val_audit,
+        "oos_audit": oos_audit,
+        "stress_val_audit": stress_val_audit,
+        "stress_oos_audit": stress_oos_audit,
         "top_sleeves": _top_concentration_rows(val_metrics, oos_metrics),
         "notes": (
+            f"val_bar_sharpe={val_sharpe_metric:.4f} "
+            f"oos_bar_sharpe={oos_sharpe_metric:.4f} "
+            f"stress_bar_sharpe={stress_sharpe_metric:.4f} "
             f"val_return={val_return_metric:.4f} "
             f"oos_return={oos_return_metric:.4f} "
-            f"stress_return={stress_return_metric:.4f} "
             f"rolling_pos_rate={rolling_positive_rate:.2f} "
             f"top_sleeve={val_metrics.get('top_sleeve', '') or oos_metrics.get('top_sleeve', '')}"
         ).strip(),
@@ -366,6 +470,8 @@ def run_shadow_trial(
     end_timestamp: int | None = None,
     engine: V2SignalEngine | None = None,
 ) -> dict:
+    from .backtest import _secondary_metrics, _series_from_curve, build_v2_backtest_result
+
     with tempfile.TemporaryDirectory(prefix="v2_eval_") as tmpdir:
         root = Path(tmpdir)
         state_path = root / "state.json"
@@ -384,10 +490,37 @@ def run_shadow_trial(
             start_timestamp=start_timestamp,
             end_timestamp=end_timestamp,
             engine=engine,
+            collect_bar_history=True,
         )
         summary = summarize_shadow_run(state_path=state_path, log_path=log_path, max_recent=12)
         log_rows = _read_jsonl(log_path)
     metrics = _summarize_trial(bundle_name, result, summary, log_rows)
+    backtest_result = build_v2_backtest_result(
+        bundle_name=bundle_name,
+        run_result=result,
+        summary=summary,
+        log_rows=log_rows,
+    )
+    equity_series = _series_from_curve(backtest_result.equity_curve, backtest_result.equity_timestamps)
+    secondary_metrics = _secondary_metrics(equity_series, bundle_name)
+    metrics.update(
+        {
+            "backtest_score": float(prepare.compute_score(backtest_result)),
+            "bar_sharpe": float(backtest_result.sharpe),
+            "daily_sharpe": float(secondary_metrics.get("daily_sharpe", 0.0) or 0.0),
+            "daily_sortino": float(secondary_metrics.get("daily_sortino", 0.0) or 0.0),
+            "daily_observations": int(secondary_metrics.get("daily_observations", 0) or 0),
+            "max_drawdown_pct": float(backtest_result.max_drawdown_pct),
+            "win_rate_pct": float(backtest_result.win_rate_pct),
+            "profit_factor": float(backtest_result.profit_factor),
+            "annual_turnover": float(backtest_result.annual_turnover),
+            "metric_caveat": (
+                "promotion_score is a policy score; benchmark gating should use bar_sharpe, "
+                "profit_factor, max_drawdown_pct, win_rate_pct, and trades_per_day"
+            ),
+        }
+    )
+    metrics["benchmark_audit"] = _build_metric_audit(metrics)
     if start_timestamp is not None:
         metrics["window_start"] = int(start_timestamp)
     if end_timestamp is not None:
@@ -562,14 +695,24 @@ def evaluate_candidate(
         float(val_metrics.get("top_sleeve_share", 0.0) or 0.0),
         float(oos_metrics.get("top_sleeve_share", 0.0) or 0.0),
     )
+    val_audit = _build_metric_audit(val_metrics)
+    oos_audit = _build_metric_audit(oos_metrics)
+    stress_val_audit = _build_metric_audit(stress_val) if stress_val else {}
+    stress_oos_audit = _build_metric_audit(stress_oos) if stress_oos else {}
     val_return_metric = float(val_metrics.get("raw_return_pct", val_metrics.get("return_pct", 0.0)) or 0.0)
     oos_return_metric = float(oos_metrics.get("raw_return_pct", oos_metrics.get("return_pct", 0.0)) or 0.0)
     val_promotion_metric = float(val_metrics.get("promotion_score", val_metrics.get("score", 0.0)) or 0.0)
     oos_promotion_metric = float(oos_metrics.get("promotion_score", oos_metrics.get("score", 0.0)) or 0.0)
+    val_sharpe_metric = _safe_metric(val_metrics, "bar_sharpe")
+    oos_sharpe_metric = _safe_metric(oos_metrics, "bar_sharpe")
     if has_stress:
         stress_return_metric = min(
             float(stress_val.get("raw_return_pct", stress_val.get("return_pct", 0.0)) or 0.0),
             float(stress_oos.get("raw_return_pct", stress_oos.get("return_pct", 0.0)) or 0.0),
+        )
+        stress_sharpe_metric = min(
+            _safe_metric(stress_val, "bar_sharpe"),
+            _safe_metric(stress_oos, "bar_sharpe"),
         )
         stress_promotion_metric = min(
             float(stress_val.get("promotion_score", stress_val.get("score", 0.0)) or 0.0),
@@ -577,6 +720,7 @@ def evaluate_candidate(
         )
     else:
         stress_return_metric = float(min(val_return_metric, oos_return_metric))
+        stress_sharpe_metric = float(min(val_sharpe_metric, oos_sharpe_metric))
         stress_promotion_metric = 0.0
     shadow_ready = bool(val_metrics.get("shadow_ready", False) and oos_metrics.get("shadow_ready", False))
     trades_per_day = max(
@@ -602,19 +746,29 @@ def evaluate_candidate(
         default=0.0,
     )
     meets_gate = (
-        val_return_metric >= 0.0
-        and oos_return_metric >= 0.0
+        val_audit["passed"]
+        and oos_audit["passed"]
+        and ((stress_val_audit.get("passed", False) and stress_oos_audit.get("passed", False)) if has_stress else True)
         and shadow_ready
-        and trades_per_day > 0.0
     )
     return {
         **evaluation,
         "sleeve": sleeve_name,
         "summary": {
             "meets_gate": bool(meets_gate),
-            "validation_metric": float(val_return_metric),
-            "oos_metric": float(oos_return_metric),
-            "stress_metric": float(stress_return_metric),
+            "metric_kind": "bar_sharpe",
+            "validation_metric": float(val_sharpe_metric),
+            "oos_metric": float(oos_sharpe_metric),
+            "stress_metric": float(stress_sharpe_metric),
+            "validation_return_pct": float(val_return_metric),
+            "oos_return_pct": float(oos_return_metric),
+            "stress_return_pct": float(stress_return_metric),
+            "validation_daily_sharpe": _safe_metric(val_metrics, "daily_sharpe"),
+            "oos_daily_sharpe": _safe_metric(oos_metrics, "daily_sharpe"),
+            "stress_daily_sharpe": min(
+                _safe_metric(stress_val, "daily_sharpe"),
+                _safe_metric(stress_oos, "daily_sharpe"),
+            ) if has_stress else min(_safe_metric(val_metrics, "daily_sharpe"), _safe_metric(oos_metrics, "daily_sharpe")),
             "validation_promotion_score": float(val_promotion_metric),
             "oos_promotion_score": float(oos_promotion_metric),
             "stress_promotion_score": float(stress_promotion_metric),
@@ -626,7 +780,14 @@ def evaluate_candidate(
             "has_stress": bool(has_stress),
             "rolling_positive_window_rate": float(rolling_positive_rate),
             "rolling_mean_return_pct": float(rolling_mean_return),
+            "validation_audit": val_audit,
+            "oos_audit": oos_audit,
+            "stress_val_audit": stress_val_audit,
+            "stress_oos_audit": stress_oos_audit,
             "notes": (
+                f"val_bar_sharpe={val_sharpe_metric:.4f} "
+                f"oos_bar_sharpe={oos_sharpe_metric:.4f} "
+                f"stress_bar_sharpe={stress_sharpe_metric:.4f} "
                 f"val_return={val_metrics.get('return_pct', 0.0):.4f} "
                 f"oos_return={oos_metrics.get('return_pct', 0.0):.4f} "
                 f"val_promo={val_promotion_metric:.4f} "
