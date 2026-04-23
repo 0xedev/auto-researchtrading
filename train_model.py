@@ -235,9 +235,14 @@ def train(
     short_calibration_mode="raw",
     train_bear_short_meta=False,
     bear_short_target_mode="default",
+    n_trees=None,
+    depth=None,
+    train_start=None,
+    trim_train_end=None,
 ):
     print(f"Training Cross-Sectional Sniper (Classifier) for {timeframe} bars...")
-    X, y, y_meta, states, sample_meta, features = prepare_dataset(timeframe, "train", feature_profile=feature_profile)
+    split_name = "train_15m" if timeframe == "15m" else "train"
+    X, y, y_meta, states, sample_meta, features = prepare_dataset(timeframe, split_name, feature_profile=feature_profile)
     
     if X is None or len(X) < 1000:
         print("Insufficient data for training.")
@@ -247,8 +252,38 @@ def train(
         X, y, y_meta, states, sample_meta, test_size=0.2, shuffle=False
     )
 
-    n_trees = args.n_trees if args.n_trees else 250
-    depth = args.depth if args.depth else {"1h": 14, "4h": 16, "15m": 12}.get(timeframe, 14)
+    def _mask_apply(obj, mask):
+        if hasattr(obj, "reset_index"):
+            return obj[mask].reset_index(drop=True)
+        return obj[mask]
+
+    if train_start:
+        cutoff_ms = int(pd.Timestamp(train_start).timestamp() * 1000)
+        recent_mask = (meta_train["timestamp"] >= cutoff_ms).values
+        if recent_mask.sum() < 500:
+            print(f"WARNING: --train-start {train_start} leaves only {recent_mask.sum()} train bars, ignoring")
+        else:
+            print(f"Trimming training start: {len(X_train)} → {recent_mask.sum()} bars (from {train_start})")
+            X_train = _mask_apply(X_train, recent_mask)
+            y_train = _mask_apply(y_train, recent_mask)
+            y_meta_train = _mask_apply(y_meta_train, recent_mask)
+            s_train = _mask_apply(s_train, recent_mask)
+            meta_train = _mask_apply(meta_train, recent_mask)
+    if trim_train_end:
+        cutoff_ms = int(pd.Timestamp(trim_train_end).timestamp() * 1000)
+        end_mask = (meta_train["timestamp"] <= cutoff_ms).values
+        if end_mask.sum() < 500:
+            print(f"WARNING: --trim-train-end {trim_train_end} leaves only {end_mask.sum()} train bars, ignoring")
+        else:
+            print(f"Trimming training end: {len(X_train)} → {end_mask.sum()} bars (until {trim_train_end})")
+            X_train = _mask_apply(X_train, end_mask)
+            y_train = _mask_apply(y_train, end_mask)
+            y_meta_train = _mask_apply(y_meta_train, end_mask)
+            s_train = _mask_apply(s_train, end_mask)
+            meta_train = _mask_apply(meta_train, end_mask)
+
+    n_trees = n_trees if n_trees else 250
+    depth = depth if depth else {"1h": 14, "4h": 16, "15m": 12}.get(timeframe, 14)
     out_dir = _output_dir(model_set)
 
     metadata = {
@@ -294,17 +329,15 @@ def train(
                 model.fit(X_s, y_s, sample_weight=w_s)
             _save_model(model, out_dir, f"lead_{timeframe}_s{state}.json")
             
-            # 2. Meta Model
-            meta_target = (ym_s == 1).astype(int)
-            meta_val_target = (ym_v == 1).astype(int)
-            w_meta = compute_sample_weight(class_weight="balanced", y=meta_target)
-            
+            # 2. Meta Model — directional volatility gate on full state training set.
+            # Target: 1 if bar has a non-flat directional label (trending), 0 if flat.
+            # Trains on all state training bars → 100K+ samples, deployment-matched.
             meta_model = build_model(n_trees, depth - 2, 0.03)
-            if len(X_v) > 50:
-                meta_model.fit(X_s, meta_target, sample_weight=w_meta, eval_set=[(X_v, meta_val_target)], verbose=False)
-            else:
-                meta_model.set_params(early_stopping_rounds=None)
-                meta_model.fit(X_s, meta_target, sample_weight=w_meta)
+            meta_model.set_params(early_stopping_rounds=None)
+            s_arr = y_s.values if hasattr(y_s, "values") else y_s
+            meta_t_s = (s_arr != 0).astype(int)
+            print(f"  State {state} meta: {len(meta_t_s)} bars, pos_rate={meta_t_s.mean():.3f}")
+            meta_model.fit(X_s[features], meta_t_s, verbose=False)
             _save_model(meta_model, out_dir, f"meta_{timeframe}_s{state}.json")
     
     # Also train a "Global" fallback model
@@ -395,10 +428,19 @@ def train(
         model.fit(X_train, y_train, eval_set=[(X_val[features], y_val)], verbose=False)
 
         print(f"Training Stage 2: Meta-Labeling ({timeframe})...")
-        meta_target = (y_meta_train == 1).astype(int)
-        meta_val_target = (y_meta_val == 1).astype(int)
+        # Directional volatility gate: meta = 1 when bar has a non-flat directional
+        # label (price moved significantly), 0 when flat.  Training on ALL training
+        # bars gives 100K+ samples matching deployment distribution (meta runs on
+        # every bar, not just signal bars).  Avoids the 50/50 triple-barrier issue
+        # from extended 2017-2024 window and the tiny-sample problem from filtering.
+        train_arr = y_train.values if hasattr(y_train, "values") else y_train
+        meta_target = (train_arr != 0).astype(int)
+        pos_rate = meta_target.mean()
+        print(f"  Train meta labels: {len(meta_target)} bars, meta positive rate: {pos_rate:.3f}")
+
         meta_model = build_model(n_trees, depth - 2, 0.03)
-        meta_model.fit(X_train, meta_target, eval_set=[(X_val[features], meta_val_target)], verbose=False)
+        meta_model.set_params(early_stopping_rounds=None)
+        meta_model.fit(X_train[features], meta_target, verbose=False)
 
         _save_model(model, out_dir, f"lead_{timeframe}.json")
         _save_model(meta_model, out_dir, f"meta_{timeframe}.json")
@@ -406,12 +448,15 @@ def train(
         # Validation / Meta-Diagnostics
         val_preds = model.predict(X_val[features])
         val_meta_probs = meta_model.predict_proba(X_val[features])[:, 1]
+        val_arr_diag = y_val.values if hasattr(y_val, "values") else y_val
 
-        is_trend_pred = (val_preds != 0)
-        base_wr = accuracy_score(y_val[is_trend_pred], val_preds[is_trend_pred]) if any(is_trend_pred) else 0.0
+        # Bars where lead model predicts directional movement (non-flat argmax)
+        is_trend_pred = val_preds != 0
+        base_wr = accuracy_score(val_arr_diag[is_trend_pred], val_preds[is_trend_pred]) if any(is_trend_pred) else 0.0
 
+        # "Sniper" bars: meta says trending AND lead says directional
         sniper_mask = is_trend_pred & (val_meta_probs > 0.65)
-        sniper_wr = accuracy_score(y_val[sniper_mask], val_preds[sniper_mask]) if any(sniper_mask) else 0.0
+        sniper_wr = accuracy_score(val_arr_diag[sniper_mask], val_preds[sniper_mask]) if any(sniper_mask) else 0.0
 
         if not model_set:
             model.save_model(os.path.expanduser(f"~/.cache/autotrader/model_{timeframe}.json"))
@@ -433,6 +478,8 @@ if __name__ == "__main__":
     parser.add_argument("--n_trees", type=int, default=100)
     parser.add_argument("--depth", type=int, default=12)
     parser.add_argument("--train_hmm", action="store_true", help="Also retrain the macro HMM")
+    parser.add_argument("--train-start", type=str, default=None, help="Trim training set to bars on/after this date (e.g. 2020-01-01)")
+    parser.add_argument("--trim-train-end", type=str, default=None, help="Trim training set to bars on/before this date (e.g. 2022-06-30)")
     parser.add_argument("--feature-profile", type=str, default="price_only", choices=["price_only", "price_context", "price_context_plus"])
     parser.add_argument("--model-set", type=str, default=None, help="Optional models/<name>/ output directory")
     parser.add_argument("--short-calibration-mode", type=str, default="raw", choices=["raw", "platt", "isotonic", "rank", "bear_model"])
@@ -457,4 +504,8 @@ if __name__ == "__main__":
         short_calibration_mode=args.short_calibration_mode,
         train_bear_short_meta=args.train_bear_short_meta,
         bear_short_target_mode=args.bear_short_target_mode,
+        n_trees=args.n_trees,
+        depth=args.depth,
+        train_start=args.train_start,
+        trim_train_end=args.trim_train_end,
     )

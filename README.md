@@ -16,6 +16,7 @@ The active product lane and frozen research control are documented in:
 
 - [POSITIONING.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/POSITIONING.md)
 - [CONTROL_BASELINE.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/CONTROL_BASELINE.md)
+- [RETRAIN_PROTOCOL.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/RETRAIN_PROTOCOL.md)
 
 > Historical note
 >
@@ -67,6 +68,9 @@ uv run train_model.py --timeframe 15m
 # Train a tagged experimental model set with short-confidence plumbing
 uv run train_model.py --timeframe 15m --model-set exp_short_platt --short-calibration-mode platt --train-bear-short-meta
 
+# Explicit train-window trimming for tagged retrain experiments
+uv run train_model.py --timeframe 15m --model-set exp_window_probe --train-start 2020-01-01 --trim-train-end 2022-06-30
+
 # Run the shadow paper-trading engine with persisted state plus dashboard outputs
 uv run shadow_trade.py --timeframe 1h --split 2026q1 --state-path shadow_state.json --log-path shadow_trade_log.jsonl --dashboard-path shadow_dashboard.md --summary-json-path shadow_summary.json --max-days 5
 
@@ -75,6 +79,34 @@ uv run shadow_trade.py --config-path shadow_config.example.json
 
 # Automation-friendly mode that keeps only the final result JSON on stdout
 uv run shadow_trade.py --config-path shadow_config.example.json --json-only
+
+# Train a V2 multi-alpha sleeve on the role-based fast/base/slow bundle layer
+uv run v2_train.py --bundle bundle_intraday_core --model-set v2_probe --sleeve trend_pullback --feature-profile price_only --max-symbols 8
+
+# Prepare the legacy-root V2 foundation sleeve that ports the proven 1h directional lane
+uv run v2_train.py --bundle bundle_intraday_core --model-set v2_probe --sleeve trend_1h_directional --max-symbols 8
+
+# Prepare the legacy-root V2 calibrated short foundation sleeve
+uv run v2_train.py --bundle bundle_intraday_core --model-set v2_probe --sleeve bear_1h_calibrated --max-symbols 8
+
+# Prepare the broader legacy-root short foundation sleeve (bear_fortress + calibrated fallback)
+uv run v2_train.py --bundle bundle_intraday_core --model-set v2_probe --sleeve bear_1h_foundation --max-symbols 8
+
+# Audit sleeve density across train / val / 2026q1 before training a V2 wave
+uv run v2_audit.py --bundle bundle_intraday_core --feature-profile price_only --max-symbols 8 --sleeve cross_asset_relative_strength --sleeve trend_pullback
+
+# Run the V2 paper allocator with persisted state and operator outputs
+uv run v2_shadow.py --bundle bundle_intraday_core --model-set v2_probe --split 2026q1 --portfolio-config v2_portfolio.example.json
+
+# Evaluate a V2 sleeve on val + 2026q1 plus capacity stress and optionally update the sleeve registry
+uv run v2_evaluate.py --bundle bundle_intraday_core --model-set v2_probe --sleeve trend_pullback --portfolio-config v2_portfolio.example.json --update-registry --promote-if-pass
+
+# Run a lighter rolling stability sweep without stress to compare candidate behavior across multiple windows
+uv run v2_evaluate.py --bundle bundle_intraday_core --model-set v2_probe --sleeve trend_1h_directional --portfolio-config v2_portfolio.example.json --rolling-window-days 7 --rolling-step-days 30 --rolling-max-windows 2 --skip-stress
+
+# Run a benchmark-style V2 backtest over the full validation split with real portfolio metrics
+# Note: score still uses the legacy bar-level composite; daily_sharpe/daily_sortino are the cleaner V2 credibility checks
+uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_probe --split val --portfolio-config v2_portfolio.example.json --json
 
 # Retrain the macro HMM as well
 uv run train_model.py --timeframe 1h --train_hmm
@@ -90,7 +122,7 @@ uv run verify_harness.py
 
 ```
 
-There are no unit tests or CI pipelines. Validation is done through `backtest.py`, `evaluate.py`, and benchmark comparison.
+There is no CI pipeline yet. Validation is done through the backtest/evaluate harness plus the local unit test suite under `tests/`.
 
 ## Current Setup
 
@@ -105,12 +137,20 @@ There are no unit tests or CI pipelines. Validation is done through `backtest.py
 
 ### Splits
 
-The fixed date windows come from [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L61):
+The fixed date windows come from [prepare.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare.py#L102):
 
-- `train`: 2017-01-01 to 2022-06-30, with per-symbol start floors
-- `val`: 2022-07-01 to 2024-06-30
-- `robustness`: 2018-01-01 to 2024-06-30
+- `train`: 2017-01-01 to 2024-06-30, with per-symbol start floors
+- `val`: 2024-07-01 to 2025-09-30
+- `robustness`: 2018-01-01 to 2025-09-30
 - `oos`: 2025-01-01 to 2025-12-31
+- `2026q1`: 2026-01-01 to 2026-03-31
+- `holdout`: 2025-10-01 to 2025-12-31
+
+Historical note:
+
+- the frozen shell reference is still `exp494`
+- but the code split changed later in `exp503`, so old and new validation scores are
+  not directly comparable unless that split change is called out
 
 ### Models
 
@@ -182,7 +222,7 @@ For day-to-day research:
 1. Refresh [RESEARCH_MEMORY.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/RESEARCH_MEMORY.md) with `uv run analyze_results.py --update-memory`
 2. Run `uv run verify_harness.py` to catch drift in artifacts, dependencies, or cache assumptions
 3. Refresh data if needed with `prepare.py`
-4. Retrain models if the experiment needs new artifacts
+4. Retrain models only into tagged `--model-set` directories if the experiment needs new artifacts
 5. Change `strategy.py`
 6. Run `uv run backtest.py --timeframe 1h --no-log`
 7. Run `uv run evaluate.py --timeframe 1h --label <label>`
@@ -190,6 +230,10 @@ For day-to-day research:
 8. Compare against `run_benchmarks.py`
 
 `research_loop.py` is retained as historical automation infrastructure, but the active workflow is manual experimentation plus explicit `results.tsv` logging.
+
+Retrain-specific guardrails, runtime pinning, and the keep/reject bar versus the
+current `exp494` shell are defined in
+[RETRAIN_PROTOCOL.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/RETRAIN_PROTOCOL.md).
 
 `backtest.py` also appends a summary row to `results.tsv`.
 
@@ -200,6 +244,18 @@ The shadow execution surface now emits:
 - `shadow_dashboard.md`: operator-facing markdown dashboard with positions, action mix, signal mix, regime mix, and recent decisions
 - `shadow_summary.json`: machine-readable run summary for downstream automation or notification layers
 - `shadow_config.example.json`: example config for risk limits, output paths, and operator settings
+
+The parallel V2 research layer now adds:
+
+- `v2/`: bundle manifests, sleeve manifests, clock-time features, bundle dataset assembly, signal runtime, and allocator logic for the role-based `fast/base/slow` platform
+- `v2_audit.py`: sleeve density audit across `train`, `val`, and `2026q1` so dead or sample-fragile sleeves can be filtered before training
+- `v2_train.py`: trains tagged sleeve artifacts into `models/<model-set>/v2/<bundle>/`
+- `v2_shadow.py`: runs the V2 portfolio paper runtime with the same dashboard and summary surface used by the current shadow engine
+- `v2_evaluate.py`: scores candidate sleeves or whole model sets on `val` and `2026q1`, supports optional rolling-window stability sweeps, can skip stress for faster research passes, and can update `v2_sleeve_registry.json`
+- `v2_backtest.py`: benchmark-style V2 replay with score, bar-level Sharpe, and daily-level Sharpe/Sortino so probe results are less likely to be over-interpreted
+- `v2_backtest.py`: runs a full-period V2 replay with benchmark-style Sharpe / DD / PF / trades-day metrics, concentration readouts, optional JSON output, and optional `results.tsv` logging
+- `v2_portfolio.example.json`: portfolio-level caps for sleeve, symbol, cluster, participation, and short-share controls
+- `v2_sleeve_registry.json`: sleeve lifecycle tracking for candidate, paper-live, champion, and retired states
 
 The shadow dashboard now also includes:
 

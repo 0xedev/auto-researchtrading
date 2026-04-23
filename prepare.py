@@ -14,6 +14,12 @@ import math
 import signal
 import argparse
 import joblib
+from dotenv import load_dotenv
+load_dotenv()
+
+FRED_API_KEY      = os.environ.get("FRED_API_KEY", "")
+ALPHA_VANTAGE_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY", "")
+TIINGO_API_KEY    = os.environ.get("TIINGO_API_KEY", "")
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -41,13 +47,35 @@ BAR_INTERVAL = "1h"
 SYMBOLS = [
     "BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "LINK",
     "AVAX", "DOT", "ATOM", "NEAR", "UNI", "APT", "SUI",
-    "XAU", "SP500"
+    "XAU", "SP500",
+    # Equities (Tiingo daily)
+    "AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "SPY", "QQQ", "GLD", "TLT",
+    # Forex (Alpha Vantage daily)
+    "EURUSD", "GBPUSD", "USDJPY", "AUDUSD",
+    # Commodities (yfinance daily)
+    "CL", "SI",
 ]
+
+EQUITY_SYMBOLS    = ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "SPY", "QQQ", "GLD", "TLT"]
+FOREX_SYMBOLS     = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"]
+COMMODITY_SYMBOLS = ["CL", "SI"]
+DAILY_ASSET_CLASSES = {2, 3}   # equity, forex — bars are daily-resolution
+DAILY_COMMODITIES   = {"CL", "SI"}
 
 SYMBOLS_15M = [
     "BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "LINK",
     "AVAX", "DOT", "ATOM", "NEAR", "UNI", "APT", "SUI", "XAU"
 ]  # SP500/DXY excluded — no free 15min intraday source
+
+# Training universe: crypto-only (Phase 1).
+# SYMBOLS is the full serving universe; TRAIN_SYMBOLS controls what prepare_dataset() trains on.
+# To add equities/forex/commodities to training, extend TRAIN_SYMBOLS after validating the
+# daily-bar alignment and training-distribution balance.
+TRAIN_SYMBOLS = [
+    "BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "LINK",
+    "AVAX", "DOT", "ATOM", "NEAR", "UNI", "APT", "SUI",
+    "XAU", "SP500",
+]
 
 # Earliest Binance USDT listing dates (approx) for 15m downloads
 BINANCE_15M_START = {
@@ -103,16 +131,41 @@ SYMBOL_TRAIN_START = {
     "SOL":   "2020-04-01",
     "XAU":   "2004-01-01",  # Gold — full history
     "SP500": "2004-01-01",  # S&P — full history
+    # Equities (Tiingo)
+    "AAPL":  "2000-01-01",
+    "MSFT":  "2000-01-01",
+    "NVDA":  "2000-01-01",
+    "TSLA":  "2010-07-01",  # IPO June 2010
+    "AMZN":  "2000-01-01",
+    "SPY":   "1993-01-01",
+    "QQQ":   "1999-03-01",
+    "GLD":   "2004-11-01",  # GLD ETF launch
+    "TLT":   "2002-07-01",  # TLT ETF launch
+    # Forex (Alpha Vantage)
+    "EURUSD": "2000-01-01",
+    "GBPUSD": "2000-01-01",
+    "USDJPY": "2000-01-01",
+    "AUDUSD": "2000-01-01",
+    # Commodities (yfinance)
+    "CL": "2000-01-01",
+    "SI": "2000-01-01",
 }
 
 # Asset class labels — universal feature, works across any market
-# 0=Crypto (volatile, 24/7), 1=Commodity (macro-driven), 2=Equity Index (session-based)
+# 0=Crypto (volatile, 24/7), 1=Commodity (macro-driven), 2=Equity (session-based), 3=Forex
 ASSET_CLASS = {
     "BTC": 0, "ETH": 0, "SOL": 0, "BNB": 0, "XRP": 0,
     "ADA": 0, "DOGE": 0, "LINK": 0, "AVAX": 0, "DOT": 0,
     "ATOM": 0, "NEAR": 0, "UNI": 0, "APT": 0, "SUI": 0,
     "XAU": 1,
     "SP500": 2,
+    # Equities
+    "AAPL": 2, "MSFT": 2, "NVDA": 2, "TSLA": 2, "AMZN": 2,
+    "SPY": 2, "QQQ": 2, "GLD": 2, "TLT": 2,
+    # Forex
+    "EURUSD": 3, "GBPUSD": 3, "USDJPY": 3, "AUDUSD": 3,
+    # Commodities
+    "CL": 1, "SI": 1,
 }
 
 HOURS_PER_YEAR = 8760
@@ -124,16 +177,29 @@ HOURS_PER_YEAR = 8760
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "autotrader")
 DATA_DIR = os.path.join(CACHE_DIR, "data")
 
+# External data source URLs + cache paths
+FRED_BASE_URL    = "https://api.stlouisfed.org/fred/series/observations"
+MACRO_CACHE_FILE = os.path.join(DATA_DIR, "fred_macro.parquet")
+FRED_MACRO_SERIES = {"VIXCLS": "vix_raw", "DGS10": "yield_10y_raw", "FEDFUNDS": "fed_rate_raw"}
+
+TIINGO_BASE_URL = "https://api.tiingo.com/tiingo/daily"
+AV_BASE_URL     = "https://www.alphavantage.co/query"
+YFINANCE_TICKER_MAP = {"CL": "CL=F", "SI": "SI=F"}
+
 # Quantitative Feature Columns
 BASE_FEATURE_COLS = [
-    'ret_1h', 'ret_4h', 'ret_12h', 'ret_24h', 'ret_48h', 
-    'rsi_8', 'rsi_24', 'macd_hist', 'macd_line', 
-    'bb_width', 'ema_200_dist', 'vol_24h', 'atr_pct', 
+    'ret_1b', 'ret_4b', 'ret_12b', 'ret_24b', 'ret_48b',
+    'rsi_8b', 'rsi_24b', 'macd_hist', 'macd_line',
+    'bb_width', 'ema_200_dist', 'vol_24h', 'atr_pct',
     'dist_to_high', 'dist_to_low', 'vol_ratio_24h', 'asset_class',
     'dist_to_vwap', 'vol_ema_50', 'market_vol', 'market_ret',
-    'rel_ret_1h', 'rel_ret_4h', 'rel_bb_width',
+    'rel_ret_1b', 'rel_ret_4b', 'rel_bb_width',
     'fvg_detected', 'msb_status', 'ob_dist', 'frac_diff_close',
-    'range_position', 'vol_trend_8h', 'funding_roc_4h'
+    'range_position', 'vol_trend_8b', 'funding_roc_4b',
+    'bar_interval_hours', 'has_funding',
+    # vix_norm, yield_10y_norm, fed_rate_norm are available in load_data() but excluded from
+    # XGBoost training — they encode macro regime too strongly, suppressing signals in elevated-rate
+    # val periods. Re-evaluate as strategy-level threshold scalers in Phase 2.
 ]
 
 CORE_CONTEXT_FEATURE_COLS = [
@@ -186,12 +252,12 @@ def calculate_features(df, timeframe="1h", symbol=None, feature_profile="price_o
     high = df['high']
     low = df['low']
     
-    # 1. Returns
-    df['ret_1h'] = close.pct_change(1)
-    df['ret_4h'] = close.pct_change(4)
-    df['ret_12h'] = close.pct_change(12)
-    df['ret_24h'] = close.pct_change(24)
-    df['ret_48h'] = close.pct_change(48)
+    # 1. Returns (bar-relative: _1b = 1 bar ago, regardless of timeframe)
+    df['ret_1b'] = close.pct_change(1)
+    df['ret_4b'] = close.pct_change(4)
+    df['ret_12b'] = close.pct_change(12)
+    df['ret_24b'] = close.pct_change(24)
+    df['ret_48b'] = close.pct_change(48)
     
     # 2. RSI
     def v_rsi(s, p):
@@ -201,8 +267,8 @@ def calculate_features(df, timeframe="1h", symbol=None, feature_profile="price_o
         rs = g / l.replace(0, 1e-10)
         return 100 - (100 / (1 + rs))
 
-    df['rsi_8'] = v_rsi(close, 8)
-    df['rsi_24'] = v_rsi(close, 24)
+    df['rsi_8b'] = v_rsi(close, 8)
+    df['rsi_24b'] = v_rsi(close, 24)
     
     # 3. MACD
     ema_12 = close.ewm(span=12, adjust=False).mean()
@@ -241,7 +307,7 @@ def calculate_features(df, timeframe="1h", symbol=None, feature_profile="price_o
     df['vol_24h'] = df['volume'].rolling(24).mean()
     df['vol_ema_50'] = df['volume'].ewm(span=50, adjust=False).mean()
     vol_ratio_ema4 = df['vol_ratio_24h'].ewm(span=4).mean()
-    df['vol_trend_8h'] = (df['vol_ratio_24h'] - vol_ratio_ema4).fillna(0.0)
+    df['vol_trend_8b'] = (df['vol_ratio_24h'] - vol_ratio_ema4).fillna(0.0)
     
     # 9. VWAP (Approximate via typical price)
     tp = (high + low + close) / 3
@@ -280,7 +346,7 @@ def calculate_features(df, timeframe="1h", symbol=None, feature_profile="price_o
 
     # 14a. Funding rate momentum (rate-of-change, orthogonal to funding level used in strategy)
     _funding = df["funding_rate"] if "funding_rate" in df.columns else pd.Series(0.0, index=df.index)
-    df["funding_roc_4h"] = _funding.diff(4).fillna(0.0)
+    df["funding_roc_4b"] = _funding.diff(4).fillna(0.0)
 
     # 14. Macro Regime (HMM Slot)
     # This will be populated by the strategy/backtester using the saved HMM model
@@ -294,9 +360,14 @@ def calculate_features(df, timeframe="1h", symbol=None, feature_profile="price_o
     for col in CONTEXT_COLUMNS:
         df[col] = context_frame[col].values if col in context_frame else 0.0
 
-    # 15. Sanitization
+    # 15. Pass-through guards for columns injected by load_data() (not computed here)
+    for _col in ("bar_interval_hours", "has_funding", "vix_norm", "yield_10y_norm", "fed_rate_norm"):
+        if _col not in df.columns:
+            df[_col] = 0.0
+
+    # 16. Sanitization
     df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
-    
+
     return df
 
 # Index data types 
@@ -490,9 +561,9 @@ def prepare_dataset(timeframe, split_name, feature_profile="price_only"):
         # Inject Market Context
         df_feat['market_vol'] = m_vol
         df_feat['market_ret'] = m_ret
-        market_ret_4h = m_ret.rolling(4).sum().fillna(0)
-        df_feat['rel_ret_1h'] = df_feat['ret_1h'] - df_feat['market_ret']
-        df_feat['rel_ret_4h'] = df_feat['ret_4h'] - market_ret_4h
+        market_ret_4b = m_ret.rolling(4).sum().fillna(0)
+        df_feat['rel_ret_1b'] = df_feat['ret_1b'] - df_feat['market_ret']
+        df_feat['rel_ret_4b'] = df_feat['ret_4b'] - market_ret_4b
         df_feat['rel_bb_width'] = df_feat['bb_width'] - df_feat['market_vol']
         
         labels, forward_ret = get_directional_labels(df_feat, timeframe)
@@ -797,6 +868,337 @@ def _download_hf_xau_15m() -> pd.DataFrame:
     return df
 
 
+# ---------------------------------------------------------------------------
+# FRED macro pipeline (Task 3)
+# ---------------------------------------------------------------------------
+
+def _download_fred_series(series_id: str) -> pd.DataFrame:
+    """Fetch a single FRED series. Returns DataFrame[timestamp_ms, value]."""
+    params = {
+        "series_id": series_id,
+        "api_key": FRED_API_KEY,
+        "file_type": "json",
+        "observation_start": TRAIN_START,
+        "observation_end": DATA_END,
+    }
+    try:
+        resp = requests.get(FRED_BASE_URL, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        print(f"    FRED {series_id} fetch failed: {e}")
+        return pd.DataFrame()
+
+    rows = []
+    for obs in data.get("observations", []):
+        try:
+            val = float(obs["value"])  # FRED uses "." for missing — raises ValueError
+        except ValueError:
+            continue
+        ts = int(pd.Timestamp(obs["date"], tz="UTC").timestamp() * 1000)
+        rows.append({"timestamp": ts, "value": val})
+    return pd.DataFrame(rows)
+
+
+def download_fred_macro():
+    """Download VIX, 10Y yield, fed funds rate from FRED and cache as parquet."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    frames = {}
+    for series_id, col_name in FRED_MACRO_SERIES.items():
+        print(f"  FRED {series_id} → {col_name}")
+        df = _download_fred_series(series_id)
+        if len(df) > 0:
+            frames[col_name] = df.set_index("timestamp")["value"]
+        time.sleep(0.5)
+
+    if not frames:
+        print("  FRED: no data downloaded")
+        return
+    macro = pd.DataFrame(frames).reset_index().rename(columns={"index": "timestamp"})
+    macro.sort_values("timestamp", inplace=True)
+    macro.to_parquet(MACRO_CACHE_FILE, index=False)
+    print(f"  FRED macro saved: {len(macro)} rows → {MACRO_CACHE_FILE}")
+
+
+def _load_fred_macro_features(index_ms: pd.Series) -> pd.DataFrame:
+    """Align FRED macro to an arbitrary millisecond timestamp index.
+
+    Normalises each series with a 252-bar rolling z-score (clipped ±3) then
+    forward-fills daily obs to any intraday resolution via merge_asof.
+    Returns DataFrame[vix_norm, yield_10y_norm, fed_rate_norm].
+    """
+    empty = pd.DataFrame({
+        "vix_norm": 0.0, "yield_10y_norm": 0.0, "fed_rate_norm": 0.0
+    }, index=index_ms.index)
+
+    if not os.path.exists(MACRO_CACHE_FILE):
+        return empty
+
+    macro = pd.read_parquet(MACRO_CACHE_FILE)
+    if macro.empty:
+        return empty
+
+    # Rolling z-score per series
+    for raw_col, norm_col in [("vix_raw", "vix_norm"), ("yield_10y_raw", "yield_10y_norm"), ("fed_rate_raw", "fed_rate_norm")]:
+        if raw_col not in macro.columns:
+            macro[norm_col] = 0.0
+            continue
+        s = macro[raw_col]
+        mu = s.rolling(252, min_periods=1).mean()
+        sd = s.rolling(252, min_periods=1).std().replace(0, 1)
+        macro[norm_col] = ((s - mu) / sd).clip(-3, 3).fillna(0.0)
+
+    macro_sorted = macro[["timestamp", "vix_norm", "yield_10y_norm", "fed_rate_norm"]].sort_values("timestamp")
+
+    target = pd.DataFrame({"timestamp": index_ms.values})
+    merged = pd.merge_asof(target, macro_sorted, on="timestamp", direction="backward")
+    for col in ("vix_norm", "yield_10y_norm", "fed_rate_norm"):
+        if col not in merged.columns:
+            merged[col] = 0.0
+    merged.fillna(0.0, inplace=True)
+    result = merged[["vix_norm", "yield_10y_norm", "fed_rate_norm"]]
+    result.index = index_ms.index
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Tiingo equity pipeline (Task 4)
+# ---------------------------------------------------------------------------
+
+def _download_tiingo_daily(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+    """Fetch adjusted daily OHLCV from Tiingo. Returns standard OHLCV DataFrame."""
+    url = f"{TIINGO_BASE_URL}/{symbol.lower()}/prices"
+    params = {
+        "startDate": start_date,
+        "endDate": end_date,
+        "resampleFreq": "daily",
+        "token": TIINGO_API_KEY,
+    }
+    try:
+        resp = requests.get(url, params=params, timeout=30)
+        resp.raise_for_status()
+        bars = resp.json()
+    except Exception as e:
+        print(f"    Tiingo {symbol} fetch failed: {e}")
+        return pd.DataFrame()
+
+    rows = []
+    for bar in bars:
+        try:
+            dt = pd.Timestamp(bar["date"])
+            if dt.tzinfo is None:
+                dt = dt.tz_localize("UTC")
+            ts = int(dt.normalize().timestamp() * 1000)
+            rows.append({
+                "timestamp": ts,
+                "open": float(bar.get("adjOpen") or bar.get("open", 0)),
+                "high": float(bar.get("adjHigh") or bar.get("high", 0)),
+                "low":  float(bar.get("adjLow")  or bar.get("low", 0)),
+                "close": float(bar.get("adjClose") or bar.get("close", 0)),
+                "volume": float(bar.get("adjVolume") or bar.get("volume", 0)),
+                "funding_rate": 0.0,
+            })
+        except Exception:
+            continue
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows).sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
+    return df
+
+
+def download_equity_data(symbols=None):
+    """Download daily equity data from Tiingo with incremental parquet updates."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    if symbols is None:
+        symbols = EQUITY_SYMBOLS
+    end_date = DATA_END
+
+    for symbol in symbols:
+        filepath = os.path.join(DATA_DIR, f"{symbol}_1h.parquet")
+        start_date = SYMBOL_TRAIN_START.get(symbol, TRAIN_START)
+
+        if os.path.exists(filepath):
+            existing = pd.read_parquet(filepath)
+            if len(existing) > 0:
+                last_ts = existing["timestamp"].max()
+                start_date = pd.Timestamp(last_ts, unit="ms", tz="UTC").strftime("%Y-%m-%d")
+
+        print(f"  Tiingo {symbol}: {start_date} → {end_date}")
+        df = _download_tiingo_daily(symbol, start_date, end_date)
+        if df.empty:
+            continue
+
+        if os.path.exists(filepath):
+            existing = pd.read_parquet(filepath)
+            df = pd.concat([existing, df]).drop_duplicates("timestamp").sort_values("timestamp").reset_index(drop=True)
+
+        df.to_parquet(filepath, index=False)
+        print(f"    saved {len(df)} rows")
+
+
+# ---------------------------------------------------------------------------
+# Alpha Vantage forex + yfinance commodities (Task 5)
+# ---------------------------------------------------------------------------
+
+def _download_av_fx_daily(symbol: str) -> pd.DataFrame:
+    """Fetch full daily FX history from Alpha Vantage. symbol e.g. 'EURUSD'."""
+    from_sym = symbol[:3]
+    to_sym   = symbol[3:]
+    params = {
+        "function": "FX_DAILY",
+        "from_symbol": from_sym,
+        "to_symbol":   to_sym,
+        "outputsize":  "full",
+        "apikey":      ALPHA_VANTAGE_KEY,
+    }
+    try:
+        resp = requests.get(AV_BASE_URL, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        print(f"    AV {symbol} fetch failed: {e}")
+        return pd.DataFrame()
+
+    # AV embeds rate-limit notices in the JSON body rather than HTTP errors
+    ts_series = data.get("Time Series FX (Daily)", {})
+    if not ts_series:
+        print(f"    AV {symbol}: no data — {data.get('Note', data.get('Information', 'unknown'))}")
+        return pd.DataFrame()
+
+    rows = []
+    for date_str, bar in ts_series.items():
+        try:
+            ts = int(pd.Timestamp(date_str, tz="UTC").normalize().timestamp() * 1000)
+            rows.append({
+                "timestamp": ts,
+                "open":  float(bar["1. open"]),
+                "high":  float(bar["2. high"]),
+                "low":   float(bar["3. low"]),
+                "close": float(bar["4. close"]),
+                "volume": 0.0,
+                "funding_rate": 0.0,
+            })
+        except Exception:
+            continue
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows).sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
+
+
+def download_forex_data(symbols=None):
+    """Download full daily FX history from Alpha Vantage (always full history in one call)."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    if symbols is None:
+        symbols = FOREX_SYMBOLS
+
+    for i, symbol in enumerate(symbols):
+        print(f"  AV FX {symbol} ({i+1}/{len(symbols)})")
+        df = _download_av_fx_daily(symbol)
+        if df.empty:
+            continue
+        filepath = os.path.join(DATA_DIR, f"{symbol}_1h.parquet")
+        df.to_parquet(filepath, index=False)
+        print(f"    saved {len(df)} rows")
+        if i < len(symbols) - 1:
+            time.sleep(13)  # AV free tier: 5 req/min
+
+
+def _download_yfinance_daily(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+    """Fetch daily commodity data from yfinance."""
+    import yfinance as yf
+    ticker = YFINANCE_TICKER_MAP.get(symbol, symbol)
+    try:
+        raw = yf.Ticker(ticker).history(start=start_date, end=end_date, interval="1d", auto_adjust=True)
+    except Exception as e:
+        print(f"    yfinance {symbol} fetch failed: {e}")
+        return pd.DataFrame()
+
+    if raw.empty:
+        return pd.DataFrame()
+
+    rows = []
+    for idx, row in raw.iterrows():
+        try:
+            ts = int(pd.Timestamp(idx).normalize().tz_localize("UTC").timestamp() * 1000)
+        except Exception:
+            ts = int(pd.Timestamp(idx).normalize().timestamp() * 1000)
+        rows.append({
+            "timestamp": ts,
+            "open":  float(row["Open"]),
+            "high":  float(row["High"]),
+            "low":   float(row["Low"]),
+            "close": float(row["Close"]),
+            "volume": float(row.get("Volume", 0)),
+            "funding_rate": 0.0,
+        })
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows).sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
+
+
+def download_commodity_data(symbols=None):
+    """Download daily commodity data from yfinance with incremental parquet updates."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    if symbols is None:
+        symbols = COMMODITY_SYMBOLS
+    end_date = DATA_END
+
+    for symbol in symbols:
+        filepath = os.path.join(DATA_DIR, f"{symbol}_1h.parquet")
+        start_date = SYMBOL_TRAIN_START.get(symbol, TRAIN_START)
+
+        if os.path.exists(filepath):
+            existing = pd.read_parquet(filepath)
+            if len(existing) > 0:
+                last_ts = existing["timestamp"].max()
+                start_date = pd.Timestamp(last_ts, unit="ms", tz="UTC").strftime("%Y-%m-%d")
+
+        print(f"  yfinance {symbol}: {start_date} → {end_date}")
+        df = _download_yfinance_daily(symbol, start_date, end_date)
+        if df.empty:
+            continue
+
+        if os.path.exists(filepath):
+            existing = pd.read_parquet(filepath)
+            df = pd.concat([existing, df]).drop_duplicates("timestamp").sort_values("timestamp").reset_index(drop=True)
+
+        df.to_parquet(filepath, index=False)
+        print(f"    saved {len(df)} rows")
+
+
+# ---------------------------------------------------------------------------
+# Daily → 1H resampler (expands each daily bar to 24 hourly rows)
+# ---------------------------------------------------------------------------
+
+def _resample_daily_to_1h(df: pd.DataFrame) -> pd.DataFrame:
+    """Expand daily-resolution bars to 24 hourly rows for unified 1H timeline.
+
+    OHLC is copied across all 24 hours; volume is distributed evenly.
+    Injected columns (asset_class, funding_rate, bar_interval_hours, has_funding,
+    vix_norm, yield_10y_norm, fed_rate_norm) are carried forward unchanged.
+    """
+    carry_cols = [c for c in df.columns if c not in ("timestamp", "open", "high", "low", "close", "volume")]
+    rows = []
+    for _, bar in df.iterrows():
+        base_ts = int(bar["timestamp"])
+        vol_per_hour = float(bar.get("volume", 0)) / 24.0
+        for h in range(24):
+            row = {
+                "timestamp": base_ts + h * 3_600_000,
+                "open":  float(bar["open"]),
+                "high":  float(bar["high"]),
+                "low":   float(bar["low"]),
+                "close": float(bar["close"]),
+                "volume": vol_per_hour,
+            }
+            for col in carry_cols:
+                row[col] = bar[col]
+            rows.append(row)
+    if not rows:
+        return pd.DataFrame(columns=df.columns)
+    return pd.DataFrame(rows).sort_values("timestamp").reset_index(drop=True)
+
+
 def download_data(symbols=None):
     """Download historical OHLCV + funding data for all symbols."""
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -969,7 +1371,12 @@ def load_data(split: str = "val", resample_4h: bool = False, resample_15m: bool 
 
     # Determine which symbols and file suffix to use
     use_15m = resample_15m or split.endswith("_15m")
-    symbol_list = SYMBOLS_15M if use_15m else SYMBOLS
+    if use_15m:
+        symbol_list = SYMBOLS_15M
+    else:
+        # Phase 1: crypto-only universe for both training and backtesting.
+        # SYMBOLS (full 30-asset list) is the Phase 2 serving universe.
+        symbol_list = TRAIN_SYMBOLS
     suffix = "_15m.parquet" if use_15m else "_1h.parquet"
 
     result = {}
@@ -994,13 +1401,34 @@ def load_data(split: str = "val", resample_4h: bool = False, resample_15m: bool 
             if resample_4h:
                 split_df = _resample_to_4h(split_df)
             # Inject asset_class — universal feature for cross-asset generalization
-            split_df["asset_class"] = ASSET_CLASS.get(symbol, 0)
-            # Zero funding_rate for non-perp assets (XAU, SP500) so model
-            # doesn't learn perp-specific patterns as universal signals
-            if ASSET_CLASS.get(symbol, 0) != 0:
+            asset_cls = ASSET_CLASS.get(symbol, 0)
+            split_df["asset_class"] = asset_cls
+            # Zero funding_rate for non-perp assets so model doesn't over-fit perp signal
+            if asset_cls != 0:
                 split_df["funding_rate"] = 0.0
             elif "funding_rate" not in split_df.columns:
                 split_df["funding_rate"] = 0.0
+
+            # bar_interval_hours: encodes timeframe so the model can generalise
+            if use_15m:
+                split_df["bar_interval_hours"] = 0.25
+            elif asset_cls in DAILY_ASSET_CLASSES or symbol in DAILY_COMMODITIES:
+                split_df["bar_interval_hours"] = 24.0
+            else:
+                split_df["bar_interval_hours"] = 1.0
+
+            # has_funding: 1 for crypto perps (funding rate is meaningful), 0 otherwise
+            split_df["has_funding"] = 1.0 if asset_cls == 0 else 0.0
+
+            # Expand daily-bar symbols to hourly rows so they join the 1H timeline
+            if not use_15m and not resample_4h and (asset_cls in DAILY_ASSET_CLASSES or symbol in DAILY_COMMODITIES):
+                split_df = _resample_daily_to_1h(split_df)
+
+            # Inject FRED macro features (forward-filled daily → intraday)
+            macro_feats = _load_fred_macro_features(split_df["timestamp"])
+            for col in ("vix_norm", "yield_10y_norm", "fed_rate_norm"):
+                split_df[col] = macro_feats[col].values
+
             result[symbol] = split_df
     return result
 
@@ -1397,16 +1825,49 @@ if __name__ == "__main__":
     parser.add_argument("--symbols", nargs="+", default=None, help="Symbols to download (default: all)")
     parser.add_argument("--mode", choices=["data", "15m"], default="data",
                         help="'data' = 1H candles (default), '15m' = 15-minute candles")
+    parser.add_argument("--macro",     action="store_true", help="Download FRED macro series")
+    parser.add_argument("--equity",    action="store_true", help="Download Tiingo equity daily data")
+    parser.add_argument("--forex",     action="store_true", help="Download Alpha Vantage FX daily data")
+    parser.add_argument("--commodity", action="store_true", help="Download yfinance commodity daily data")
+    parser.add_argument("--all-new",   action="store_true", help="Run all new asset class downloaders")
     args = parser.parse_args()
 
     print(f"Cache directory: {CACHE_DIR}")
     print()
 
-    if args.mode == "15m":
-        print("Downloading 15-minute data...")
-        download_15m_data(args.symbols)
-    else:
-        print("Downloading data...")
-        download_data(args.symbols)
+    ran_any = False
+
+    if args.macro or args.all_new:
+        print("Downloading FRED macro data...")
+        download_fred_macro()
+        print()
+        ran_any = True
+
+    if args.equity or args.all_new:
+        print("Downloading Tiingo equity data...")
+        download_equity_data(args.symbols)
+        print()
+        ran_any = True
+
+    if args.forex or args.all_new:
+        print("Downloading Alpha Vantage forex data...")
+        download_forex_data(args.symbols)
+        print()
+        ran_any = True
+
+    if args.commodity or args.all_new:
+        print("Downloading yfinance commodity data...")
+        download_commodity_data(args.symbols)
+        print()
+        ran_any = True
+
+    if not ran_any:
+        if args.mode == "15m":
+            print("Downloading 15-minute data...")
+            download_15m_data(args.symbols)
+        else:
+            print("Downloading crypto data...")
+            download_data(args.symbols)
+
     print()
     print("Done! Ready to backtest.")

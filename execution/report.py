@@ -28,6 +28,8 @@ def _read_jsonl(path: str | Path) -> list[dict]:
 def _fmt_ts(ts: int | float | None) -> str:
     if not ts:
         return "n/a"
+    if abs(float(ts)) > 1e11:
+        ts = float(ts) / 1000.0
     return datetime.fromtimestamp(int(ts), tz=timezone.utc).isoformat()
 
 
@@ -49,9 +51,13 @@ def summarize_shadow_run(
 
     action_counts = Counter()
     signal_counts = Counter()
+    sleeve_counts = Counter()
+    bundle_counts = Counter()
+    cluster_counts = Counter()
     regime_counts = Counter()
     decision_reason_counts = Counter()
     symbol_stats = defaultdict(lambda: {"actions": 0, "realized_pnl": 0.0, "fees": 0.0})
+    sleeve_stats = defaultdict(lambda: {"actions": 0, "realized_pnl": 0.0, "fees": 0.0})
 
     realized_pnl_total = 0.0
     fees_total = 0.0
@@ -59,6 +65,9 @@ def summarize_shadow_run(
     for row in rows:
         action = row.get("action", "unknown")
         signal_tag = row.get("signal_tag", "")
+        sleeve = row.get("sleeve", "")
+        bundle = row.get("bundle", "")
+        cluster = row.get("cluster", "")
         regime = row.get("signal_regime_family", "unknown")
         symbol = row.get("symbol", "")
         reason = row.get("decision_reason", "") or row.get("reject_reason", "") or row.get("skip_reason", "")
@@ -66,6 +75,12 @@ def summarize_shadow_run(
         action_counts[action] += 1
         if signal_tag:
             signal_counts[signal_tag] += 1
+        if sleeve:
+            sleeve_counts[sleeve] += 1
+        if bundle:
+            bundle_counts[bundle] += 1
+        if cluster:
+            cluster_counts[cluster] += 1
         if regime:
             regime_counts[regime] += 1
         if reason:
@@ -75,6 +90,11 @@ def summarize_shadow_run(
         stats["actions"] += 1
         stats["realized_pnl"] += float(row.get("realized_pnl", 0.0) or 0.0)
         stats["fees"] += float(row.get("fee", 0.0) or 0.0)
+        if sleeve:
+            sleeve_row = sleeve_stats[sleeve]
+            sleeve_row["actions"] += 1
+            sleeve_row["realized_pnl"] += float(row.get("realized_pnl", 0.0) or 0.0)
+            sleeve_row["fees"] += float(row.get("fee", 0.0) or 0.0)
 
         realized_pnl_total += float(row.get("realized_pnl", 0.0) or 0.0)
         fees_total += float(row.get("fee", 0.0) or 0.0)
@@ -115,6 +135,23 @@ def summarize_shadow_run(
             "fees": float(stats["fees"]),
         }
         for symbol, stats in sorted(symbol_stats.items(), key=lambda item: item[1]["realized_pnl"], reverse=True)
+    ]
+    sleeve_pnl = [
+        {
+            "sleeve": sleeve,
+            "actions": int(stats["actions"]),
+            "realized_pnl": float(stats["realized_pnl"]),
+            "fees": float(stats["fees"]),
+        }
+        for sleeve, stats in sorted(sleeve_stats.items(), key=lambda item: item[1]["realized_pnl"], reverse=True)
+    ]
+    positive_pnl = sum(max(row["realized_pnl"], 0.0) for row in sleeve_pnl) or 0.0
+    sleeve_concentration = [
+        {
+            "sleeve": row["sleeve"],
+            "pnl_share": (row["realized_pnl"] / positive_pnl) if positive_pnl > 0 and row["realized_pnl"] > 0 else 0.0,
+        }
+        for row in sleeve_pnl
     ]
 
     alerts = []
@@ -184,6 +221,9 @@ def summarize_shadow_run(
             "fees_total": float(fees_total),
             "action_counts": dict(action_counts),
             "signal_counts": dict(signal_counts),
+            "sleeve_counts": dict(sleeve_counts),
+            "bundle_counts": dict(bundle_counts),
+            "cluster_counts": dict(cluster_counts),
             "regime_counts": dict(regime_counts),
             "decision_reason_counts": dict(decision_reason_counts),
         },
@@ -194,6 +234,8 @@ def summarize_shadow_run(
         },
         "alerts": alerts,
         "symbol_pnl": symbol_pnl,
+        "sleeve_pnl": sleeve_pnl,
+        "sleeve_concentration": sleeve_concentration,
         "recent_actions": list(reversed(recent_actions)),
     }
 
@@ -223,19 +265,36 @@ def render_shadow_dashboard(summary: dict) -> str:
     operator = runtime_config.get("operator", {})
     kill_switch = summary.get("kill_switch", {})
     if runtime_config:
-        lines.extend(
-            [
-                f"- Config Source: `{runtime_config.get('source', 'defaults')}`",
-                f"- Timeframe: `{runtime_config.get('timeframe', 'n/a')}`",
-                f"- Split: `{runtime_config.get('split', 'n/a')}`",
-                f"- Max Days: `{runtime_config.get('max_days', 'all')}`",
-                f"- Max Leverage: `{risk_config.get('max_leverage', 0.0):.3f}`",
-                f"- Max Symbol Notional %: `{risk_config.get('max_symbol_notional_pct', 0.0):.3f}`",
-                f"- Recent Actions Window: `{operator.get('recent_actions', 0)}`",
-                f"- Kill Switch Path: `{paths.get('kill_switch_path', 'n/a')}`",
-                f"- Halt New Orders: `{kill_switch.get('halt_new_orders', False)}`",
-            ]
-        )
+        if "portfolio" in runtime_config:
+            portfolio_cfg = runtime_config.get("portfolio", {})
+            lines.extend(
+                [
+                    f"- Bundle: `{runtime_config.get('bundle', 'n/a')}`",
+                    f"- Model Set: `{runtime_config.get('model_set', 'n/a')}`",
+                    f"- Split: `{runtime_config.get('split', 'n/a')}`",
+                    f"- Max Days: `{runtime_config.get('max_days', 'all')}`",
+                    f"- Max Gross Leverage: `{portfolio_cfg.get('max_gross_leverage', 0.0):.3f}`",
+                    f"- Max Net Exposure %: `{portfolio_cfg.get('max_net_exposure_pct', 0.0):.3f}`",
+                    f"- Max Per Sleeve %: `{portfolio_cfg.get('max_per_sleeve_pct', 0.0):.3f}`",
+                    f"- Max Per Cluster %: `{portfolio_cfg.get('max_per_cluster_pct', 0.0):.3f}`",
+                    f"- Kill Switch Path: `{runtime_config.get('kill_switch_path', 'n/a')}`",
+                    f"- Halt New Orders: `{kill_switch.get('halt_new_orders', False)}`",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    f"- Config Source: `{runtime_config.get('source', 'defaults')}`",
+                    f"- Timeframe: `{runtime_config.get('timeframe', 'n/a')}`",
+                    f"- Split: `{runtime_config.get('split', 'n/a')}`",
+                    f"- Max Days: `{runtime_config.get('max_days', 'all')}`",
+                    f"- Max Leverage: `{risk_config.get('max_leverage', 0.0):.3f}`",
+                    f"- Max Symbol Notional %: `{risk_config.get('max_symbol_notional_pct', 0.0):.3f}`",
+                    f"- Recent Actions Window: `{operator.get('recent_actions', 0)}`",
+                    f"- Kill Switch Path: `{paths.get('kill_switch_path', 'n/a')}`",
+                    f"- Halt New Orders: `{kill_switch.get('halt_new_orders', False)}`",
+                ]
+            )
     else:
         lines.append("- No runtime config snapshot recorded.")
 
@@ -306,6 +365,14 @@ def render_shadow_dashboard(summary: dict) -> str:
     else:
         lines.append("- No signal tags recorded.")
 
+    lines.extend(["", "### Sleeve Mix", ""])
+    sleeve_counts = log_stats.get("sleeve_counts", {})
+    if sleeve_counts:
+        for sleeve, count in sorted(sleeve_counts.items(), key=lambda item: (-item[1], item[0])):
+            lines.append(f"- `{sleeve}`: {count}")
+    else:
+        lines.append("- No sleeve tags recorded.")
+
     lines.extend(["", "### Regime Mix", ""])
     regime_counts = log_stats.get("regime_counts", {})
     if regime_counts:
@@ -329,6 +396,22 @@ def render_shadow_dashboard(summary: dict) -> str:
             )
     else:
         lines.append("No symbol-level PnL yet.")
+
+    lines.extend(["", "## Sleeve PnL", ""])
+    sleeve_pnl = summary.get("sleeve_pnl", [])
+    if sleeve_pnl:
+        lines.extend(
+            [
+                "| Sleeve | Actions | Realized PnL | Fees |",
+                "| --- | ---: | ---: | ---: |",
+            ]
+        )
+        for row in sleeve_pnl[:12]:
+            lines.append(
+                f"| {row['sleeve']} | {row['actions']} | {row['realized_pnl']:.2f} | {row['fees']:.2f} |"
+            )
+    else:
+        lines.append("No sleeve-level PnL yet.")
 
     lines.extend(["", "## Recent Decisions", ""])
     recent_actions = summary.get("recent_actions", [])

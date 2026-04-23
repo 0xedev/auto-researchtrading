@@ -11,7 +11,7 @@ from market_regime import build_regime_frame
 from prepare import FEATURE_COLS, calculate_features, load_data
 
 
-DEFAULT_MODEL_SET = os.environ.get("AUTOTRADER_MODEL_SET", "exp256_active")
+DEFAULT_MODEL_SET = os.environ.get("AUTOTRADER_MODEL_SET", "exp256_active")  # root models/ is fallback only
 
 
 @dataclass
@@ -196,13 +196,14 @@ class Strategy:
         loaded_paths = {}
         for tf in ["15m", "1h", "4h"]:
             path_map = {
-                "lead": self._resolve_model_path(f"lead_{tf}.xgb", f"lead_{tf}.json"),
-                "meta": self._resolve_model_path(f"meta_{tf}.xgb", f"meta_{tf}.json"),
-                "long": self._resolve_model_path(f"lead_long_{tf}.xgb", f"lead_long_{tf}.json"),
-                "short": self._resolve_model_path(f"lead_short_{tf}.xgb", f"lead_short_{tf}.json"),
-                "long_meta": self._resolve_model_path(f"meta_long_{tf}.xgb", f"meta_long_{tf}.json"),
-                "short_meta": self._resolve_model_path(f"meta_short_{tf}.xgb", f"meta_short_{tf}.json"),
-                "bear_short_meta": self._resolve_model_path(f"meta_short_bear_{tf}.xgb", f"meta_short_bear_{tf}.json"),
+                # Prefer .json (newer training format) over .xgb (legacy)
+                "lead": self._resolve_model_path(f"lead_{tf}.json", f"lead_{tf}.xgb"),
+                "meta": self._resolve_model_path(f"meta_{tf}.json", f"meta_{tf}.xgb"),
+                "long": self._resolve_model_path(f"lead_long_{tf}.json", f"lead_long_{tf}.xgb"),
+                "short": self._resolve_model_path(f"lead_short_{tf}.json", f"lead_short_{tf}.xgb"),
+                "long_meta": self._resolve_model_path(f"meta_long_{tf}.json", f"meta_long_{tf}.xgb"),
+                "short_meta": self._resolve_model_path(f"meta_short_{tf}.json", f"meta_short_{tf}.xgb"),
+                "bear_short_meta": self._resolve_model_path(f"meta_short_bear_{tf}.json", f"meta_short_bear_{tf}.xgb"),
             }
 
             if path_map["lead"]:
@@ -266,9 +267,9 @@ class Strategy:
             df_feat = calculate_features(df, timeframe=timeframe, symbol=symbol, feature_profile="price_context")
             df_feat["market_vol"] = m_vol
             df_feat["market_ret"] = m_ret
-            market_ret_4h = m_ret.rolling(4, min_periods=1).sum().fillna(0.0)
-            df_feat["rel_ret_1h"] = df_feat["ret_1h"] - df_feat["market_ret"]
-            df_feat["rel_ret_4h"] = df_feat["ret_4h"] - market_ret_4h
+            market_ret_4b = m_ret.rolling(4, min_periods=1).sum().fillna(0.0)
+            df_feat["rel_ret_1b"] = df_feat["ret_1b"] - df_feat["market_ret"]
+            df_feat["rel_ret_4b"] = df_feat["ret_4b"] - market_ret_4b
             df_feat["rel_bb_width"] = df_feat["bb_width"] - df_feat["market_vol"]
 
             use_directional = (
@@ -346,8 +347,8 @@ class Strategy:
             if include_state:
                 table["atr_val"] = df_feat["atr_14"].values
                 table["market_ret"] = df_feat["market_ret"].values
-                table["rsi_8"] = df_feat["rsi_8"].values
-                table["rsi_24"] = df_feat["rsi_24"].values
+                table["rsi_8b"] = df_feat["rsi_8b"].values
+                table["rsi_24b"] = df_feat["rsi_24b"].values
                 table["atr_pct"] = df_feat["atr_pct"].values
                 table["liquidity_sweep"] = df_feat["liquidity_sweep"].values
                 table["msb_status"] = df_feat["msb_status"].values
@@ -355,7 +356,9 @@ class Strategy:
                 table["ob_dist"] = df_feat["ob_dist"].values
                 table["ema_200_dist"] = df_feat["ema_200_dist"].values
                 table["dist_to_vwap"] = df_feat["dist_to_vwap"].values
-                table["vol_trend_8h"] = df_feat["vol_trend_8h"].values if "vol_trend_8h" in df_feat.columns else 0.0
+                table["vol_trend_8b"] = df_feat["vol_trend_8b"].values if "vol_trend_8b" in df_feat.columns else 0.0
+                table["has_funding"] = df_feat["has_funding"].values if "has_funding" in df_feat.columns else 1.0
+                table["bar_interval_hours"] = df_feat["bar_interval_hours"].values if "bar_interval_hours" in df_feat.columns else 1.0
                 table["macro_event_flag"] = df_feat["macro_event_flag"].values
                 table["context_sentiment"] = df_feat["context_sentiment"].values
                 table["major_market_event_flag"] = df_feat["major_market_event_flag"].values
@@ -446,8 +449,8 @@ class Strategy:
                     "timestamp",
                     "atr_val",
                     "market_ret",
-                    "rsi_8",
-                    "rsi_24",
+                    "rsi_8b",
+                    "rsi_24b",
                     "atr_pct",
                     "liquidity_sweep",
                     "msb_status",
@@ -455,6 +458,8 @@ class Strategy:
                     "ob_dist",
                     "ema_200_dist",
                     "dist_to_vwap",
+                    "has_funding",
+                    "bar_interval_hours",
                     "macro_event_flag",
                     "context_sentiment",
                     "major_market_event_flag",
@@ -594,8 +599,14 @@ class Strategy:
             row = cache[idx]
             self.bar_counts[symbol] += 1
 
+            # Daily-bar symbols are expanded to 24 hourly rows in load_data().
+            # Only process the midnight bar (hour=0) to avoid 24x duplicate signals.
+            if row.get("bar_interval_hours", 1.0) >= 24.0:
+                if (bar.timestamp // 3_600_000) % 24 != 0:
+                    continue
+
             m15 = row["meta_15m"]
-            rsi_8 = row.get("rsi_8", 50.0)
+            rsi_8 = row.get("rsi_8b", 50.0)
             market_regime_family = self.regime_family_by_ts.get(int(row["timestamp"]), "unknown")
             m15_long = row.get("meta_long_15m", m15)
             m15_short_raw = row.get("meta_short_15m", m15)
@@ -617,8 +628,8 @@ class Strategy:
 
             active_meta = [m for m in (max(m15_long, m15_short), m1h, m4h) if m > 0]
             meta_score = float(np.mean(active_meta)) if active_meta else 0.0
-            supportive_regime = (m1h <= 0 or m1h > 0.45)
-            supportive_regime_4h = (m4h <= 0 or m4h > 0.45)
+            supportive_regime = (m1h <= 0 or m1h > 0.33)
+            supportive_regime_4h = (m4h <= 0 or m4h > 0.42)
             atr_mult = (4.0 if self._macro_bear else 7.0) * self._atr_scale
             stop_dist = atr_mult * row["atr_val"] if row["atr_val"] > 0 else max(bar.close * 0.02, 1e-6)
             mret_bar = row.get("market_ret", 0.0)
@@ -837,7 +848,9 @@ class Strategy:
             rsi_scale = max(0.5, 1.0 - max(0.0, rsi_8 - 40) / 40)
             mret_scale = max(0.5, min(1.5, 1.0 + 40.0 * mret_bar))
             funding = bar.funding_rate if hasattr(bar, 'funding_rate') else 0.0
-            fund_scale = max(0.5, min(2.5, 1.0 - 3000.0 * funding))
+            has_funding_flag = row.get("has_funding", 1.0)
+            # fund_scale is meaningful only for crypto perps; equity/forex/commodity get neutral 1.0
+            fund_scale = max(0.5, min(2.5, 1.0 - 3000.0 * funding)) if has_funding_flag > 0.5 else 1.0
             if bull_fortress and not prefer_short and not_falling_knife and not_hyper_vol and not raw_bear_fortress and (not bear_fortress or m15_long >= m15_short) and macro_bull_ok and long_gate_ok:
                 entry_size = long_size * self._entry_scale * vol_scale * rsi_scale * mret_scale * fund_scale * self._leverage_mult
                 if market_regime_family == "sideways":

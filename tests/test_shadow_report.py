@@ -4,10 +4,13 @@ import unittest
 from pathlib import Path
 
 from execution.paper import ShadowState, save_shadow_state
-from execution.report import render_shadow_dashboard, summarize_shadow_run, write_shadow_dashboard
+from execution.report import _fmt_ts, render_shadow_dashboard, summarize_shadow_run, write_shadow_dashboard
 
 
 class ShadowReportTests(unittest.TestCase):
+    def test_fmt_ts_supports_millisecond_timestamps(self):
+        self.assertEqual(_fmt_ts(1713484800000), "2024-04-19T00:00:00+00:00")
+
     def test_shadow_report_summary_and_dashboard(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
