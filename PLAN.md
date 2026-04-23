@@ -1,7 +1,7 @@
 # V2 Renaissance-Style Multi-Alpha Platform
 
 ## Current Stage
-As of `2026-04-22`, this plan is in the **portfolio proving and diversification stage**.
+As of `2026-04-23`, this plan is in the **reality-check and V2 rebuild stage**.
 
 What is already true:
 - the parallel V2 platform exists beside the frozen `exp494` control
@@ -18,43 +18,42 @@ What is already true:
 
 What is not true yet:
 - we do **not** have `5-8` live-quality independent sleeves
-- the current lead candidate does satisfy the `<=30%` sleeve concentration target on the corrected base full splits, but no single policy currently clears both the corrected base and corrected stress bars together
+- the latest fully corrected V2 benchmark candidate no longer satisfies the `<=30%` sleeve concentration target, and it also fails the PF gate badly
 - V2 still does not use the legacy `backtest.py` engine, but it now has its own benchmark-style replay/backtest path
 - most historical V2 reads were still probe or rolling-window evaluations, so the new full-period backtest path now needs to become part of the normal research loop
 
 Current practical stage label:
 - **Stage 1 complete:** platform foundation
 - **Stage 2 in progress:** sleeve wave build-out and foundation sleeve porting
-- **Stage 3 in progress:** portfolio allocator and concentration reduction
+- **Stage 3 in progress:** portfolio allocator, realism hardening, and concentration reduction
 - **Stage 4 partially complete:** shadow execution and evaluation
 - **Stage 5 early / partial:** challenger registry and rolling evaluation exist, but promotion cadence and portfolio champion workflow are not mature yet
 
 Latest V2 read worth tracking:
-- corrected full 8-symbol replay after the max-hold friction fix:
-  - [v2_portfolio.wave4_quality2.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_quality2.json) is the strongest corrected base policy:
-    - `val`: legacy score `14.74`, daily Sharpe `11.04`, PF `4.26`, return `635.12%`, trades/day `14.37`, concentration `28.96%`
-    - `2026q1`: legacy score `15.31`, daily Sharpe `11.68`, PF `4.28`, return `28.84%`, trades/day `15.99`, concentration `28.86%`
-  - matching corrected stress replay on [v2_portfolio.wave4_stress_quality2.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_stress_quality2.json) failed PF on both splits:
-    - `val`: daily Sharpe `9.62`, PF `3.61`, concentration `30.00%`
-    - `2026q1`: daily Sharpe `9.30`, PF `3.56`, concentration `27.57%`
-  - [v2_portfolio.wave4_quality4.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_quality4.json) and [v2_portfolio.wave4_stress_quality4.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_stress_quality4.json) showed the opposite tradeoff:
-    - corrected stress passed on both splits
-    - corrected base concentration still missed the `<=30%` target by a hair
-- conclusion: the friction bug is fixed and the new indexed replay path makes full stress runs practical, but V2 is back to a near-miss state rather than a confirmed champion
+- the big V2 benchmark claims from `v2exp6`-`v2exp8` are no longer trustworthy as stated
+  - after fixing three more realism/metric issues:
+    - millisecond-aware max-hold timing in [execution/v2_paper.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/execution/v2_paper.py)
+    - base-time funding drag in V2 replay
+    - net realized trade accounting including allocated entry fees and partial reductions
+  - the same [v2_portfolio.wave4_quality2.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_quality2.json) policy reran much lower on full 8-symbol replay:
+    - `val`: legacy score `5.67`, daily Sharpe `5.92`, PF `1.98`, return `473.50%`, trades/day `7.59`, concentration `39.51%`
+    - `2026q1`: legacy score `3.32`, daily Sharpe `3.59`, PF `1.49`, return `17.74%`, trades/day `8.69`, concentration `35.93%`
+- conclusion:
+  - the V2 edge is probably real
+  - the old Sharpe/PF story was materially overstated
+  - V2 is back to “promising prototype” rather than “near-replacement benchmark”
 
 Current leading V2 candidate:
-- `v2_wave4_carry` with the corrected base policy from [v2_portfolio.wave4_quality2.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_quality2.json)
-  - still looks like the strongest corrected base policy after the friction fix
-  - full corrected 8-symbol replay:
-    - `val`: legacy score `14.74`, daily Sharpe `11.04`, PF `4.26`, return `635.12%`, trades/day `14.37`, short share `30.56%`, top sleeve concentration `28.96%`
-    - `2026q1`: legacy score `15.31`, daily Sharpe `11.68`, PF `4.28`, return `28.84%`, trades/day `15.99`, short share `31.36%`, top sleeve concentration `28.86%`
-  - corrected stress replay:
-    - `val`: daily Sharpe `9.62`, PF `3.61`, concentration `30.00%`
-    - `2026q1`: daily Sharpe `9.30`, PF `3.56`, concentration `27.57%`
+- there is no trustworthy promotion-ready V2 benchmark candidate right now
+  - `v2_wave4_carry` / `quality2` is still the best-known policy family structurally
+  - but after the latest replay hardening it fails the replacement bar on:
+    - PF
+    - concentration
+    - win rate
 - interpretation:
-  - `funding_carry` remains the meaningful fourth pillar while `post_event_mean_reversion` is still mostly inert
-  - the corrected friction bug materially reduced realized PF and return; that bug fix was important and changed the benchmark verdict
-  - no single policy currently clears corrected base concentration/PF and corrected stress PF together, so V2 remains a strong candidate rather than a promoted benchmark
+  - `basis_dislocation`, `cross_asset_relative_strength`, and `post_extension_snapback` still look like the main real sleeves
+  - `funding_carry` is no longer strong enough to save the book once funding is actually charged
+  - V2 now needs another true research wave, not just another promotion pass
 
 Useful research note:
 - `post_event_mean_reversion` currently looks more like a policy-gated sleeve than a bad model:
@@ -63,9 +62,14 @@ Useful research note:
   - the first event-floor test at `0.30` increased live event actions but did not move portfolio-level outcomes materially, so that is not the best next lever right now
 
 Immediate next focus:
-- unify the corrected base and corrected stress bars in one policy instead of maintaining separate near-miss solutions
-- run a longer paper-shadow validation pass only after a single policy clears both corrected base and corrected stress bars
-- compare the corrected V2 candidate against the legacy control on explicit replacement criteria, not just standalone V2 strength
+- redesign around the corrected reality instead of trying to rescue the old wave4 policy by tiny allocator nudges
+- specifically:
+  - inspect why max-hold-corrected sleeves are still profitable in aggregate but now over-concentrated and low-PF
+  - reduce dependence on `cross_asset_relative_strength`, `basis_dislocation`, and `post_extension_snapback`
+  - retune hold horizons and sleeve exit behavior now that max-hold uses the real clock
+  - rebuild stress-aware carry sleeves with actual funding charged
+- run a longer paper-shadow validation pass only after a single policy clears corrected base and corrected stress bars again
+- compare any rebuilt V2 candidate against the legacy control on explicit replacement criteria, not just standalone V2 strength
 - keep using the stricter V2 benchmark audit in `v2_evaluate.py`:
   - bar Sharpe
   - win rate
@@ -73,7 +77,7 @@ Immediate next focus:
   - max drawdown
   - trades/day
 - keep the confidence-override path available for later sleeve activation work, but do not spend the next loop on `post_event_mean_reversion` unless a better event-side hypothesis appears
-- continue using the faster indexed replay path for routine wave work; the main blocker is policy fit now, not replay throughput
+- continue using the faster indexed replay path for routine wave work; the main blocker is now policy fit and replay realism, not raw throughput
 
 ## Summary
 Build a **parallel V2 platform** beside the frozen `exp494` control. The goal is not “one better strategy,” but a **research-and-allocation machine** that manages **12-20 candidate alphas**, promotes **5-8 live sleeves**, supports **role-based timeframe bundles**, and compounds many weak-to-medium edges under strict risk and anti-overfitting controls.

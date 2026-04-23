@@ -19,6 +19,7 @@ class V2ShadowState:
     cash: float = prepare.INITIAL_CAPITAL
     positions: dict = field(default_factory=dict)
     entry_prices: dict = field(default_factory=dict)
+    position_fee_basis: dict = field(default_factory=dict)
     position_meta: dict = field(default_factory=dict)
     recent_entries: dict = field(default_factory=dict)
     equity: float = prepare.INITIAL_CAPITAL
@@ -37,6 +38,7 @@ def load_v2_shadow_state(path: str | Path) -> V2ShadowState:
         cash=float(payload.get("cash", prepare.INITIAL_CAPITAL)),
         positions={k: float(v) for k, v in payload.get("positions", {}).items()},
         entry_prices={k: float(v) for k, v in payload.get("entry_prices", {}).items()},
+        position_fee_basis={k: float(v) for k, v in payload.get("position_fee_basis", {}).items()},
         position_meta=payload.get("position_meta", {}) or {},
         recent_entries={k: int(v) for k, v in (payload.get("recent_entries", {}) or {}).items()},
         equity=float(payload.get("equity", prepare.INITIAL_CAPITAL)),
@@ -94,6 +96,29 @@ def _mark_to_market(portfolio: PortfolioState, close_by_symbol: dict[str, float]
             unrealized += pos * (price - entry) / entry
     portfolio.equity = portfolio.cash + sum(abs(v) for v in portfolio.positions.values()) + unrealized
     return portfolio.equity
+
+
+def _apply_funding(
+    portfolio: PortfolioState,
+    funding_by_symbol: dict[str, dict[str, float]],
+) -> float:
+    total_funding = 0.0
+    for symbol, pos_notional in list(portfolio.positions.items()):
+        snapshot = funding_by_symbol.get(symbol, {})
+        has_funding = float(snapshot.get("has_funding", 0.0) or 0.0)
+        if has_funding <= 0.0:
+            continue
+        funding_rate = float(snapshot.get("funding_rate", 0.0) or 0.0)
+        if funding_rate == 0.0:
+            continue
+        bar_interval_hours = float(snapshot.get("bar_interval_hours", 1.0) or 1.0)
+        bars_per_funding = 8.0 / max(bar_interval_hours, 1e-9)
+        funding_payment = pos_notional * funding_rate / max(bars_per_funding, 1e-9)
+        if funding_payment == 0.0:
+            continue
+        portfolio.cash -= funding_payment
+        total_funding += funding_payment
+    return float(total_funding)
 
 
 def _cooldown_key(signal) -> str:
@@ -173,6 +198,7 @@ def run_v2_shadow_session(
         equity=state.equity,
         timestamp=state.last_timestamp,
     )
+    position_fee_basis = dict(state.position_fee_basis)
     position_meta = dict(state.position_meta)
     recent_entries = dict(state.recent_entries)
 
@@ -201,6 +227,7 @@ def run_v2_shadow_session(
         active_candidates = engine.signals_at_timestamp(timestamp)
         active_candidates, cooldown_rejections = _apply_reentry_cooldown(active_candidates, recent_entries, int(timestamp))
         close_by_symbol = engine.close_by_symbol_at_timestamp(timestamp)
+        funding_by_symbol = getattr(engine, "funding_by_symbol_at_timestamp", lambda _ts: {})(timestamp)
 
         # Portfolio exits by max-hold.
         close_requests = []
@@ -208,7 +235,8 @@ def run_v2_shadow_session(
             meta = position_meta.get(symbol, {})
             opened_ts = int(meta.get("opened_ts", timestamp))
             max_hold_hours = float(meta.get("max_hold_hours", 0.0) or 0.0)
-            age_hours = max(0.0, (timestamp - opened_ts) / 3600.0)
+            unit_scale = 1000.0 if max(abs(int(timestamp)), abs(int(opened_ts))) > 1e11 else 1.0
+            age_hours = max(0.0, (timestamp - opened_ts) / (3600.0 * unit_scale))
             if max_hold_hours and age_hours >= max_hold_hours:
                 close_requests.append(
                     {
@@ -219,6 +247,8 @@ def run_v2_shadow_session(
                     }
                 )
 
+        _mark_to_market(portfolio, close_by_symbol)
+        _apply_funding(portfolio, funding_by_symbol)
         _mark_to_market(portfolio, close_by_symbol)
         allocated, rejected = allocator.allocate(
             active_candidates,
@@ -250,12 +280,15 @@ def run_v2_shadow_session(
             exec_price = _execution_price(base_close, -current, portfolio_config.slippage_bps)
             fee = abs(current) * prepare.TAKER_FEE
             entry = portfolio.entry_prices.get(symbol, exec_price)
-            realized = current * (exec_price - entry) / entry if entry > 0 else 0.0
+            gross_realized = current * (exec_price - entry) / entry if entry > 0 else 0.0
+            entry_fee_allocated = float(position_fee_basis.get(symbol, 0.0) or 0.0)
+            realized = gross_realized - entry_fee_allocated - fee
             portfolio.cash -= fee
-            portfolio.cash += abs(current) + realized
+            portfolio.cash += abs(current) + gross_realized
             portfolio.total_volume = getattr(portfolio, "total_volume", 0.0) + abs(current)
             portfolio.positions.pop(symbol, None)
             portfolio.entry_prices.pop(symbol, None)
+            position_fee_basis.pop(symbol, None)
             meta = position_meta.pop(symbol, {})
             _append_log(
                 log_path,
@@ -272,6 +305,8 @@ def run_v2_shadow_session(
                     "delta_notional": abs(current),
                     "exec_price": exec_price,
                     "fee": fee,
+                    "entry_fee_allocated": entry_fee_allocated,
+                    "gross_realized_pnl": gross_realized,
                     "realized_pnl": realized,
                     "portfolio_equity": portfolio.equity,
                 },
@@ -310,30 +345,46 @@ def run_v2_shadow_session(
                 portfolio.cash -= fee
                 event = "modify"
                 realized = 0.0
+                gross_realized = 0.0
+                entry_fee_allocated = 0.0
 
                 if current == 0:
                     event = "open"
                     portfolio.cash -= abs(target)
                     portfolio.entry_prices[signal.symbol] = exec_price
+                    position_fee_basis[signal.symbol] = float(position_fee_basis.get(signal.symbol, 0.0) or 0.0) + fee
                     recent_entries[_cooldown_key(signal)] = int(timestamp)
                 elif target == 0:
                     event = "close"
                     entry = portfolio.entry_prices.get(signal.symbol, exec_price)
-                    realized = current * (exec_price - entry) / entry if entry > 0 else 0.0
-                    portfolio.cash += abs(current) + realized
+                    gross_realized = current * (exec_price - entry) / entry if entry > 0 else 0.0
+                    entry_fee_allocated = float(position_fee_basis.get(signal.symbol, 0.0) or 0.0)
+                    realized = gross_realized - entry_fee_allocated - fee
+                    portfolio.cash += abs(current) + gross_realized
                     portfolio.entry_prices.pop(signal.symbol, None)
+                    position_fee_basis.pop(signal.symbol, None)
                 else:
                     old_entry = portfolio.entry_prices.get(signal.symbol, exec_price)
+                    old_fee_basis = float(position_fee_basis.get(signal.symbol, 0.0) or 0.0)
                     if abs(target) > abs(current):
                         added = abs(target) - abs(current)
                         portfolio.cash -= added
                         portfolio.entry_prices[signal.symbol] = ((old_entry * abs(current)) + (exec_price * added)) / max(abs(target), 1.0)
+                        position_fee_basis[signal.symbol] = old_fee_basis + fee
                     elif abs(target) < abs(current):
                         reduced = abs(current) - abs(target)
-                        realized = np.sign(current) * reduced * (exec_price - old_entry) / old_entry if old_entry > 0 else 0.0
-                        portfolio.cash += reduced + realized
+                        gross_realized = np.sign(current) * reduced * (exec_price - old_entry) / old_entry if old_entry > 0 else 0.0
+                        entry_fee_allocated = old_fee_basis * (reduced / max(abs(current), 1.0))
+                        realized = gross_realized - entry_fee_allocated - fee
+                        portfolio.cash += reduced + gross_realized
+                        remaining_fee_basis = max(old_fee_basis - entry_fee_allocated, 0.0)
+                        if abs(target) > 0.0:
+                            position_fee_basis[signal.symbol] = remaining_fee_basis
+                        else:
+                            position_fee_basis.pop(signal.symbol, None)
                 if target == 0:
                     portfolio.positions.pop(signal.symbol, None)
+                    position_fee_basis.pop(signal.symbol, None)
                     position_meta.pop(signal.symbol, None)
                 else:
                     portfolio.positions[signal.symbol] = target
@@ -365,6 +416,8 @@ def run_v2_shadow_session(
                         "delta_notional": delta,
                         "exec_price": exec_price,
                         "fee": fee,
+                        "entry_fee_allocated": entry_fee_allocated if event in {"close", "modify"} else 0.0,
+                        "gross_realized_pnl": gross_realized if event in {"close", "modify"} else 0.0,
                         "realized_pnl": realized,
                         "participation": participation,
                         "rationale": signal.metadata.get("activation_rule", signal.reason_tag),
@@ -399,6 +452,7 @@ def run_v2_shadow_session(
     state.cash = portfolio.cash
     state.positions = dict(portfolio.positions)
     state.entry_prices = dict(portfolio.entry_prices)
+    state.position_fee_basis = dict(position_fee_basis)
     state.position_meta = dict(position_meta)
     state.recent_entries = dict(recent_entries)
     state.equity = portfolio.equity

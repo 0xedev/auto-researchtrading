@@ -148,7 +148,11 @@ def build_v2_backtest_result(
         run_result.get("equity_curve", []) or [],
         run_result.get("equity_timestamps", []) or [],
     )
-    close_rows = [row for row in log_rows if row.get("action") == "close"]
+    close_rows = [
+        row
+        for row in log_rows
+        if row.get("action") in {"close", "modify"} and abs(float(row.get("realized_pnl", 0.0) or 0.0)) > 1e-12
+    ]
     num_trades, win_rate_pct, profit_factor = _profit_metrics(close_rows)
     total_bars = int(run_result.get("total_bars_available", run_result.get("bars_processed", 0)) or 0)
     bars_processed = int(run_result.get("bars_processed", 0) or 0)

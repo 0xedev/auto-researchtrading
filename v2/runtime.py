@@ -38,16 +38,41 @@ class V2SignalEngine:
         self.sleeve_features: dict[str, list[str]] = {}
         self.models: dict[str, xgb.XGBClassifier] = {}
         self.bundle_close_by_timestamp: dict[int, dict[str, float]] = {}
+        self.bundle_funding_by_timestamp: dict[int, dict[str, dict[str, float]]] = {}
 
     def _build_bundle_close_index(self) -> None:
         self.bundle_close_by_timestamp = {}
+        self.bundle_funding_by_timestamp = {}
         if self.bundle_frame.empty or "timestamp" not in self.bundle_frame.columns:
             return
-        close_frame = self.bundle_frame[["timestamp", "symbol", "base_close"]].copy()
+        close_frame = self.bundle_frame.copy()
+        for column, default in (
+            ("base_funding_rate", 0.0),
+            ("base_has_funding", 0.0),
+            ("base_bar_interval_hours", 1.0),
+        ):
+            if column not in close_frame.columns:
+                close_frame[column] = default
+        close_frame = close_frame[
+            [
+                "timestamp",
+                "symbol",
+                "base_close",
+                "base_funding_rate",
+                "base_has_funding",
+                "base_bar_interval_hours",
+            ]
+        ].copy()
         for row in close_frame.itertuples(index=False):
             timestamp = int(row.timestamp)
             close_by_symbol = self.bundle_close_by_timestamp.setdefault(timestamp, {})
             close_by_symbol[str(row.symbol)] = float(row.base_close)
+            funding_by_symbol = self.bundle_funding_by_timestamp.setdefault(timestamp, {})
+            funding_by_symbol[str(row.symbol)] = {
+                "funding_rate": float(row.base_funding_rate),
+                "has_funding": float(row.base_has_funding),
+                "bar_interval_hours": float(row.base_bar_interval_hours),
+            }
 
     def _build_sleeve_timestamp_index(self, sleeve_name: str) -> dict[int, list[dict]]:
         frame = self.sleeve_tables.get(sleeve_name, pd.DataFrame())
@@ -63,6 +88,9 @@ class V2SignalEngine:
 
     def close_by_symbol_at_timestamp(self, timestamp: int) -> dict[str, float]:
         return self.bundle_close_by_timestamp.get(int(timestamp), {})
+
+    def funding_by_symbol_at_timestamp(self, timestamp: int) -> dict[str, dict[str, float]]:
+        return self.bundle_funding_by_timestamp.get(int(timestamp), {})
 
     def prepare(self, split: str) -> None:
         self.bundle_frame = build_bundle_dataset(

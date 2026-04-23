@@ -33,6 +33,8 @@ class V2BacktestTests(unittest.TestCase):
             {"action": "close", "realized_pnl": 200.0},
             {"action": "open", "target_position": -3_000.0},
             {"action": "close", "realized_pnl": -100.0},
+            {"action": "modify", "realized_pnl": 50.0},
+            {"action": "modify", "realized_pnl": 0.0},
         ]
 
         result = build_v2_backtest_result(
@@ -42,10 +44,10 @@ class V2BacktestTests(unittest.TestCase):
             log_rows=log_rows,
         )
 
-        self.assertEqual(result.num_trades, 2)
+        self.assertEqual(result.num_trades, 3)
         self.assertAlmostEqual(result.total_return_pct, 3.0)
-        self.assertAlmostEqual(result.win_rate_pct, 50.0)
-        self.assertAlmostEqual(result.profit_factor, 2.0)
+        self.assertAlmostEqual(result.win_rate_pct, 66.66666666666666)
+        self.assertAlmostEqual(result.profit_factor, 2.5)
         self.assertGreater(result.sharpe, 0.0)
         self.assertGreater(result.max_drawdown_pct, 0.0)
         self.assertGreater(result.annual_turnover, 0.0)
