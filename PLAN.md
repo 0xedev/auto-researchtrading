@@ -36,30 +36,31 @@ Latest V2 read worth tracking:
 - conclusion: V2 clearly has real breadth and portfolio activity on a broader slice too, but concentration is still above the `30%` target and even the daily metrics remain optimistic enough that replay realism is still an open research risk
 
 Current leading V2 candidate:
-- `v2_wave2_pair`
-  - adds `volatility_reversion` and `leader_laggard_rotation` on top of the current foundation set
-  - full 8-symbol `val` replay versus `v2_wave1_priceonly`:
-    - legacy score `15.36` vs `16.43`
-    - daily Sharpe `12.58` vs `12.39`
-    - return `912.10%` vs `738.19%`
-    - trades/day `13.27` vs `12.05`
-    - top sleeve concentration `37.7%` vs `42.7%`
-  - full 8-symbol `2026q1` replay versus `v2_wave1_priceonly`:
-    - legacy score `16.10` vs `16.19`
-    - daily Sharpe `12.93` vs `12.87`
-    - return `27.80%` vs `27.00%`
-    - trades/day `11.89` vs `11.45`
-    - top sleeve concentration `42.4%` vs `43.6%`
+- `v2_wave3_orth`
+  - adds `basis_dislocation`, `macro_beta_dispersion`, `macro_event_drift`, and `bear_stress_short` on top of `v2_wave2_pair`
+  - full 8-symbol `val` replay versus `v2_wave2_pair`:
+    - legacy score `14.38` vs `15.36`
+    - daily Sharpe `12.58` vs `12.58`
+    - return `1155.83%` vs `912.10%`
+    - trades/day `15.60` vs `13.27`
+    - short share `26.61%` vs `23.32%`
+    - top sleeve concentration `33.1%` vs `37.7%`
+  - full 8-symbol `2026q1` replay versus `v2_wave2_pair`:
+    - legacy score `17.81` vs `16.10`
+    - daily Sharpe `15.03` vs `12.93`
+    - return `37.96%` vs `27.80%`
+    - trades/day `17.15` vs `11.89`
+    - short share `32.96%` vs `21.64%`
+    - top sleeve concentration `31.4%` vs `42.4%`
 - interpretation:
-  - `volatility_reversion` helps more on validation
-  - `leader_laggard_rotation` helps more on `2026q1`
-  - the pair still improves breadth on the broader replay and is now logged as the leading V2 candidate in `results.tsv`
-  - it is still not a V2 champion because concentration remains above target and the old legacy composite score still prefers the baseline
+  - `basis_dislocation` is the first new sleeve to look like a true second pillar instead of a small add-on
+  - the wave materially improves short participation and gets concentration very close to the `30%` target
+  - it is still not a V2 champion because concentration is not yet below target on both splits and replay realism still needs stress confirmation
 
 Immediate next focus:
-- reduce `post_extension_snapback` / `sideways_mean_reversion` dominance
-- strengthen non-dominant sleeves, especially shorts and orthogonal sleeves
-- move routine V2 research from short probe Sharpe toward fuller-period runs and daily-level metrics
+- stress-test `v2_wave3_orth` so the new breadth survives a less optimistic replay lens
+- close the last concentration gap below `30%` on both `val` and `2026q1`
+- keep strengthening the non-dominant sleeves that are now proving useful, especially carry and short clusters
 
 ## Summary
 Build a **parallel V2 platform** beside the frozen `exp494` control. The goal is not “one better strategy,” but a **research-and-allocation machine** that manages **12-20 candidate alphas**, promotes **5-8 live sleeves**, supports **role-based timeframe bundles**, and compounds many weak-to-medium edges under strict risk and anti-overfitting controls.
