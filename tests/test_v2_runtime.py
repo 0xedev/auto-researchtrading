@@ -66,6 +66,26 @@ class V2RuntimeTests(unittest.TestCase):
         self.assertEqual(len(signals), 1)
         self.assertAlmostEqual(signals[0].metadata["min_confidence"], 0.30)
 
+    def test_bundle_close_index_returns_symbol_prices_by_timestamp(self):
+        engine = V2SignalEngine(
+            bundle_name="bundle_intraday_core",
+            model_set="unused",
+            active_sleeves=[],
+        )
+        engine.bundle_frame = pd.DataFrame(
+            [
+                {"timestamp": 100, "symbol": "BTC", "base_close": 101.0},
+                {"timestamp": 100, "symbol": "ETH", "base_close": 202.0},
+                {"timestamp": 200, "symbol": "BTC", "base_close": 103.0},
+            ]
+        )
+
+        engine._build_bundle_close_index()
+
+        self.assertEqual(engine.close_by_symbol_at_timestamp(100), {"BTC": 101.0, "ETH": 202.0})
+        self.assertEqual(engine.close_by_symbol_at_timestamp(200), {"BTC": 103.0})
+        self.assertEqual(engine.close_by_symbol_at_timestamp(300), {})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -195,12 +195,7 @@ def run_v2_shadow_session(
 
         active_candidates = engine.signals_at_timestamp(timestamp)
         active_candidates, cooldown_rejections = _apply_reentry_cooldown(active_candidates, recent_entries, int(timestamp))
-        bundle_rows = engine.bundle_frame[engine.bundle_frame["timestamp"] == timestamp]
-        close_by_symbol = {
-            str(row.symbol): float(row.base_close)
-            for row in bundle_rows.itertuples(index=False)
-            if hasattr(row, "base_close")
-        }
+        close_by_symbol = engine.close_by_symbol_at_timestamp(timestamp)
 
         # Portfolio exits by max-hold.
         close_requests = []

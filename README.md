@@ -118,8 +118,14 @@ uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_wave3_orth --
 # the concentration target on both val and 2026q1
 uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_wave4_carry --split val --portfolio-config v2_portfolio.wave4_trim_rs.json
 
+# Run the current quality-focused wave4 benchmark candidate
+uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_wave4_carry --split val --portfolio-config v2_portfolio.wave4_quality2.json
+
 # Run the same wave4 policy under the harsher stress lens used by v2_evaluate.py
 uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_wave4_carry --split val --portfolio-config v2_portfolio.wave4_trim_rs_stress.json
+
+# Run the stress-confirmed quality2 variant under the same harsher lens
+uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_wave4_carry --split val --portfolio-config v2_portfolio.wave4_stress_quality2.json
 
 # Retrain the macro HMM as well
 uv run train_model.py --timeframe 1h --train_hmm

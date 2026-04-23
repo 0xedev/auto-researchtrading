@@ -18,7 +18,7 @@ What is already true:
 
 What is not true yet:
 - we do **not** have `5-8` live-quality independent sleeves
-- the current lead candidate does satisfy the `<=30%` sleeve concentration target on the base full splits, but that has **not** yet been confirmed under stress / harsher replay assumptions
+- the current lead candidate does satisfy the `<=30%` sleeve concentration target on both the base and harsher stress full splits, but it still has not been proven through a longer paper-shadow run
 - V2 still does not use the legacy `backtest.py` engine, but it now has its own benchmark-style replay/backtest path
 - most historical V2 reads were still probe or rolling-window evaluations, so the new full-period backtest path now needs to become part of the normal research loop
 
@@ -30,21 +30,27 @@ Current practical stage label:
 - **Stage 5 early / partial:** challenger registry and rolling evaluation exist, but promotion cadence and portfolio champion workflow are not mature yet
 
 Latest V2 read worth tracking:
-- full 8-symbol benchmark-style replay on `v2_wave4_carry` with the small cross-asset trim policy in [v2_portfolio.wave4_trim_rs.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_trim_rs.json):
-  - `val`: return `1042.89%`, daily Sharpe `11.57`, trades/day `15.93`, short share `30.96%`, top sleeve concentration `29.50%`
-  - `2026q1`: return `40.05%`, daily Sharpe `13.39`, trades/day `18.85`, short share `29.99%`, top sleeve concentration `26.83%`
-- conclusion: V2 now has its first full-split portfolio that clears the `<=30%` sleeve concentration target on both `val` and `2026q1`; the next blocker is no longer diversification, but realism/stress confirmation
+- full 8-symbol benchmark-style replay on `v2_wave4_carry` with the quality-focused policy in [v2_portfolio.wave4_quality2.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_quality2.json):
+  - `val`: legacy score `16.39`, daily Sharpe `12.04`, PF `4.46`, return `854.95%`, trades/day `14.08`, short share `30.58%`, top sleeve concentration `29.15%`
+  - `2026q1`: legacy score `18.68`, daily Sharpe `14.10`, PF `4.63`, return `37.39%`, trades/day `15.93`, short share `31.47%`, top sleeve concentration `28.94%`
+- matching harsher stress replay on [v2_portfolio.wave4_stress_quality2.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_stress_quality2.json):
+  - `val`: daily Sharpe `10.99`, PF `4.09`, return `605.54%`, trades/day `12.91`, concentration `29.15%`
+  - `2026q1`: daily Sharpe `12.60`, PF `4.34`, return `32.99%`, trades/day `14.88`, concentration `28.18%`
+- conclusion: V2 now has its first full-split portfolio that clears the concentration target and also survives the stricter stress audit on both `val` and `2026q1`; the next blocker is no longer replay stress, but proving the candidate through paper-shadow and clearer replacement criteria versus the legacy line
 
 Current leading V2 candidate:
-- `v2_wave4_carry` with the small `cross_asset_relative_strength` trim from [v2_portfolio.wave4_trim_rs.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_trim_rs.json)
-  - adds `funding_carry` and `post_event_mean_reversion` on top of the family-cluster-fixed `v2_wave3_orth`, then lightly trims cross-asset concentration in the allocator
+- `v2_wave4_carry` with the quality-focused policy from [v2_portfolio.wave4_quality2.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_quality2.json)
+  - adds `funding_carry` and `post_event_mean_reversion` on top of the family-cluster-fixed `v2_wave3_orth`, then tightens cross-asset concentration, the dominant mean-reversion sleeve floors, and Tier-B sizing
   - full 8-symbol replay:
-    - `val`: legacy score `15.06`, daily Sharpe `11.57`, return `1042.89%`, trades/day `15.93`, short share `30.96%`, top sleeve concentration `29.50%`
-    - `2026q1`: legacy score `17.73`, daily Sharpe `13.39`, return `40.05%`, trades/day `18.85`, short share `29.99%`, top sleeve concentration `26.83%`
+    - `val`: legacy score `16.39`, daily Sharpe `12.04`, PF `4.46`, return `854.95%`, trades/day `14.08`, short share `30.58%`, top sleeve concentration `29.15%`
+    - `2026q1`: legacy score `18.68`, daily Sharpe `14.10`, PF `4.63`, return `37.39%`, trades/day `15.93`, short share `31.47%`, top sleeve concentration `28.94%`
+  - full stress replay:
+    - `val`: daily Sharpe `10.99`, PF `4.09`, return `605.54%`, trades/day `12.91`, concentration `29.15%`
+    - `2026q1`: daily Sharpe `12.60`, PF `4.34`, return `32.99%`, trades/day `14.88`, concentration `28.18%`
 - interpretation:
-  - `funding_carry` proved to be the real new contributor; it added a meaningful fourth pillar while `post_event_mean_reversion` stayed nearly inert at default confidence
-  - the tiny cross-asset trim was enough to convert wave4 from “almost there” into the first V2 portfolio that passes the concentration target on both full splits
-  - it is still not a V2 champion because replay realism and stress still need confirmation, but the alpha-breadth part of the plan is now materially closer to done
+  - `funding_carry` remains the meaningful fourth pillar while `post_event_mean_reversion` is still mostly inert
+  - the stronger quality policy gave up some headline return but materially improved PF, drawdown control, and stressed durability
+  - this is the first V2 portfolio that passes the concentration target and the stricter replay stress audit on both full splits, so the alpha/replay side of the plan is materially closer to done
 
 Useful research note:
 - `post_event_mean_reversion` currently looks more like a policy-gated sleeve than a bad model:
@@ -53,17 +59,16 @@ Useful research note:
   - the first event-floor test at `0.30` increased live event actions but did not move portfolio-level outcomes materially, so that is not the best next lever right now
 
 Immediate next focus:
-- stress-test the trimmed `v2_wave4_carry` benchmark so the new breadth survives a less optimistic replay lens
-- use the stricter V2 benchmark audit in `v2_evaluate.py`:
+- run a longer paper-shadow validation pass on the quality2 policy with restart/kill-switch checks
+- compare the quality2 policy against the legacy control on explicit replacement criteria, not just standalone V2 strength
+- keep using the stricter V2 benchmark audit in `v2_evaluate.py`:
   - bar Sharpe
   - win rate
   - profit factor
   - max drawdown
   - trades/day
-  instead of the older raw-return-only promotion lens
-- compare the trimmed wave4 benchmark against the current realism gates and shadow/capacity assumptions before any promotion language gets stronger
 - keep the confidence-override path available for later sleeve activation work, but do not spend the next loop on `post_event_mean_reversion` unless a better event-side hypothesis appears
-- if full 8-symbol stress replay remains too slow for routine research, add a faster dedicated stress harness rather than relying on the heaviest end-to-end evaluator path every time
+- optionally migrate the faster indexed replay path into a dedicated V2 stress CLI so this benchmark remains cheap enough for routine wave work
 
 ## Summary
 Build a **parallel V2 platform** beside the frozen `exp494` control. The goal is not “one better strategy,” but a **research-and-allocation machine** that manages **12-20 candidate alphas**, promotes **5-8 live sleeves**, supports **role-based timeframe bundles**, and compounds many weak-to-medium edges under strict risk and anti-overfitting controls.
