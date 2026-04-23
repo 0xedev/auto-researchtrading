@@ -30,31 +30,32 @@ Current practical stage label:
 - **Stage 5 early / partial:** challenger registry and rolling evaluation exist, but promotion cadence and portfolio champion workflow are not mature yet
 
 Latest V2 read worth tracking:
-- full 8-symbol benchmark-style replay on `v2_wave4_carry`:
-  - `val`: return `1068.52%`, daily Sharpe `11.58`, trades/day `15.78`, short share `31.10%`, top sleeve concentration `30.04%`
-  - `2026q1`: return `39.74%`, daily Sharpe `13.31`, trades/day `18.73`, short share `30.19%`, top sleeve concentration `26.96%`
-- conclusion: wave4 is the strongest breadth candidate so far; it materially improves return, activity, and concentration versus `v2exp3`, and now misses the `30%` val concentration bar by only `0.038` percentage points
+- full 8-symbol benchmark-style replay on `v2_wave4_carry` with the small cross-asset trim policy in [v2_portfolio.wave4_trim_rs.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_trim_rs.json):
+  - `val`: return `1042.89%`, daily Sharpe `11.57`, trades/day `15.93`, short share `30.96%`, top sleeve concentration `29.50%`
+  - `2026q1`: return `40.05%`, daily Sharpe `13.39`, trades/day `18.85`, short share `29.99%`, top sleeve concentration `26.83%`
+- conclusion: V2 now has its first full-split portfolio that clears the `<=30%` sleeve concentration target on both `val` and `2026q1`; the next blocker is no longer diversification, but realism/stress confirmation
 
 Current leading V2 candidate:
-- `v2_wave4_carry`
-  - adds `funding_carry` and `post_event_mean_reversion` on top of the family-cluster-fixed `v2_wave3_orth`
+- `v2_wave4_carry` with the small `cross_asset_relative_strength` trim from [v2_portfolio.wave4_trim_rs.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave4_trim_rs.json)
+  - adds `funding_carry` and `post_event_mean_reversion` on top of the family-cluster-fixed `v2_wave3_orth`, then lightly trims cross-asset concentration in the allocator
   - full 8-symbol replay:
-    - `val`: legacy score `15.03`, daily Sharpe `11.58`, return `1068.52%`, trades/day `15.78`, short share `31.10%`, top sleeve concentration `30.04%`
-    - `2026q1`: legacy score `17.64`, daily Sharpe `13.31`, return `39.74%`, trades/day `18.73`, short share `30.19%`, top sleeve concentration `26.96%`
+    - `val`: legacy score `15.06`, daily Sharpe `11.57`, return `1042.89%`, trades/day `15.93`, short share `30.96%`, top sleeve concentration `29.50%`
+    - `2026q1`: legacy score `17.73`, daily Sharpe `13.39`, return `40.05%`, trades/day `18.85`, short share `29.99%`, top sleeve concentration `26.83%`
 - interpretation:
   - `funding_carry` proved to be the real new contributor; it added a meaningful fourth pillar while `post_event_mean_reversion` stayed nearly inert at default confidence
-  - the book is now diversified enough that `cross_asset_relative_strength` and `post_extension_snapback` are both around `30%` on `val`, instead of one sleeve dominating the whole portfolio
-  - it is still not a V2 champion because `val` concentration is just barely above the `30%` bar and replay realism still needs stress confirmation
+  - the tiny cross-asset trim was enough to convert wave4 from “almost there” into the first V2 portfolio that passes the concentration target on both full splits
+  - it is still not a V2 champion because replay realism and stress still need confirmation, but the alpha-breadth part of the plan is now materially closer to done
 
 Useful research note:
 - `post_event_mean_reversion` currently looks more like a policy-gated sleeve than a bad model:
   - metadata looked good, but default runtime confidence produced almost no live signals
   - a new V2 confidence-override path now exists so that sleeve can be tested without rewriting manifests
+  - the first event-floor test at `0.30` increased live event actions but did not move portfolio-level outcomes materially, so that is not the best next lever right now
 
 Immediate next focus:
-- stress-test `v2_wave4_carry` so the new breadth survives a less optimistic replay lens
-- close the final `0.038` concentration gap on `val`, either through allocator policy or a targeted sleeve-gate tweak
-- use the new per-sleeve confidence override path to test whether `post_event_mean_reversion` can become a real contributor rather than near-zero noise
+- stress-test the trimmed `v2_wave4_carry` benchmark so the new breadth survives a less optimistic replay lens
+- compare the trimmed wave4 benchmark against the current realism gates and shadow/capacity assumptions before any promotion language gets stronger
+- keep the confidence-override path available for later sleeve activation work, but do not spend the next loop on `post_event_mean_reversion` unless a better event-side hypothesis appears
 
 ## Summary
 Build a **parallel V2 platform** beside the frozen `exp494` control. The goal is not “one better strategy,” but a **research-and-allocation machine** that manages **12-20 candidate alphas**, promotes **5-8 live sleeves**, supports **role-based timeframe bundles**, and compounds many weak-to-medium edges under strict risk and anti-overfitting controls.

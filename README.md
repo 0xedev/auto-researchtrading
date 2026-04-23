@@ -112,6 +112,10 @@ uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_probe --split
 # uses sleeve/cluster overrides to reduce concentration in the allocator
 uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_wave3_orth --split val --portfolio-config v2_portfolio.wave3_diversified.json
 
+# Run the leading wave4 benchmark with the light cross-asset trim that clears
+# the concentration target on both val and 2026q1
+uv run v2_backtest.py --bundle bundle_intraday_core --model-set v2_wave4_carry --split val --portfolio-config v2_portfolio.wave4_trim_rs.json
+
 # Retrain the macro HMM as well
 uv run train_model.py --timeframe 1h --train_hmm
 
@@ -260,6 +264,7 @@ The parallel V2 research layer now adds:
 - `v2_backtest.py`: runs a full-period V2 replay with benchmark-style Sharpe / DD / PF / trades-day metrics, concentration readouts, optional JSON output, and optional `results.tsv` logging
 - `v2_portfolio.example.json`: default portfolio-level caps for sleeve, symbol, strategy-cluster, participation, and short-share controls
 - `v2_portfolio.wave3_diversified.json`: reproducible wave3 diversification profile using sleeve weight overrides plus sleeve/cluster caps
+- `v2_portfolio.wave4_trim_rs.json`: the current leading wave4 benchmark policy; lightly trims `cross_asset_relative_strength` to keep full-split sleeve concentration below `30%`
 - `v2_sleeve_registry.json`: sleeve lifecycle tracking for candidate, paper-live, champion, and retired states
 
 The shadow dashboard now also includes:
