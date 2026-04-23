@@ -30,28 +30,31 @@ Current practical stage label:
 - **Stage 5 early / partial:** challenger registry and rolling evaluation exist, but promotion cadence and portfolio champion workflow are not mature yet
 
 Latest V2 read worth tracking:
-- full 4-symbol benchmark-style replay on `v2_wave1_priceonly`:
-  - `val`: return `160.99%`, trades/day `7.30`, top sleeve concentration `44.5%`
-  - `2026q1`: return `9.59%`, trades/day `6.24`, top sleeve concentration `38.8%`
-- conclusion: V2 has real breadth and trade density on the longer replay too, but concentration is still above the `30%` target and the daily metrics are still optimistic enough that realism checks remain a live priority
+- full 8-symbol benchmark-style replay on `v2_wave1_priceonly`:
+  - `val`: return `738.19%`, daily Sharpe `12.39`, trades/day `12.05`, top sleeve concentration `42.7%`
+  - `2026q1`: return `27.00%`, daily Sharpe `12.87`, trades/day `11.45`, top sleeve concentration `43.6%`
+- conclusion: V2 clearly has real breadth and portfolio activity on a broader slice too, but concentration is still above the `30%` target and even the daily metrics remain optimistic enough that replay realism is still an open research risk
 
 Current leading V2 candidate:
 - `v2_wave2_pair`
   - adds `volatility_reversion` and `leader_laggard_rotation` on top of the current foundation set
-  - full 4-symbol `val` replay versus `v2_wave1_priceonly`:
-    - score `15.41` vs `14.87`
-    - return `188.66%` vs `160.99%`
-    - trades/day `8.06` vs `7.30`
-    - top sleeve concentration `38.8%` vs `44.5%`
-  - full 4-symbol `2026q1` replay versus `v2_wave1_priceonly`:
-    - score `10.40` vs `10.45`
-    - return `9.76%` vs `9.59%`
-    - trades/day `6.42` vs `6.24`
-    - top sleeve concentration `39.0%` vs `38.8%`
+  - full 8-symbol `val` replay versus `v2_wave1_priceonly`:
+    - legacy score `15.36` vs `16.43`
+    - daily Sharpe `12.58` vs `12.39`
+    - return `912.10%` vs `738.19%`
+    - trades/day `13.27` vs `12.05`
+    - top sleeve concentration `37.7%` vs `42.7%`
+  - full 8-symbol `2026q1` replay versus `v2_wave1_priceonly`:
+    - legacy score `16.10` vs `16.19`
+    - daily Sharpe `12.93` vs `12.87`
+    - return `27.80%` vs `27.00%`
+    - trades/day `11.89` vs `11.45`
+    - top sleeve concentration `42.4%` vs `43.6%`
 - interpretation:
   - `volatility_reversion` helps more on validation
   - `leader_laggard_rotation` helps more on `2026q1`
-  - the pair still improves breadth on the longer replay, but it has not solved concentration and the new daily metrics are still suspiciously strong enough that replay realism remains an open question
+  - the pair still improves breadth on the broader replay and is now logged as the leading V2 candidate in `results.tsv`
+  - it is still not a V2 champion because concentration remains above target and the old legacy composite score still prefers the baseline
 
 Immediate next focus:
 - reduce `post_extension_snapback` / `sideways_mean_reversion` dominance
