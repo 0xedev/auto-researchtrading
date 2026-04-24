@@ -233,6 +233,34 @@ def run_v2_shadow_session(
         close_requests = []
         for symbol, notional in list(portfolio.positions.items()):
             meta = position_meta.get(symbol, {})
+            entry_price = portfolio.entry_prices.get(symbol, close_by_symbol.get(symbol, 0.0))
+            current_price = close_by_symbol.get(symbol, entry_price)
+            stop_distance = float(meta.get("stop_distance", 0.0) or 0.0)
+            take_profit_r = float(portfolio_config.take_profit_r_multiple or 0.0)
+            if portfolio_config.enable_stop_loss and entry_price > 0 and stop_distance > 0 and current_price > 0:
+                side = 1.0 if notional > 0 else -1.0
+                adverse_move = side * (current_price - entry_price)
+                favorable_move = side * (current_price - entry_price)
+                if adverse_move <= -stop_distance:
+                    close_requests.append(
+                        {
+                            "symbol": symbol,
+                            "target": 0.0,
+                            "reason": "stop_loss",
+                            "meta": meta,
+                        }
+                    )
+                    continue
+                if take_profit_r > 0 and favorable_move >= (stop_distance * take_profit_r):
+                    close_requests.append(
+                        {
+                            "symbol": symbol,
+                            "target": 0.0,
+                            "reason": "take_profit",
+                            "meta": meta,
+                        }
+                    )
+                    continue
             opened_ts = int(meta.get("opened_ts", timestamp))
             max_hold_hours = float(meta.get("max_hold_hours", 0.0) or 0.0)
             unit_scale = 1000.0 if max(abs(int(timestamp)), abs(int(opened_ts))) > 1e11 else 1.0
@@ -301,7 +329,7 @@ def run_v2_shadow_session(
                     "bundle": meta.get("bundle", bundle_name),
                     "signal_regime_family": meta.get("regime_context", "unknown"),
                     "cluster": meta.get("cluster", "other"),
-                    "decision_reason": "max_hold",
+                    "decision_reason": close_request.get("reason", "max_hold"),
                     "delta_notional": abs(current),
                     "exec_price": exec_price,
                     "fee": fee,
@@ -394,6 +422,7 @@ def run_v2_shadow_session(
                         "cluster": signal.cluster,
                         "opened_ts": timestamp,
                         "max_hold_hours": signal.holding_horizon_hours,
+                        "stop_distance": signal.stop_distance,
                         "regime_context": signal.regime_context,
                         "reason_tag": signal.reason_tag,
                     }

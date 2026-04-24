@@ -187,6 +187,23 @@ Current leading V2 candidate:
   - `funding_carry` is no longer strong enough to save the book once funding is actually charged
   - the legacy directional foundation sleeve is now mostly ballast / narrative, not a material alpha contributor
   - V2 now needs another true research wave, not just another promotion pass
+- latest research seed:
+  - [v2_portfolio.wave5_quality3.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave5_quality3.json)
+  - [v2_portfolio.wave5_quality3_stress.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave5_quality3_stress.json)
+  - this adds opt-in stop-loss / take-profit exits to the stricter wave5 quality policy
+  - formal gate report:
+    - [tmp/v2_promotion_wave5_quality3.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/tmp/v2_promotion_wave5_quality3.json)
+    - gate status: **FAIL**, but it is the best corrected research seed so far
+  - full corrected base replay:
+    - `val`: daily Sharpe `11.15`, PF `2.92`, win rate `60.66%`, trades/day `9.15`, concentration `27.31%`
+    - `2026q1`: daily Sharpe `12.28`, PF `2.77`, win rate `60.84%`, trades/day `9.33`, concentration `33.95%`
+  - full corrected stress replay:
+    - `val`: daily Sharpe `9.78`, PF `2.79`, win rate `60.10%`, trades/day `8.21`, concentration `26.77%`
+    - `2026q1`: daily Sharpe `10.85`, PF `2.79`, win rate `59.94%`, trades/day `8.14`, concentration `34.33%`
+  - conclusion:
+    - enforcing the existing `stop_distance` signal was a real improvement
+    - the remaining blocker is now mostly Q1 concentration plus PF still below `4.0`
+    - the next branch should tune payoff exits and reduce `basis_dislocation` / `post_extension_snapback` Q1 dominance without killing the new win-rate improvement
 
 Useful research note:
 - `post_event_mean_reversion` currently looks more like a policy-gated sleeve than a bad model:

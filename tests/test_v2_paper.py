@@ -278,6 +278,115 @@ class V2PaperTests(unittest.TestCase):
             saved_state = json.loads(state_path.read_text(encoding="utf-8"))
             self.assertIn("BTC", saved_state["positions"])
 
+    def test_opt_in_stop_loss_closes_position(self):
+        opened_ts = 1_700_000_000_000
+        bar_ts = opened_ts + 3_600_000
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            state_path = root / "state.json"
+            log_path = root / "log.jsonl"
+
+            save_v2_shadow_state(
+                state_path,
+                V2ShadowState(
+                    cash=prepare.INITIAL_CAPITAL - 100.0,
+                    positions={"BTC": 100.0},
+                    entry_prices={"BTC": 100.0},
+                    position_fee_basis={"BTC": 100.0 * prepare.TAKER_FEE},
+                    position_meta={
+                        "BTC": {
+                            "bundle": "bundle_intraday_core",
+                            "sleeve": "trend_pullback",
+                            "cluster": "trend",
+                            "opened_ts": opened_ts,
+                            "max_hold_hours": 24.0,
+                            "stop_distance": 2.0,
+                            "regime_context": "bull",
+                            "reason_tag": "trend_pullback",
+                        }
+                    },
+                    equity=prepare.INITIAL_CAPITAL,
+                    last_timestamp=opened_ts,
+                ),
+            )
+
+            run_v2_shadow_session(
+                bundle_name="bundle_intraday_core",
+                model_set="unused",
+                split="val",
+                portfolio_config=PortfolioConfig(slippage_bps=0.0, enable_stop_loss=True),
+                state_path=str(state_path),
+                log_path=str(log_path),
+                engine=_FakeV2Engine(
+                    timestamps=[bar_ts],
+                    close_by_timestamp={bar_ts: {"BTC": 97.5}},
+                ),
+            )
+
+            rows = [
+                json.loads(line)
+                for line in log_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(rows[0]["action"], "close")
+            self.assertEqual(rows[0]["decision_reason"], "stop_loss")
+
+    def test_opt_in_take_profit_closes_position(self):
+        opened_ts = 1_700_000_000_000
+        bar_ts = opened_ts + 3_600_000
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            state_path = root / "state.json"
+            log_path = root / "log.jsonl"
+
+            save_v2_shadow_state(
+                state_path,
+                V2ShadowState(
+                    cash=prepare.INITIAL_CAPITAL - 100.0,
+                    positions={"BTC": 100.0},
+                    entry_prices={"BTC": 100.0},
+                    position_meta={
+                        "BTC": {
+                            "bundle": "bundle_intraday_core",
+                            "sleeve": "trend_pullback",
+                            "cluster": "trend",
+                            "opened_ts": opened_ts,
+                            "max_hold_hours": 24.0,
+                            "stop_distance": 2.0,
+                            "regime_context": "bull",
+                            "reason_tag": "trend_pullback",
+                        }
+                    },
+                    equity=prepare.INITIAL_CAPITAL,
+                    last_timestamp=opened_ts,
+                ),
+            )
+
+            run_v2_shadow_session(
+                bundle_name="bundle_intraday_core",
+                model_set="unused",
+                split="val",
+                portfolio_config=PortfolioConfig(
+                    slippage_bps=0.0,
+                    enable_stop_loss=True,
+                    take_profit_r_multiple=1.5,
+                ),
+                state_path=str(state_path),
+                log_path=str(log_path),
+                engine=_FakeV2Engine(
+                    timestamps=[bar_ts],
+                    close_by_timestamp={bar_ts: {"BTC": 103.2}},
+                ),
+            )
+
+            rows = [
+                json.loads(line)
+                for line in log_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(rows[0]["action"], "close")
+            self.assertEqual(rows[0]["decision_reason"], "take_profit")
+
 
 if __name__ == "__main__":
     unittest.main()

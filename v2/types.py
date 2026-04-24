@@ -85,6 +85,8 @@ class PortfolioConfig:
     short_min_share: float = 0.10
     max_participation_rate: float = 0.03
     slippage_bps: float = 2.0
+    enable_stop_loss: bool = False
+    take_profit_r_multiple: float = 0.0
 
     @classmethod
     def from_dict(cls, payload: dict | None) -> "PortfolioConfig":

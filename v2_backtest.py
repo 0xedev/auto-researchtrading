@@ -86,7 +86,7 @@ def main() -> None:
     print(f"bars_processed:     {result.bars_processed}/{result.total_bars}")
     print(f"duration_days:      {result.duration_days:.2f}")
     print(f"short_share:        {backtest['short_share']:.6f}")
-    print(f"concentration_pct:  {top_share:.6f}")
+    print(f"concentration_pct:  {top_share * 100.0:.6f}")
 
     print("\n" + "=" * 60)
     print("  BENCHMARK AUDIT")
