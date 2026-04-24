@@ -85,7 +85,7 @@ This is the checklist that must be green before V2 can be considered production-
 - [x] Historical overstated V2 rows were preserved rather than rewritten.
 - [x] Corrected follow-up rows `v2exp9` and `v2exp10` document the realism downgrade.
 - [x] `PLAN.md` now treats V2 as a rebuild candidate, not a production candidate.
-- [ ] Promotion gates must be written as code, not only prose.
+- [x] Promotion gates are now written as code via `v2_promotion_gate.py` and `v2/promotion.py`.
 - [ ] V2 experiment rows need a richer schema or sidecar JSON so daily Sharpe, PF, concentration, stress metrics, active sleeves, and config path are machine-readable.
 - [ ] Need a formal rule for when `2026q1` is considered consumed and which split replaces it.
 - [ ] Need a champion registry for portfolio-level candidates, not only sleeve-level candidates.
@@ -115,6 +115,7 @@ What is already true:
 - role-based `fast/base/slow` bundles are implemented
 - V2 training, audit, evaluation, registry, allocator, and shadow runtime all exist
 - V2 now also has a benchmark-style full-period backtest path via `v2_backtest.py`
+- V2 now has an executable production promotion gate via `v2_promotion_gate.py`
 - the `15m` split mismatch was fixed for the old trainer before V2 sleeve work continued
 - V2 now has `18` manifests live in code:
   - `15` experimental sleeves from the plan source list
@@ -172,6 +173,15 @@ Current leading V2 candidate:
     - [v2_portfolio.wave5_seed_pruned_stress.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave5_seed_pruned_stress.json)
     - `val`: daily Sharpe `5.12`, PF `1.86`, concentration `39.23%`
     - `2026q1`: daily Sharpe `3.10`, PF `1.51`, concentration `35.47%`
+- formal production-gate report:
+  - [tmp/v2_promotion_wave5_seed.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/tmp/v2_promotion_wave5_seed.json)
+  - gate status: **FAIL**
+  - main failures:
+    - PF below `4.0` on all base and stress splits
+    - win rate below `60%` on all base and stress splits
+    - concentration above `30%` on all base and stress splits
+    - stressed `2026q1` bar Sharpe below `3.5`
+    - no fresh replacement OOS / forward-paper label yet
 - interpretation:
   - `basis_dislocation`, `cross_asset_relative_strength`, and `post_extension_snapback` still look like the main real sleeves
   - `funding_carry` is no longer strong enough to save the book once funding is actually charged
