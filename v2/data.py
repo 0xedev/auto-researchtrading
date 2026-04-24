@@ -36,6 +36,8 @@ def _split_bounds(split: str) -> tuple[str, str]:
         "oos_15m": ("2025-01-01", "2025-12-31"),
         "2026q1": ("2026-01-01", "2026-03-31"),
         "2026q1_15m": ("2026-01-01", "2026-03-31"),
+        "newasset_oos2y": ("2024-04-01", "2026-03-31"),
+        "newasset_oos2y_15m": ("2024-04-01", "2026-03-31"),
         "holdout": (prepare.HOLDOUT_START, prepare.HOLDOUT_END),
         "holdout_15m": (prepare.HOLDOUT_START, prepare.HOLDOUT_END),
     }
@@ -179,9 +181,10 @@ def build_bundle_dataset(
     split: str,
     feature_profile: str = "price_context_plus",
     max_symbols: int | None = None,
+    symbols: list[str] | None = None,
 ) -> pd.DataFrame:
     bundle = BUNDLE_MANIFESTS[bundle_name]
-    selected_symbols = _default_symbol_universe(bundle.base_tf)
+    selected_symbols = list(symbols) if symbols is not None else _default_symbol_universe(bundle.base_tf)
     if max_symbols is not None:
         selected_symbols = selected_symbols[:max_symbols]
 

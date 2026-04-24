@@ -22,6 +22,7 @@ class V2SignalEngine:
         active_sleeves: list[str] | None = None,
         feature_profile: str = "price_context_plus",
         max_symbols: int | None = None,
+        symbols: list[str] | None = None,
         confidence_overrides: dict[str, float] | None = None,
     ):
         self.bundle_name = bundle_name
@@ -29,6 +30,7 @@ class V2SignalEngine:
         self.model_set = model_set
         self.feature_profile = feature_profile
         self.max_symbols = max_symbols
+        self.symbols = list(symbols) if symbols is not None else None
         self.active_sleeves = active_sleeves or list(SLEEVE_MANIFESTS.keys())
         self.confidence_overrides = dict(confidence_overrides or {})
         self.bundle_frame = pd.DataFrame()
@@ -98,6 +100,7 @@ class V2SignalEngine:
             split=split,
             feature_profile=self.feature_profile,
             max_symbols=self.max_symbols,
+            symbols=self.symbols,
         )
         self.timestamps = sorted(self.bundle_frame["timestamp"].unique().tolist()) if not self.bundle_frame.empty else []
         self.sleeve_rows_by_timestamp = {}
@@ -116,6 +119,7 @@ class V2SignalEngine:
                     bundle_name=self.bundle_name,
                     split=split,
                     max_symbols=self.max_symbols,
+                    symbols=self.symbols,
                 )
                 if sleeve_frame.empty:
                     continue

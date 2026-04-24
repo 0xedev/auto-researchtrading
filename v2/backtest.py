@@ -197,12 +197,14 @@ def run_v2_backtest(
     active_sleeves: list[str] | None = None,
     max_days: int | None = None,
     max_symbols: int | None = None,
+    symbols: list[str] | None = None,
 ) -> dict:
     engine = V2SignalEngine(
         bundle_name=bundle_name,
         model_set=model_set,
         active_sleeves=active_sleeves,
         max_symbols=max_symbols,
+        symbols=symbols,
         confidence_overrides=portfolio_config.sleeve_min_confidence_overrides,
     )
     engine.prepare(split)
@@ -222,6 +224,7 @@ def run_v2_backtest(
             max_days=max_days,
             active_sleeves=active_sleeves,
             max_symbols=max_symbols,
+            symbols=symbols,
             engine=engine,
             collect_bar_history=True,
         )

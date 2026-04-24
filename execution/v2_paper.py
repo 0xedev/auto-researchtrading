@@ -163,6 +163,7 @@ def run_v2_shadow_session(
     max_days: int | None = None,
     active_sleeves: list[str] | None = None,
     max_symbols: int | None = None,
+    symbols: list[str] | None = None,
     start_timestamp: int | None = None,
     end_timestamp: int | None = None,
     engine: V2SignalEngine | None = None,
@@ -174,6 +175,7 @@ def run_v2_shadow_session(
             model_set=model_set,
             active_sleeves=active_sleeves,
             max_symbols=max_symbols,
+            symbols=symbols,
             confidence_overrides=portfolio_config.sleeve_min_confidence_overrides,
         )
         engine.prepare(split)
@@ -186,6 +188,7 @@ def run_v2_shadow_session(
         "max_days": max_days,
         "portfolio": asdict(portfolio_config),
         "active_sleeves": active_sleeves or list(engine.sleeve_tables.keys()),
+        "symbols": symbols,
         "kill_switch_path": kill_switch_path,
         "start_timestamp": start_timestamp,
         "end_timestamp": end_timestamp,

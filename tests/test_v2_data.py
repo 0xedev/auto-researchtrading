@@ -7,6 +7,7 @@ class V2DataTests(unittest.TestCase):
     def test_split_for_timeframe_handles_15m_suffixes(self):
         self.assertEqual(split_for_timeframe("train", "15m"), "train_15m")
         self.assertEqual(split_for_timeframe("2026q1", "15m"), "2026q1_15m")
+        self.assertEqual(split_for_timeframe("newasset_oos2y", "15m"), "newasset_oos2y_15m")
         self.assertEqual(split_for_timeframe("train_15m", "1h"), "train")
         self.assertEqual(split_for_timeframe("2026q1_15m", "4h"), "2026q1")
 

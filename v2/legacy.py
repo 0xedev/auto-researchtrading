@@ -360,8 +360,10 @@ def _build_legacy_base_frame(
     bundle_name: str,
     split: str,
     max_symbols: int | None = None,
+    symbols: list[str] | None = None,
 ) -> pd.DataFrame:
-    key = (bundle_name, split, max_symbols)
+    symbol_key = tuple(symbols or [])
+    key = (bundle_name, split, max_symbols, symbol_key)
     cached = _LEGACY_BASE_CACHE.get(key)
     if cached is not None:
         return cached.copy()
@@ -373,7 +375,7 @@ def _build_legacy_base_frame(
         return pd.DataFrame()
 
     base_split = split[:-4] if split.endswith("_15m") else split
-    selected_data = load_timeframe_data("1h", base_split)
+    selected_data = load_timeframe_data("1h", base_split, symbols=symbols)
     if not selected_data:
         return pd.DataFrame()
     selected_symbols = list(selected_data)[:max_symbols] if max_symbols is not None else list(selected_data)
@@ -400,6 +402,7 @@ def _build_legacy_base_frame(
         "val": "val_15m",
         "oos": "oos_15m",
         "2026q1": "2026q1_15m",
+        "newasset_oos2y": "newasset_oos2y_15m",
         "holdout": "holdout_15m",
     }.get(base_split)
     aux_15m_tables = {}
@@ -507,13 +510,15 @@ def build_legacy_foundation_frame(
     bundle_name: str,
     split: str,
     max_symbols: int | None = None,
+    symbols: list[str] | None = None,
 ) -> pd.DataFrame:
-    key = (sleeve_name, bundle_name, split, max_symbols)
+    symbol_key = tuple(symbols or [])
+    key = (sleeve_name, bundle_name, split, max_symbols, symbol_key)
     cached = _LEGACY_FRAME_CACHE.get(key)
     if cached is not None:
         return cached.copy()
 
-    base = _build_legacy_base_frame(bundle_name, split, max_symbols=max_symbols)
+    base = _build_legacy_base_frame(bundle_name, split, max_symbols=max_symbols, symbols=symbols)
     if base.empty:
         return pd.DataFrame()
 
@@ -534,10 +539,12 @@ def build_trend_1h_directional_frame(
     bundle_name: str,
     split: str,
     max_symbols: int | None = None,
+    symbols: list[str] | None = None,
 ) -> pd.DataFrame:
     return build_legacy_foundation_frame(
         "trend_1h_directional",
         bundle_name,
         split,
         max_symbols=max_symbols,
+        symbols=symbols,
     )

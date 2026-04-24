@@ -29,6 +29,7 @@ def main():
     parser.add_argument("--summary-json-path", default=None)
     parser.add_argument("--kill-switch-path", default=None)
     parser.add_argument("--sleeve", action="append", default=[], help="Repeat to restrict active sleeves.")
+    parser.add_argument("--symbol", action="append", default=[], help="Repeat to restrict the replay/shadow universe.")
     parser.add_argument("--max-days", type=int, default=None)
     parser.add_argument("--max-symbols", type=int, default=None)
     args = parser.parse_args()
@@ -54,6 +55,7 @@ def main():
         max_days=args.max_days,
         active_sleeves=active_sleeves,
         max_symbols=args.max_symbols,
+        symbols=args.symbol or None,
     )
     summary = write_shadow_dashboard(
         state_path=state_path,

@@ -631,6 +631,11 @@ BINANCE_SYMBOL_MAP = {
     "DOGE": "DOGEUSDT", "LINK": "LINKUSDT", "AVAX": "AVAXUSDT",
     "DOT": "DOTUSDT", "ATOM": "ATOMUSDT", "NEAR": "NEARUSDT",
     "UNI": "UNIUSDT", "APT": "APTUSDT", "SUI": "SUIUSDT",
+    # Never-used crypto OOS candidates. These are intentionally not in
+    # TRAIN_SYMBOLS; they are for cross-sectional validation only.
+    "LTC": "LTCUSDT", "BCH": "BCHUSDT", "ETC": "ETCUSDT",
+    "FIL": "FILUSDT", "AAVE": "AAVEUSDT", "TRX": "TRXUSDT",
+    "ARB": "ARBUSDT", "OP": "OPUSDT",
 }
 
 def _download_cryptocompare_candles(symbol: str, start_ms: int, end_ms: int) -> pd.DataFrame:

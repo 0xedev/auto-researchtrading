@@ -27,9 +27,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Benchmark-grade V2 backtest runner")
     parser.add_argument("--bundle", required=True, choices=sorted(BUNDLE_MANIFESTS))
     parser.add_argument("--model-set", required=True)
-    parser.add_argument("--split", default="val", choices=["val", "2026q1", "holdout"])
+    parser.add_argument("--split", default="val", choices=["val", "2026q1", "holdout", "newasset_oos2y"])
     parser.add_argument("--portfolio-config", default="v2_portfolio.example.json")
     parser.add_argument("--sleeve", action="append", default=[], help="Repeat to restrict active sleeves.")
+    parser.add_argument("--symbol", action="append", default=[], help="Repeat to restrict the symbol universe.")
     parser.add_argument("--max-days", type=int, default=None)
     parser.add_argument("--max-symbols", type=int, default=None)
     parser.add_argument("--description", default="V2 full backtest iteration")
@@ -55,6 +56,7 @@ def main() -> None:
         active_sleeves=active_sleeves,
         max_days=args.max_days,
         max_symbols=args.max_symbols,
+        symbols=args.symbol or None,
     )
 
     result = backtest["result"]

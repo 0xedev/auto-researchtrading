@@ -1,451 +1,452 @@
 commit          	 score   	 sharpe 	 max_dd	 status     	 description
-exp0            	 -999.000	 0.000  	   0.00	 BASELINE   	 clean audited branch, no trades before 1h fallback
-exp2            	 -999.000	 0.715  	   4.17	 REVERT     	 tighten meta and lead thresholds (too restrictive)
-exp3            	 0.680   	 0.680  	   4.39	 REVERT     	 require market-ret alignment for entries (worse Sharpe)
-exp4            	 1.136   	 1.136  	   9.15	 KEEP       	 raise meta threshold to 0.45 (new best audited baseline)
-exp5            	 -999.000	 0.934  	   6.24	 REVERT     	 raise lead threshold to 0.40 (lower Sharpe)
-exp6            	 -999.000	 0.797  	  10.02	 REVERT     	 widen ATR stop to 4.5x (worse)
-exp7            	 1.100   	 1.100  	   5.14	 REVERT     	 confidence-scaled position sizing (close but below exp4)
-exp8            	 -999.000	 1.120  	   9.28	 REVERT     	 require stronger short threshold (close but below exp4)
-exp9            	 -999.000	 1.075  	   9.28	 REVERT     	 Auto-research iteration
-exp10           	 -999.000	 0.048  	  14.17	 REVERT     	 exp10: first true mtf fortress
-exp11           	 0.472   	 0.472  	   6.32	 REVERT     	 exp11: first 15m mtf baseline
-exp12           	 -999.000	 0.256  	   1.17	 REVERT     	 exp12: sniper gate 15m meta and lead thresholds
-exp13           	 -999.000	 0.606  	   2.34	 REVERT     	 exp13: relax sniper gate to recover trade count
-exp14           	 -999.000	 0.384  	   0.98	 REVERT     	 exp14: align exits to 4-bar label horizon
-exp15           	 -999.000	 0.446  	   0.95	 REVERT     	 exp15: denser 15m lead labels at 1.0x vol
-exp16           	 -999.000	 0.719  	   3.55	 REVERT     	 exp16: relax 15m sniper gate on denser model
-exp17           	 -999.000	 0.606  	   1.17	 REVERT     	 exp17: 15m-only entry gate with regime-sized positions
-exp18           	 -999.000	 0.663  	   1.17	 REVERT     	 exp18: lower 15m directional threshold to 0.25
-exp19           	 -999.000	 0.640  	   1.16	 REVERT     	 exp19: shorten 15m max hold to 2 bars
-exp20           	 -999.000	 0.618  	   1.37	 REVERT     	 exp20: shorten 15m max hold to 1 bar
-exp21           	 -999.000	 0.545  	   1.18	 REVERT     	 exp21: shorten 15m lead label horizon to 2 bars
-exp22           	 0.559   	 0.559  	   0.95	 REVERT     	 exp22: lower meta gate with tiered confidence sizing
-exp23           	 0.502   	 0.502  	   0.87	 REVERT     	 exp23: widen meta ladder with micro-size weak signals
-exp24           	 -3.632  	 -2.651 	  34.60	 REVERT     	 exp24: balanced lead/meta sample weights
-exp25           	 0.604   	 0.604  	   0.88	 REVERT     	 exp25: staged 15m sizing with adaptive in-position updates
-exp26           	 0.815   	 0.815  	   0.66	 REVERT     	 exp26: require strong continuation before full-size scale-up
-exp27           	 -999.000	 0.580  	   0.42	 REVERT     	 exp27: require market tape agreement for marginal 15m entries
-exp28           	 0.815   	 0.815  	   0.66	 REVERT     	 exp28: refresh 1h and 4h regime models
-exp29           	 0.741   	 0.741  	   0.50	 REVERT     	 exp29: polarize size ladder toward strongest 15m setups
-exp30           	 -999.000	 0.617  	   0.49	 REVERT     	 exp30: tighten staged 15m fortress gate to 0.60
-exp31           	 0.888   	 0.888  	   1.02	 REVERT     	 exp31: 15m model with colsample 0.7
-exp32           	 0.641   	 0.641  	   1.37	 REVERT     	 exp32: relax staged fortress gate to 0.50 on improved 15m model
-exp33           	 -999.000	 0.481  	   0.42	 REVERT     	 exp33: benchmark audit + 15m directional split
-exp34           	 -999.000	 0.562  	   0.53	 REVERT     	 exp34: add soft 15m quarter-size entries
-exp35           	 -999.000	 0.542  	   0.50	 REVERT     	 exp35: tighten soft entry and full-size scale-up
-exp36           	 -999.000	 0.472  	   0.46	 REVERT     	 exp36: shorten 15m max hold to 2 bars
-exp37           	 -999.000	 0.545  	   0.51	 REVERT     	 exp37: shrink soft entry size to preserve PF
-exp38           	 -999.000	 0.493  	   0.49	 REVERT     	 exp38: weaker 15m entries in strong HTF regimes
-exp39           	 -999.000	 0.424  	   0.00	 REVERT     	 exp40: densify 15m directional labels
-exp40           	 -4.287  	 -3.283 	  35.10	 REVERT     	 exp41: calibrate thresholds for dense-label 15m model
-exp41           	 -999.000	 0.006  	   1.39	 REVERT     	 exp42: tighten calibrated dense-model gates
-exp42           	 -0.574  	 -0.574 	   4.61	 REVERT     	 exp44: long-only dense 15m with regime support
-exp43           	 -999.000	 0.000  	   0.00	 REVERT     	 exp45: medium-density 15m labels + exp35 shell
-exp44           	 -0.469  	 -0.469 	   3.65	 REVERT     	 exp46: calibrated medium-density long-only
-exp45           	 -0.826  	 -0.826 	   5.13	 REVERT     	 exp47b: relative strength features with aligned model inputs
-exp46           	 -999.000	 -26.322	  99.00	 REVERT     	 exp48: dense relative-strength labels with ranked entries
-exp47           	 -999.000	 -27.556	  99.00	 REVERT     	 exp49: medium relative-strength models with ranker
-exp48           	 -999.000	 -9.109 	  93.73	 REVERT     	 exp50: tighten ranker with cooldown and top-1 picks
-exp49           	 2.304   	 2.304  	   5.84	 REVERT     	 Auto-research iteration
-exp50           	 2.304   	 2.304  	   5.84	 REVERT     	 Auto-research iteration
-exp51           	 1.824   	 1.824  	   7.66	 REVERT     	 Auto-research iteration
-exp52           	 1.804   	 1.804  	   7.67	 REVERT     	 Auto-research iteration
-exp53           	 2.304   	 2.304  	   5.84	 REVERT     	 Auto-research iteration
-exp54           	 -999.000	 1.943  	  12.08	 REVERT     	 Auto-research iteration
-exp55           	 -999.000	 0.958  	  55.72	 REVERT     	 Auto-research iteration
-exp56           	 -0.113  	 0.368  	  24.63	 REVERT     	 Auto-research iteration
-exp57           	 2.304   	 2.304  	   5.84	 REVERT     	 Auto-research iteration
-exp58           	 2.322   	 2.322  	   4.33	 REVERT     	 Auto-research iteration
-exp59           	 2.086   	 2.086  	   5.84	 REVERT     	 Auto-research iteration
-exp60           	 2.304   	 2.304  	   5.84	 REVERT     	 Auto-research iteration
-exp61           	 2.204   	 2.204  	   7.55	 REVERT     	 Auto-research iteration
-exp62           	 1.951   	 1.951  	   5.86	 REVERT     	 Auto-research iteration
-exp63           	 2.309   	 2.309  	   5.83	 REVERT     	 Auto-research iteration
-exp64           	 1.886   	 1.886  	  13.16	 REVERT     	 Auto-research iteration
-exp65           	 2.309   	 2.309  	   5.83	 REVERT     	 Auto-research iteration
-exp66           	 2.312   	 2.312  	   5.83	 REVERT     	 Auto-research iteration
-exp67           	 2.244   	 2.244  	   5.83	 REVERT     	 Auto-research iteration
-exp68           	 2.276   	 2.276  	   5.83	 REVERT     	 Auto-research iteration
-exp69           	 1.302   	 1.302  	   7.35	 REVERT     	 Auto-research iteration
-exp70           	 2.312   	 2.312  	   5.83	 REVERT     	 Auto-research iteration
-exp71           	 0.011   	 0.011  	   1.79	 REVERT     	 recovered from run_exp71_1h.log
-exp72           	 0.593   	 0.593  	   1.50	 REVERT     	 recovered from run_exp72_1h.log
-exp73           	 0.685   	 0.685  	   1.56	 REVERT     	 recovered from run_exp73_1h.log
-exp74           	 0.686   	 0.686  	   1.56	 REVERT     	 recovered from run_exp74_1h.log
-exp75           	 0.687   	 0.687  	   1.56	 REVERT     	 recovered from run_exp75_1h.log
-exp76           	 0.688   	 0.688  	   1.56	 REVERT     	 recovered from run_exp76_1h.log
-exp77           	 0.688   	 0.688  	   1.56	 REVERT     	 recovered from run_exp77_1h.log
-exp78           	 -999.000	 1.054  	   0.65	 REVERT     	 recovered from run_exp78_1h.log
-exp79           	 -999.000	 0.984  	   0.97	 REVERT     	 recovered from run_exp79_1h.log
-exp80           	 0.904   	 0.904  	   1.00	 REVERT     	 recovered from run_exp80_1h.log
-exp81           	 0.940   	 0.940  	   0.89	 REVERT     	 recovered from run_exp81_1h.log
-exp82           	 0.976   	 0.976  	   0.79	 REVERT     	 recovered from run_exp82_1h.log
-exp83           	 1.008   	 1.008  	   0.69	 REVERT     	 recovered from run_exp83_1h.log
-exp84           	 1.024   	 1.024  	   0.66	 REVERT     	 recovered from run_exp84_1h.log
-exp85           	 0.894   	 0.894  	   0.66	 REVERT     	 recovered from run_exp85_1h.log
-exp86           	 -999.000	 0.565  	   0.43	 REVERT     	 recovered from run_exp86_1h.log
-exp87           	 0.713   	 0.713  	   0.44	 REVERT     	 recovered from run_exp87_1h.log
-exp88           	 0.619   	 0.619  	   0.44	 REVERT     	 recovered from run_exp88_1h.log
-exp89           	 -999.000	 0.360  	   0.21	 REVERT     	 recovered from run_exp89_1h.log
-exp90           	 1.039   	 1.039  	   0.65	 REVERT     	 recovered from run_exp90_1h.log
-exp91           	 0.954   	 0.954  	   0.65	 REVERT     	 recovered from run_exp91_1h.log
-exp92           	 0.686   	 0.686  	   0.63	 REVERT     	 recovered from run_exp92_1h.log
-exp93           	 -999.000	 0.448  	   0.98	 REVERT     	 recovered from run_exp93_1h.log
-exp94           	 1.010   	 1.010  	   0.33	 REVERT     	 recovered from run_exp94_1h.log
-exp95           	 0.092   	 0.092  	   3.30	 REVERT     	 recovered from run_exp95_1h.log
-exp96           	 0.870   	 0.870  	   0.91	 REVERT     	 recovered from run_exp96_1h.log
-exp97           	 1.039   	 1.039  	   0.65	 REVERT     	 recovered from run_exp97_1h.log
-exp98           	 -999.000	 0.468  	   0.55	 REVERT     	 recovered from run_exp98_1h.log
-exp99           	 1.031   	 1.031  	   0.65	 REVERT     	 recovered from run_exp99_1h.log
-exp100          	 0.840   	 0.840  	   0.65	 REVERT     	 recovered from run_exp100_1h.log
-exp101          	 -999.000	 0.000  	   0.00	 MISSING    	 no run artifact found
-exp102          	 0.810   	 0.810  	   0.70	 REVERT     	 recovered from run_exp102_1h.log
-exp103          	 1.039   	 1.039  	   0.65	 REVERT     	 recovered from run_exp103_1h.log
-exp104          	 -999.000	 0.000  	   0.00	 MISSING    	 no run artifact found
-exp105          	 0.727   	 0.727  	   1.39	 REVERT     	 recovered from run_exp105_1h.log
-exp106          	 -999.000	 0.000  	   0.00	 MISSING    	 no run artifact found
-exp107          	 -999.000	 0.000  	   0.00	 MISSING    	 no run artifact found
-exp108          	 -999.000	 0.000  	   0.00	 MISSING    	 no run artifact found
-exp109          	 -999.000	 0.536  	   0.53	 REVERT     	 recovered from run_exp109_1h.log
-exp110          	 0.959   	 0.959  	   0.84	 REVERT     	 recovered from run_exp110_1h.log
-exp111          	 -999.000	 0.941  	   1.17	 REVERT     	 recovered from run_exp111_1h.log
-exp112          	 0.748   	 0.748  	   7.94	 REVERT     	 recovered from run_exp112_1h.log
-exp113          	 0.785   	 0.785  	   0.49	 REVERT     	 recovered from run_exp113_1h.log
-exp114          	 0.998   	 0.998  	   0.74	 REVERT     	 recovered from run_exp114_1h.log
-exp115          	 0.993   	 0.993  	   0.74	 REVERT     	 recovered from run_exp115_1h.log
-exp116          	 0.826   	 0.826  	   0.75	 REVERT     	 recovered from run_exp116_1h.log
-exp117          	 -999.000	 1.056  	   0.64	 REVERT     	 recovered from run_exp117_1h.log
-exp118          	 1.039   	 1.039  	   0.65	 REVERT     	 recovered from run_exp118_1h.log
-exp119          	 1.146   	 1.146  	   0.80	 REVERT     	 recovered from run_exp119_1h.log
-exp120          	 1.141   	 1.141  	   0.80	 REVERT     	 recovered from run_exp120_1h.log
-exp121          	 1.168   	 1.168  	   2.39	 REVERT     	 recovered from run_exp121_1h.log
-exp122          	 1.200   	 1.200  	   5.91	 REVERT     	 recovered from run_exp122_1h.log
-exp123          	 1.215   	 1.215  	   7.85	 REVERT     	 recovered from run_exp123_1h.log
-exp124          	 1.028   	 1.199  	  18.42	 REVERT     	 recovered from run_exp124_1h.log
-exp125          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 RSI entry filter 67/33 — push toward 52-56 trades [no run log]
-exp126          	 1.237   	 1.237  	   0.83	 REVERT     	 recovered from run_exp126_1h.log
-exp127          	 1.253   	 1.253  	   0.83	 REVERT     	 recovered from run_exp127_1h.log
-exp128          	 -999.000	 0.216  	   0.09	 REVERT     	 recovered from run_exp128_1h.log
-exp129          	 -999.000	 0.501  	   0.38	 REVERT     	 recovered from run_exp129_1h.log
-exp130          	 -999.000	 1.180  	   0.62	 REVERT     	 recovered from run_exp130_1h.log
-exp131          	 -999.000	 1.125  	   5.03	 REVERT     	 recovered from run_exp131_1h.log
-exp132          	 0.264   	 0.264  	   9.25	 REVERT     	 recovered from run_exp132_1h.log
-exp133          	 1.585   	 1.585  	   4.93	 REVERT     	 recovered from run_exp133_1h.log
-exp134          	 0.995   	 1.361  	  20.00	 REVERT     	 recovered from run_exp134_1h.log
-exp135          	 1.794   	 1.794  	   4.12	 REVERT     	 recovered from run_exp135_1h.log
-exp136          	 1.794   	 1.794  	   4.12	 REVERT     	 recovered from run_exp136_1h.log
-exp137          	 1.164   	 1.164  	   1.17	 REVERT     	 recovered from run_exp137_1h.log
-exp138          	 1.037   	 1.037  	   9.32	 REVERT     	 recovered from run_exp138_1h.log
-exp139          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 vol scaling 0.4+0.6*vol [no run log]
-exp140          	 1.120   	 1.120  	   1.25	 REVERT     	 recovered from run_exp140_1h.log
-exp141          	 1.906   	 1.906  	   4.21	 REVERT     	 recovered from run_exp141_1h.log
-exp142          	 1.896   	 1.896  	   4.21	 REVERT     	 recovered from run_exp142_1h.log
-exp143          	 -1.348  	 -0.560 	  30.76	 REVERT     	 recovered from run_exp143_1h.log
-exp144          	 0.388   	 0.388  	   4.40	 REVERT     	 recovered from run_exp144_1h.log
-exp145          	 2.304   	 2.304  	   5.84	 REVERT     	 recovered from run_exp145_1h.log
-exp146          	 0.719   	 0.719  	   8.38	 REVERT     	 recovered from run_exp146_1h.log
-exp147          	 2.304   	 2.304  	   5.84	 REVERT     	 recovered from run_exp147_1h.log
-exp148          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 EMA_FAST 9 EMA_SLOW 22 [no run log]
-exp149          	 2.304   	 2.304  	   5.84	 REVERT     	 recovered from run_exp149_1h.log
-exp150          	 1.824   	 1.824  	   7.66	 REVERT     	 recovered from run_exp150_1h.log
-exp151          	 1.804   	 1.804  	   7.67	 REVERT     	 recovered from run_exp151_1h.log
-exp152          	 2.304   	 2.304  	   5.84	 REVERT     	 recovered from run_exp152_1h.log
-exp153          	 -999.000	 1.943  	  12.08	 REVERT     	 recovered from run_exp153_1h.log
-exp154          	 -999.000	 0.958  	  55.72	 REVERT     	 recovered from run_exp154_1h.log
-exp155          	 -0.113  	 0.368  	  24.63	 REVERT     	 recovered from run_exp155_1h.log
-exp156          	 2.304   	 2.304  	   5.84	 REVERT     	 recovered from run_exp156_1h.log
-exp157          	 2.322   	 2.322  	   4.33	 REVERT     	 recovered from run_exp157_1h.log
-exp158          	 2.086   	 2.086  	   5.84	 REVERT     	 recovered from run_exp158_1h.log
-exp159          	 2.304   	 2.304  	   5.84	 REVERT     	 recovered from run_exp159_1h.log
-exp160          	 2.204   	 2.204  	   7.55	 REVERT     	 recovered from run_exp160_1h.log
-exp161          	 1.951   	 1.951  	   5.86	 REVERT     	 recovered from run_exp161_1h.log
-exp162          	 2.309   	 2.309  	   5.83	 REVERT     	 recovered from run_exp162_1h.log
-exp163          	 1.886   	 1.886  	  13.16	 REVERT     	 recovered from run_exp163_1h.log
-exp164          	 2.244   	 2.244  	   5.83	 REVERT     	 recovered from run_exp164_1h.log
-exp165          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 tighter funding filter — FR>0.05%/FR<-0.05% (top 2.3%) [no run log]
-exp166          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 add funding_rate to FEATURE_COLS — model can now learn from funding dynamics [no run log]
-exp167          	 2.312   	 2.312  	   5.83	 REVERT     	 tighter short fortress + smaller short sizing (no effect)
-exp168          	 2.312   	 2.312  	   5.83	 REVERT     	 lower bearish gates + half-size shorts (still no short entries)
-exp169          	 2.266   	 2.266  	   6.58	 REVERT     	 raw-bear fallback created 832 short opens but hurt PF/DD
-exp170          	 2.338   	 2.338  	   5.72	 KEEP       	 stricter raw-bear fallback + 35% short sizing (284 short opens)
-exp171          	 2.330   	 2.330  	   5.73	 KEEP       	 tighter raw-bear override + 25% short sizing
-exp172          	 2.319   	 2.319  	   5.69	 KEEP       	 very selective raw-bear override + 20% short sizing (54 short opens)
-exp173          	 1.314   	 1.314  	   5.24	 REVERT     	 strong raw bull dominance gate cut too many core long trades
-exp174          	 2.319   	 2.319  	   5.69	 REVERT     	 tightened soft longs had no effect
-exp175          	 2.341   	 2.341  	   4.19	 KEEP       	 widen ATR stop 3.0x->4.5x on short-capable base (better score and DD)
-exp176          	 2.348   	 2.348  	   4.19	 KEEP       	 4h-aware soft entries + include 4h in sizing meta (small PF/score gain)
-exp177          	 2.313   	 2.313  	   4.33	 KEEP       	 signal-decay exits improved win rate and PF but slightly reduced score
-exp178          	 1.782   	 1.782  	   4.82	 REVERT     	 mild bull-dominance gate over-pruned long flow
-exp179          	 2.313   	 2.313  	   4.33	 REVERT     	 reduced 1h soft-entry size had no measurable effect
-exp205          	 1.520   	 1.520  	   5.49	 KEEP       	 XGB directional models + entry gate + risk tiers 22/11/9%
-exp237          	 1.787   	 1.787  	   4.45	 KEEP       	 asymmetric meta gates + RSI<65 + continuous 25x crush + 7x/3x stops
-exp256          	 1.863   	 1.863  	   3.15	 KEEP       	 continuous sizing 3-30% + 9x/4x ATR + macro_bear -0.015 + 45x crush + TF-portable
-funding_raw_p1  	 -1.357  	 -0.804 	  26.05	 REVERT     	 raw funding_rate feature + NaN masking + lagged 1h->15m funding, retrain all models, unchanged exp256 shell
-funding_raw_p2  	 -0.709  	 -0.707 	  15.04	 REVERT     	 raw funding_rate retrain + percentile-threshold translation against exp256_active
-temporal_stat_p1	 -1.792  	 -0.760 	  35.64	 REVERT     	 old-branch temporal/session + statistical-regime features ported into Fortress stack; retrained all models; val/OOS failed hard
-exp257          	 -999.000	 0.000  	   0.00	 REVERT     	 MTF Specialists Truth Run: zero-trade bottleneck detected (Cache-Misses)
-exp258          	 -999.000	 0.000  	   0.00	 REVERT     	 Atomic-Integer Sync: fixed int64 float-precision, still zero-trade (KeyError: 0)
-exp259          	 -999.000	 0.000  	   0.00	 REVERT     	 Macro-Regime Logic Shift: aligned buffer updates, zero-trade (Restrictive Targets)
-exp260          	 -999.000	 0.000  	   0.00	 REVERT     	 Probability Audit: confirmed Bull 0.57, Bear 0.76. Zero-trade (ms/s de-sync)
-exp261          	 -999.000	 0.000  	   0.00	 REVERT     	 Index Access Fix: switched to bar.name, zero-trade (Silent Exception Swallowing)
-exp262          	 -999.000	 0.000  	   0.00	 REVERT     	 Error-Transparency: removed try-except, identified AttributeError: BarData.name
-exp263          	 -999.000	 0.000  	   0.00	 REVERT     	 BarData Attribute Correction: identified AttributeError: Strategy._timeframe
-exp264          	 -999.000	 0.000  	   0.00	 REVERT     	 Strategy Attribute Correction: zero-trade identified Specialist-Void (Missing Training)
-exp265          	 -999.000	 0.000  	   0.00	 REVERT     	 Stage 3 Training: implemented specialists S0-S3, zero-trade (NameError: macro_bull_ok)
-exp266          	 -999.000	 0.000  	   0.00	 REVERT     	 Flow-Control: defined gate variables, zero-trade (KeyError: macro_state)
-exp267          	 -999.000	 0.000  	   0.00	 REVERT     	 Training Consolidation: resolved data partitioning, zero-trade (95% Neutral Label-Bias)
-exp268          	 3.012   	 4.850  	   1.85	 KEEP       	 Weighted Specialist Retraining: applied balanced sample_weights, trade generation unlocked
-exp269          	 3.245   	 5.120  	   1.54	 KEEP       	 Medallion Council v1.39: 4-Regime Specialists + HMM calibration + Unified Precision + balanced retraining. Trades unlocked.
+exp0            	 -999.000	 0.000  	  0.00 	 BASELINE   	 clean audited branch, no trades before 1h fallback
+exp2            	 -999.000	 0.715  	  4.17 	 REVERT     	 tighten meta and lead thresholds (too restrictive)
+exp3            	 0.680   	 0.680  	  4.39 	 REVERT     	 require market-ret alignment for entries (worse Sharpe)
+exp4            	 1.136   	 1.136  	  9.15 	 KEEP       	 raise meta threshold to 0.45 (new best audited baseline)
+exp5            	 -999.000	 0.934  	  6.24 	 REVERT     	 raise lead threshold to 0.40 (lower Sharpe)
+exp6            	 -999.000	 0.797  	 10.02 	 REVERT     	 widen ATR stop to 4.5x (worse)
+exp7            	 1.100   	 1.100  	  5.14 	 REVERT     	 confidence-scaled position sizing (close but below exp4)
+exp8            	 -999.000	 1.120  	  9.28 	 REVERT     	 require stronger short threshold (close but below exp4)
+exp9            	 -999.000	 1.075  	  9.28 	 REVERT     	 Auto-research iteration
+exp10           	 -999.000	 0.048  	 14.17 	 REVERT     	 exp10: first true mtf fortress
+exp11           	 0.472   	 0.472  	  6.32 	 REVERT     	 exp11: first 15m mtf baseline
+exp12           	 -999.000	 0.256  	  1.17 	 REVERT     	 exp12: sniper gate 15m meta and lead thresholds
+exp13           	 -999.000	 0.606  	  2.34 	 REVERT     	 exp13: relax sniper gate to recover trade count
+exp14           	 -999.000	 0.384  	  0.98 	 REVERT     	 exp14: align exits to 4-bar label horizon
+exp15           	 -999.000	 0.446  	  0.95 	 REVERT     	 exp15: denser 15m lead labels at 1.0x vol
+exp16           	 -999.000	 0.719  	  3.55 	 REVERT     	 exp16: relax 15m sniper gate on denser model
+exp17           	 -999.000	 0.606  	  1.17 	 REVERT     	 exp17: 15m-only entry gate with regime-sized positions
+exp18           	 -999.000	 0.663  	  1.17 	 REVERT     	 exp18: lower 15m directional threshold to 0.25
+exp19           	 -999.000	 0.640  	  1.16 	 REVERT     	 exp19: shorten 15m max hold to 2 bars
+exp20           	 -999.000	 0.618  	  1.37 	 REVERT     	 exp20: shorten 15m max hold to 1 bar
+exp21           	 -999.000	 0.545  	  1.18 	 REVERT     	 exp21: shorten 15m lead label horizon to 2 bars
+exp22           	 0.559   	 0.559  	  0.95 	 REVERT     	 exp22: lower meta gate with tiered confidence sizing
+exp23           	 0.502   	 0.502  	  0.87 	 REVERT     	 exp23: widen meta ladder with micro-size weak signals
+exp24           	 -3.632  	 -2.651 	 34.60 	 REVERT     	 exp24: balanced lead/meta sample weights
+exp25           	 0.604   	 0.604  	  0.88 	 REVERT     	 exp25: staged 15m sizing with adaptive in-position updates
+exp26           	 0.815   	 0.815  	  0.66 	 REVERT     	 exp26: require strong continuation before full-size scale-up
+exp27           	 -999.000	 0.580  	  0.42 	 REVERT     	 exp27: require market tape agreement for marginal 15m entries
+exp28           	 0.815   	 0.815  	  0.66 	 REVERT     	 exp28: refresh 1h and 4h regime models
+exp29           	 0.741   	 0.741  	  0.50 	 REVERT     	 exp29: polarize size ladder toward strongest 15m setups
+exp30           	 -999.000	 0.617  	  0.49 	 REVERT     	 exp30: tighten staged 15m fortress gate to 0.60
+exp31           	 0.888   	 0.888  	  1.02 	 REVERT     	 exp31: 15m model with colsample 0.7
+exp32           	 0.641   	 0.641  	  1.37 	 REVERT     	 exp32: relax staged fortress gate to 0.50 on improved 15m model
+exp33           	 -999.000	 0.481  	  0.42 	 REVERT     	 exp33: benchmark audit + 15m directional split
+exp34           	 -999.000	 0.562  	  0.53 	 REVERT     	 exp34: add soft 15m quarter-size entries
+exp35           	 -999.000	 0.542  	  0.50 	 REVERT     	 exp35: tighten soft entry and full-size scale-up
+exp36           	 -999.000	 0.472  	  0.46 	 REVERT     	 exp36: shorten 15m max hold to 2 bars
+exp37           	 -999.000	 0.545  	  0.51 	 REVERT     	 exp37: shrink soft entry size to preserve PF
+exp38           	 -999.000	 0.493  	  0.49 	 REVERT     	 exp38: weaker 15m entries in strong HTF regimes
+exp39           	 -999.000	 0.424  	  0.00 	 REVERT     	 exp40: densify 15m directional labels
+exp40           	 -4.287  	 -3.283 	 35.10 	 REVERT     	 exp41: calibrate thresholds for dense-label 15m model
+exp41           	 -999.000	 0.006  	  1.39 	 REVERT     	 exp42: tighten calibrated dense-model gates
+exp42           	 -0.574  	 -0.574 	  4.61 	 REVERT     	 exp44: long-only dense 15m with regime support
+exp43           	 -999.000	 0.000  	  0.00 	 REVERT     	 exp45: medium-density 15m labels + exp35 shell
+exp44           	 -0.469  	 -0.469 	  3.65 	 REVERT     	 exp46: calibrated medium-density long-only
+exp45           	 -0.826  	 -0.826 	  5.13 	 REVERT     	 exp47b: relative strength features with aligned model inputs
+exp46           	 -999.000	 -26.322	 99.00 	 REVERT     	 exp48: dense relative-strength labels with ranked entries
+exp47           	 -999.000	 -27.556	 99.00 	 REVERT     	 exp49: medium relative-strength models with ranker
+exp48           	 -999.000	 -9.109 	 93.73 	 REVERT     	 exp50: tighten ranker with cooldown and top-1 picks
+exp49           	 2.304   	 2.304  	  5.84 	 REVERT     	 Auto-research iteration
+exp50           	 2.304   	 2.304  	  5.84 	 REVERT     	 Auto-research iteration
+exp51           	 1.824   	 1.824  	  7.66 	 REVERT     	 Auto-research iteration
+exp52           	 1.804   	 1.804  	  7.67 	 REVERT     	 Auto-research iteration
+exp53           	 2.304   	 2.304  	  5.84 	 REVERT     	 Auto-research iteration
+exp54           	 -999.000	 1.943  	 12.08 	 REVERT     	 Auto-research iteration
+exp55           	 -999.000	 0.958  	 55.72 	 REVERT     	 Auto-research iteration
+exp56           	 -0.113  	 0.368  	 24.63 	 REVERT     	 Auto-research iteration
+exp57           	 2.304   	 2.304  	  5.84 	 REVERT     	 Auto-research iteration
+exp58           	 2.322   	 2.322  	  4.33 	 REVERT     	 Auto-research iteration
+exp59           	 2.086   	 2.086  	  5.84 	 REVERT     	 Auto-research iteration
+exp60           	 2.304   	 2.304  	  5.84 	 REVERT     	 Auto-research iteration
+exp61           	 2.204   	 2.204  	  7.55 	 REVERT     	 Auto-research iteration
+exp62           	 1.951   	 1.951  	  5.86 	 REVERT     	 Auto-research iteration
+exp63           	 2.309   	 2.309  	  5.83 	 REVERT     	 Auto-research iteration
+exp64           	 1.886   	 1.886  	 13.16 	 REVERT     	 Auto-research iteration
+exp65           	 2.309   	 2.309  	  5.83 	 REVERT     	 Auto-research iteration
+exp66           	 2.312   	 2.312  	  5.83 	 REVERT     	 Auto-research iteration
+exp67           	 2.244   	 2.244  	  5.83 	 REVERT     	 Auto-research iteration
+exp68           	 2.276   	 2.276  	  5.83 	 REVERT     	 Auto-research iteration
+exp69           	 1.302   	 1.302  	  7.35 	 REVERT     	 Auto-research iteration
+exp70           	 2.312   	 2.312  	  5.83 	 REVERT     	 Auto-research iteration
+exp71           	 0.011   	 0.011  	  1.79 	 REVERT     	 recovered from run_exp71_1h.log
+exp72           	 0.593   	 0.593  	  1.50 	 REVERT     	 recovered from run_exp72_1h.log
+exp73           	 0.685   	 0.685  	  1.56 	 REVERT     	 recovered from run_exp73_1h.log
+exp74           	 0.686   	 0.686  	  1.56 	 REVERT     	 recovered from run_exp74_1h.log
+exp75           	 0.687   	 0.687  	  1.56 	 REVERT     	 recovered from run_exp75_1h.log
+exp76           	 0.688   	 0.688  	  1.56 	 REVERT     	 recovered from run_exp76_1h.log
+exp77           	 0.688   	 0.688  	  1.56 	 REVERT     	 recovered from run_exp77_1h.log
+exp78           	 -999.000	 1.054  	  0.65 	 REVERT     	 recovered from run_exp78_1h.log
+exp79           	 -999.000	 0.984  	  0.97 	 REVERT     	 recovered from run_exp79_1h.log
+exp80           	 0.904   	 0.904  	  1.00 	 REVERT     	 recovered from run_exp80_1h.log
+exp81           	 0.940   	 0.940  	  0.89 	 REVERT     	 recovered from run_exp81_1h.log
+exp82           	 0.976   	 0.976  	  0.79 	 REVERT     	 recovered from run_exp82_1h.log
+exp83           	 1.008   	 1.008  	  0.69 	 REVERT     	 recovered from run_exp83_1h.log
+exp84           	 1.024   	 1.024  	  0.66 	 REVERT     	 recovered from run_exp84_1h.log
+exp85           	 0.894   	 0.894  	  0.66 	 REVERT     	 recovered from run_exp85_1h.log
+exp86           	 -999.000	 0.565  	  0.43 	 REVERT     	 recovered from run_exp86_1h.log
+exp87           	 0.713   	 0.713  	  0.44 	 REVERT     	 recovered from run_exp87_1h.log
+exp88           	 0.619   	 0.619  	  0.44 	 REVERT     	 recovered from run_exp88_1h.log
+exp89           	 -999.000	 0.360  	  0.21 	 REVERT     	 recovered from run_exp89_1h.log
+exp90           	 1.039   	 1.039  	  0.65 	 REVERT     	 recovered from run_exp90_1h.log
+exp91           	 0.954   	 0.954  	  0.65 	 REVERT     	 recovered from run_exp91_1h.log
+exp92           	 0.686   	 0.686  	  0.63 	 REVERT     	 recovered from run_exp92_1h.log
+exp93           	 -999.000	 0.448  	  0.98 	 REVERT     	 recovered from run_exp93_1h.log
+exp94           	 1.010   	 1.010  	  0.33 	 REVERT     	 recovered from run_exp94_1h.log
+exp95           	 0.092   	 0.092  	  3.30 	 REVERT     	 recovered from run_exp95_1h.log
+exp96           	 0.870   	 0.870  	  0.91 	 REVERT     	 recovered from run_exp96_1h.log
+exp97           	 1.039   	 1.039  	  0.65 	 REVERT     	 recovered from run_exp97_1h.log
+exp98           	 -999.000	 0.468  	  0.55 	 REVERT     	 recovered from run_exp98_1h.log
+exp99           	 1.031   	 1.031  	  0.65 	 REVERT     	 recovered from run_exp99_1h.log
+exp100          	 0.840   	 0.840  	  0.65 	 REVERT     	 recovered from run_exp100_1h.log
+exp101          	 -999.000	 0.000  	  0.00 	 MISSING    	 no run artifact found
+exp102          	 0.810   	 0.810  	  0.70 	 REVERT     	 recovered from run_exp102_1h.log
+exp103          	 1.039   	 1.039  	  0.65 	 REVERT     	 recovered from run_exp103_1h.log
+exp104          	 -999.000	 0.000  	  0.00 	 MISSING    	 no run artifact found
+exp105          	 0.727   	 0.727  	  1.39 	 REVERT     	 recovered from run_exp105_1h.log
+exp106          	 -999.000	 0.000  	  0.00 	 MISSING    	 no run artifact found
+exp107          	 -999.000	 0.000  	  0.00 	 MISSING    	 no run artifact found
+exp108          	 -999.000	 0.000  	  0.00 	 MISSING    	 no run artifact found
+exp109          	 -999.000	 0.536  	  0.53 	 REVERT     	 recovered from run_exp109_1h.log
+exp110          	 0.959   	 0.959  	  0.84 	 REVERT     	 recovered from run_exp110_1h.log
+exp111          	 -999.000	 0.941  	  1.17 	 REVERT     	 recovered from run_exp111_1h.log
+exp112          	 0.748   	 0.748  	  7.94 	 REVERT     	 recovered from run_exp112_1h.log
+exp113          	 0.785   	 0.785  	  0.49 	 REVERT     	 recovered from run_exp113_1h.log
+exp114          	 0.998   	 0.998  	  0.74 	 REVERT     	 recovered from run_exp114_1h.log
+exp115          	 0.993   	 0.993  	  0.74 	 REVERT     	 recovered from run_exp115_1h.log
+exp116          	 0.826   	 0.826  	  0.75 	 REVERT     	 recovered from run_exp116_1h.log
+exp117          	 -999.000	 1.056  	  0.64 	 REVERT     	 recovered from run_exp117_1h.log
+exp118          	 1.039   	 1.039  	  0.65 	 REVERT     	 recovered from run_exp118_1h.log
+exp119          	 1.146   	 1.146  	  0.80 	 REVERT     	 recovered from run_exp119_1h.log
+exp120          	 1.141   	 1.141  	  0.80 	 REVERT     	 recovered from run_exp120_1h.log
+exp121          	 1.168   	 1.168  	  2.39 	 REVERT     	 recovered from run_exp121_1h.log
+exp122          	 1.200   	 1.200  	  5.91 	 REVERT     	 recovered from run_exp122_1h.log
+exp123          	 1.215   	 1.215  	  7.85 	 REVERT     	 recovered from run_exp123_1h.log
+exp124          	 1.028   	 1.199  	 18.42 	 REVERT     	 recovered from run_exp124_1h.log
+exp125          	 -999.000	 0.000  	  0.00 	 NO_BACKTEST	 RSI entry filter 67/33 — push toward 52-56 trades [no run log]
+exp126          	 1.237   	 1.237  	  0.83 	 REVERT     	 recovered from run_exp126_1h.log
+exp127          	 1.253   	 1.253  	  0.83 	 REVERT     	 recovered from run_exp127_1h.log
+exp128          	 -999.000	 0.216  	  0.09 	 REVERT     	 recovered from run_exp128_1h.log
+exp129          	 -999.000	 0.501  	  0.38 	 REVERT     	 recovered from run_exp129_1h.log
+exp130          	 -999.000	 1.180  	  0.62 	 REVERT     	 recovered from run_exp130_1h.log
+exp131          	 -999.000	 1.125  	  5.03 	 REVERT     	 recovered from run_exp131_1h.log
+exp132          	 0.264   	 0.264  	  9.25 	 REVERT     	 recovered from run_exp132_1h.log
+exp133          	 1.585   	 1.585  	  4.93 	 REVERT     	 recovered from run_exp133_1h.log
+exp134          	 0.995   	 1.361  	 20.00 	 REVERT     	 recovered from run_exp134_1h.log
+exp135          	 1.794   	 1.794  	  4.12 	 REVERT     	 recovered from run_exp135_1h.log
+exp136          	 1.794   	 1.794  	  4.12 	 REVERT     	 recovered from run_exp136_1h.log
+exp137          	 1.164   	 1.164  	  1.17 	 REVERT     	 recovered from run_exp137_1h.log
+exp138          	 1.037   	 1.037  	  9.32 	 REVERT     	 recovered from run_exp138_1h.log
+exp139          	 -999.000	 0.000  	  0.00 	 NO_BACKTEST	 vol scaling 0.4+0.6*vol [no run log]
+exp140          	 1.120   	 1.120  	  1.25 	 REVERT     	 recovered from run_exp140_1h.log
+exp141          	 1.906   	 1.906  	  4.21 	 REVERT     	 recovered from run_exp141_1h.log
+exp142          	 1.896   	 1.896  	  4.21 	 REVERT     	 recovered from run_exp142_1h.log
+exp143          	 -1.348  	 -0.560 	 30.76 	 REVERT     	 recovered from run_exp143_1h.log
+exp144          	 0.388   	 0.388  	  4.40 	 REVERT     	 recovered from run_exp144_1h.log
+exp145          	 2.304   	 2.304  	  5.84 	 REVERT     	 recovered from run_exp145_1h.log
+exp146          	 0.719   	 0.719  	  8.38 	 REVERT     	 recovered from run_exp146_1h.log
+exp147          	 2.304   	 2.304  	  5.84 	 REVERT     	 recovered from run_exp147_1h.log
+exp148          	 -999.000	 0.000  	  0.00 	 NO_BACKTEST	 EMA_FAST 9 EMA_SLOW 22 [no run log]
+exp149          	 2.304   	 2.304  	  5.84 	 REVERT     	 recovered from run_exp149_1h.log
+exp150          	 1.824   	 1.824  	  7.66 	 REVERT     	 recovered from run_exp150_1h.log
+exp151          	 1.804   	 1.804  	  7.67 	 REVERT     	 recovered from run_exp151_1h.log
+exp152          	 2.304   	 2.304  	  5.84 	 REVERT     	 recovered from run_exp152_1h.log
+exp153          	 -999.000	 1.943  	 12.08 	 REVERT     	 recovered from run_exp153_1h.log
+exp154          	 -999.000	 0.958  	 55.72 	 REVERT     	 recovered from run_exp154_1h.log
+exp155          	 -0.113  	 0.368  	 24.63 	 REVERT     	 recovered from run_exp155_1h.log
+exp156          	 2.304   	 2.304  	  5.84 	 REVERT     	 recovered from run_exp156_1h.log
+exp157          	 2.322   	 2.322  	  4.33 	 REVERT     	 recovered from run_exp157_1h.log
+exp158          	 2.086   	 2.086  	  5.84 	 REVERT     	 recovered from run_exp158_1h.log
+exp159          	 2.304   	 2.304  	  5.84 	 REVERT     	 recovered from run_exp159_1h.log
+exp160          	 2.204   	 2.204  	  7.55 	 REVERT     	 recovered from run_exp160_1h.log
+exp161          	 1.951   	 1.951  	  5.86 	 REVERT     	 recovered from run_exp161_1h.log
+exp162          	 2.309   	 2.309  	  5.83 	 REVERT     	 recovered from run_exp162_1h.log
+exp163          	 1.886   	 1.886  	 13.16 	 REVERT     	 recovered from run_exp163_1h.log
+exp164          	 2.244   	 2.244  	  5.83 	 REVERT     	 recovered from run_exp164_1h.log
+exp165          	 -999.000	 0.000  	  0.00 	 NO_BACKTEST	 tighter funding filter — FR>0.05%/FR<-0.05% (top 2.3%) [no run log]
+exp166          	 -999.000	 0.000  	  0.00 	 NO_BACKTEST	 add funding_rate to FEATURE_COLS — model can now learn from funding dynamics [no run log]
+exp167          	 2.312   	 2.312  	  5.83 	 REVERT     	 tighter short fortress + smaller short sizing (no effect)
+exp168          	 2.312   	 2.312  	  5.83 	 REVERT     	 lower bearish gates + half-size shorts (still no short entries)
+exp169          	 2.266   	 2.266  	  6.58 	 REVERT     	 raw-bear fallback created 832 short opens but hurt PF/DD
+exp170          	 2.338   	 2.338  	  5.72 	 KEEP       	 stricter raw-bear fallback + 35% short sizing (284 short opens)
+exp171          	 2.330   	 2.330  	  5.73 	 KEEP       	 tighter raw-bear override + 25% short sizing
+exp172          	 2.319   	 2.319  	  5.69 	 KEEP       	 very selective raw-bear override + 20% short sizing (54 short opens)
+exp173          	 1.314   	 1.314  	  5.24 	 REVERT     	 strong raw bull dominance gate cut too many core long trades
+exp174          	 2.319   	 2.319  	  5.69 	 REVERT     	 tightened soft longs had no effect
+exp175          	 2.341   	 2.341  	  4.19 	 KEEP       	 widen ATR stop 3.0x->4.5x on short-capable base (better score and DD)
+exp176          	 2.348   	 2.348  	  4.19 	 KEEP       	 4h-aware soft entries + include 4h in sizing meta (small PF/score gain)
+exp177          	 2.313   	 2.313  	  4.33 	 KEEP       	 signal-decay exits improved win rate and PF but slightly reduced score
+exp178          	 1.782   	 1.782  	  4.82 	 REVERT     	 mild bull-dominance gate over-pruned long flow
+exp179          	 2.313   	 2.313  	  4.33 	 REVERT     	 reduced 1h soft-entry size had no measurable effect
+exp205          	 1.520   	 1.520  	  5.49 	 KEEP       	 XGB directional models + entry gate + risk tiers 22/11/9%
+exp237          	 1.787   	 1.787  	  4.45 	 KEEP       	 asymmetric meta gates + RSI<65 + continuous 25x crush + 7x/3x stops
+exp256          	 1.863   	 1.863  	  3.15 	 KEEP       	 continuous sizing 3-30% + 9x/4x ATR + macro_bear -0.015 + 45x crush + TF-portable
+funding_raw_p1  	 -1.357  	 -0.804 	 26.05 	 REVERT     	 raw funding_rate feature + NaN masking + lagged 1h->15m funding, retrain all models, unchanged exp256 shell
+funding_raw_p2  	 -0.709  	 -0.707 	 15.04 	 REVERT     	 raw funding_rate retrain + percentile-threshold translation against exp256_active
+temporal_stat_p1	 -1.792  	 -0.760 	 35.64 	 REVERT     	 old-branch temporal/session + statistical-regime features ported into Fortress stack; retrained all models; val/OOS failed hard
+exp257          	 -999.000	 0.000  	  0.00 	 REVERT     	 MTF Specialists Truth Run: zero-trade bottleneck detected (Cache-Misses)
+exp258          	 -999.000	 0.000  	  0.00 	 REVERT     	 Atomic-Integer Sync: fixed int64 float-precision, still zero-trade (KeyError: 0)
+exp259          	 -999.000	 0.000  	  0.00 	 REVERT     	 Macro-Regime Logic Shift: aligned buffer updates, zero-trade (Restrictive Targets)
+exp260          	 -999.000	 0.000  	  0.00 	 REVERT     	 Probability Audit: confirmed Bull 0.57, Bear 0.76. Zero-trade (ms/s de-sync)
+exp261          	 -999.000	 0.000  	  0.00 	 REVERT     	 Index Access Fix: switched to bar.name, zero-trade (Silent Exception Swallowing)
+exp262          	 -999.000	 0.000  	  0.00 	 REVERT     	 Error-Transparency: removed try-except, identified AttributeError: BarData.name
+exp263          	 -999.000	 0.000  	  0.00 	 REVERT     	 BarData Attribute Correction: identified AttributeError: Strategy._timeframe
+exp264          	 -999.000	 0.000  	  0.00 	 REVERT     	 Strategy Attribute Correction: zero-trade identified Specialist-Void (Missing Training)
+exp265          	 -999.000	 0.000  	  0.00 	 REVERT     	 Stage 3 Training: implemented specialists S0-S3, zero-trade (NameError: macro_bull_ok)
+exp266          	 -999.000	 0.000  	  0.00 	 REVERT     	 Flow-Control: defined gate variables, zero-trade (KeyError: macro_state)
+exp267          	 -999.000	 0.000  	  0.00 	 REVERT     	 Training Consolidation: resolved data partitioning, zero-trade (95% Neutral Label-Bias)
+exp268          	 3.012   	 4.850  	  1.85 	 KEEP       	 Weighted Specialist Retraining: applied balanced sample_weights, trade generation unlocked
+exp269          	 3.245   	 5.120  	  1.54 	 KEEP       	 Medallion Council v1.39: 4-Regime Specialists + HMM calibration + Unified Precision + balanced retraining. Trades unlocked.
 
-exp270          	 -999.000	 0.000  	   0.00	 REVERT     	 Medallion Remote Migration: v2.3 Precision Exits + 7.5x/2.5x Targets.
-exp271          	 -999.000	 -0.200 	   3.58	 REVERT     	 Medallion Remote Migration: v2.3 Precision Exits + 7.5x/2.5x Targets.
-exp272          	 -999.000	 0.487  	   7.21	 REVERT     	 Medallion Restoration: 0.25 Gates + 9x/4x Swing Exits (Reverting Decay).
-exp273          	 -999.000	 0.564  	   8.25	 REVERT     	 Medallion MTF Resonance: 15m Signal Gating + 1.6x High-Conviction Sizing.
-exp274          	 -999.000	 0.562  	  12.18	 REVERT     	 Medallion exp274: Funding-Aware Contrarian + State 0 Overweight (1.8x) + Meta 0.28.
-exp275          	 -999.000	 0.563  	   9.58	 REVERT     	 Auto-research iteration
-exp276          	 -999.000	 0.563  	   9.58	 REVERT     	 Auto-research iteration
-exp277          	 -0.310  	 0.203  	  25.27	 REVERT     	 Auto-research iteration
-exp278          	 -0.647  	 -0.320 	  21.54	 REVERT     	 Auto-research iteration
-exp279          	 -0.379  	 -0.050 	  21.59	 REVERT     	 Auto-research iteration
-exp280          	 -1.065  	 -0.044 	  35.42	 REVERT     	 Auto-research iteration
-exp281          	 -1.311  	 -0.024 	  40.74	 REVERT     	 Auto-research iteration
-exp282          	 -999.000	 0.848  	   2.63	 REVERT     	 Auto-research iteration
-exp283          	 -999.000	 0.143  	  10.42	 REVERT     	 Auto-research iteration
-exp284          	 -999.000	 0.813  	   4.30	 REVERT     	 Auto-research iteration
-exp285          	 -999.000	 0.795  	   2.10	 REVERT     	 Auto-research iteration
-exp286          	 -0.688  	 -0.564 	  17.49	 REVERT     	 Auto-research iteration
-exp287          	 -999.000	 0.667  	   2.44	 REVERT     	 Auto-research iteration
-exp288          	 -999.000	 0.666  	   3.40	 REVERT     	 Auto-research iteration
-exp289          	 -999.000	 0.452  	   6.41	 REVERT     	 Auto-research iteration
-exp290          	 -999.000	 0.431  	   6.10	 REVERT     	 Auto-research iteration
-exp291          	 -999.000	 1.745  	   1.04	 REVERT     	 Auto-research iteration
-exp292          	 -0.901  	 -0.678 	  19.46	 REVERT     	 Auto-research iteration
-exp293          	 -999.000	 0.452  	   6.41	 REVERT     	 Auto-research iteration
-exp294          	 -999.000	 0.452  	   6.41	 REVERT     	 Auto-research iteration
-exp295          	 -999.000	 0.187  	   8.14	 REVERT     	 Auto-research iteration
-exp296          	 -999.000	 -0.121 	   9.10	 REVERT     	 Auto-research iteration
-exp297          	 -999.000	 0.131  	   9.47	 REVERT     	 Auto-research iteration
-exp298          	 -999.000	 -0.018 	  10.73	 REVERT     	 Properly enforced 3-position limit. Performance collapsed, suggesting first-come gating is suboptimal.
-exp300          	 -999.000	 0.991  	   5.61	 SUCCESS    	 Vol-Adaptive Fix + 0.45 Meta. Sharpe jumped to 0.99, DD fell to 5.6%. Elite quality, but likely under-trading.
-exp301          	 0.667   	 0.667  	   2.69	 REVERT     	 exp338: Quantum Medallion Hybrid (Sizing 0.03-0.15 + 5-D RSI HMM)
-exp302          	 0.681   	 0.681  	   2.60	 REVERT     	 exp339: Ratchet Trailing Stops (Lock-at-Entry 1.0x ATR + Non-Retreating Standard Trail)
-exp303          	 0.506   	 0.506  	   4.17	 REVERT     	 exp340: Short-Side Symmetry + Funding Filter (Relaxed short gates by 0.02 + Contrarian funding < 0.03% abs)
-exp304          	 0.391   	 0.391  	   4.56	 REVERT     	 exp341: Adaptive Vol-Stop Scaling (State 2: 2.5x ATR, State 1: 1.8x ATR)
-exp305          	 0.392   	 0.392  	   5.66	 REVERT     	 exp342: Specialist Council Voting (15m/1h/4h confluence boost 1.25x)
-exp306          	 -2.108  	 -1.028 	  36.61	 REVERT     	 exp344: Alpha Density Push (Loosened gates ~0.05, 1.5x ATR stops, TTP armed 3.0x ATR)
-exp307          	 0.437   	 0.437  	   3.95	 REVERT     	 exp347: Precision Alpha + Vol-Spike Filter (Restore Gates, ATR 1.8x Skip, 1.5x Ratchet)
-exp308          	 -999.000	 0.461  	   2.06	 REVERT     	 exp348: Macro-Regime Resonance (Longs only in S1, Shorts only in S2)
-exp309          	 0.238   	 0.238  	   3.73	 REVERT     	 exp349: Soft Macro Resonance (0.5x size penalty for counter-trend trades)
-exp310          	 -999.000	 0.461  	   1.65	 REVERT     	 Auto-research iteration
-exp311          	 -999.000	 0.461  	   1.65	 REVERT     	 Auto-research iteration
-exp312          	 0.180   	 0.180  	   1.21	 REVERT     	 apr08-vast4090 remote baseline
-exp313          	 0.180   	 0.180  	   1.21	 REVERT     	 apr08-vast4090 restore state routing
-exp314          	 -999.000	 -0.525 	  24.91	 REVERT     	 apr08-vast4090 restore exp269 logic v3
-exp315          	 -4.191  	 -2.950 	  39.83	 REVERT     	 apr08-vast4090 zero macro fallback
-exp316          	 0.091   	 0.091  	   1.23	 REVERT     	 apr08-vast4090 add XAU 1h anchor v3
-exp317          	 0.091   	 0.091  	   1.23	 REVERT     	 apr08-vast4090 retrain 1h+hmm specialists
-exp318          	 -999.000	 0.000  	   0.00	 REVERT     	 apr08-vast4090 activate macro+funding cache
-exp319          	 0.170   	 0.170  	   2.58	 REVERT     	 apr08-vast4090 calibrated hmm semantics
-exp320          	 0.212   	 0.212  	   2.39	 REVERT     	 apr08-vast4090 balanced retrain calibrated hmm
-exp321          	 -999.000	 -0.590 	   2.64	 REVERT     	 apr08-vast4090 exp320 oos retest
-exp322          	 0.093   	 0.093  	   1.26	 REVERT     	 apr08-vast4090 pretrain models live regime wiring
-exp323          	 -999.000	 -0.590 	   2.64	 REVERT     	 apr08-vast4090 1h retrain old 4h oos
-exp324          	 -999.000	 -0.590 	   2.64	 REVERT     	 apr08-vast4090 pretrain wiring oos
-exp325          	 -0.375  	 -0.375 	   7.73	 REVERT     	 apr08-vast4090 1h core gate simplification
-exp326          	 -999.000	 0.036  	   1.44	 REVERT     	 apr08-vast4090 1h core gate tightening
-exp327          	 -0.145  	 -0.145 	   3.74	 REVERT     	 apr08-vast4090 1h budgeted allocator
-exp328          	 -0.158  	 -0.158 	   2.41	 REVERT     	 apr08-vast4090 1h 15m timing filter
-exp329          	 -0.274  	 -0.274 	   4.23	 REVERT     	 apr08-vast4090 restore 15m directional specialists
-exp330          	 -999.000	 -0.279 	   1.89	 REVERT     	 apr08-vast4090 15m specialist confirmation
-exp331          	 -999.000	 -0.096 	   1.78	 REVERT     	 apr08-vast4090 asymmetric short gate
-exp332          	 -999.000	 -0.096 	   1.78	 REVERT     	 apr08-vast4090 long only diagnostic
-exp333          	 -999.000	 -0.519 	  21.87	 REVERT     	 apr08-vast4090 exp269 architecture retest
-exp334          	 -999.000	 0.000  	   0.00	 REVERT     	 apr08-vast4090 15m architecture probe
-exp335          	 0.045   	 0.045  	   4.20	 REVERT     	 apr08-vast4090 15m long bias calibration
-exp336          	 0.242   	 0.242  	   5.84	 REVERT     	 apr08-vast4090 15m long bias trim
-exp337          	 -999.000	 0.056  	   5.46	 REVERT     	 apr08-vast4090 15m long bias trim v2
-exp338          	 -999.000	 0.470  	   2.85	 REVERT     	 apr08-vast4090 15m flow recovery
-exp339          	 -999.000	 0.470  	   2.85	 REVERT     	 apr08-vast4090 15m add-on unlock
-exp340          	 0.672   	 0.672  	   2.85	 REVERT     	 apr08-vast4090 15m push unlock
-exp341          	 0.786   	 0.786  	   2.44	 REVERT     	 apr08-vast4090 15m trend push reweight
-exp342          	 -999.000	 0.132  	   5.46	 REVERT     	 apr08-vast4090 15m longer hold
-exp343          	 -999.000	 0.657  	   2.85	 REVERT     	 apr08-vast4090 15m scalein clamp
-exp344          	 -999.000	 0.657  	   2.85	 REVERT     	 apr08-vast4090 15m ranked entry allocator
-exp345          	 -999.000	 0.657  	   2.85	 REVERT     	 apr08-vast4090 15m push priority allocator
-exp346          	 -999.000	 0.774  	   2.44	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 control push_bias
-exp347          	 0.858   	 0.858  	   2.85	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 push_relax control
-exp348          	 1.001   	 1.001  	   2.44	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 push_relax push_bias
-exp349          	 -999.000	 1.029  	   2.45	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 hybrid control
-exp350          	 -999.000	 1.143  	   2.25	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 hybrid push_bias
-exp351          	 -999.000	 0.657  	   2.85	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 control control
-exp352          	 -999.000	 0.774  	   2.44	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 control push_bias
-exp353          	 0.858   	 0.858  	   2.85	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 push_relax control
-exp354          	 1.002   	 1.002  	   2.44	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 push_relax push_bias
-exp355          	 -999.000	 1.029  	   2.45	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 hybrid control
-exp356          	 -999.000	 1.143  	   2.25	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 hybrid push_bias
-exp357          	 -999.000	 0.657  	   2.85	 REVERT     	 apr08-vast4090 15m campaign ranked p4 control control
-exp358          	 -999.000	 0.774  	   2.44	 REVERT     	 apr08-vast4090 15m campaign ranked p4 control push_bias
-exp359          	 0.858   	 0.858  	   2.85	 REVERT     	 apr08-vast4090 15m campaign ranked p4 push_relax control
-exp360          	 1.001   	 1.001  	   2.44	 REVERT     	 apr08-vast4090 15m campaign ranked p4 push_relax push_bias
-exp361          	 0.613   	 0.613  	   5.08	 CANDIDATE  	 apr08-vast4090 15m infra reset soft slow-tf ranking
-exp362          	 0.937   	 0.937  	   4.36	 CANDIDATE  	 apr08-vast4090 15m soft slow-tf ranked p4 push_relax push_bias
-exp363          	 0.937   	 0.937  	   4.36	 CANDIDATE  	 apr08-vast4090 15m soft slow-tf ranked p3 push_relax push_bias
-exp364          	 1.502   	 1.502  	   1.86	 REVERT     	 Auto-research iteration
-exp365          	 1.502   	 1.502  	   1.86	 REVERT     	 Auto-research iteration
-exp366          	 2.201   	 2.201  	   1.87	 REVERT     	 Auto-research iteration
-exp367          	 1.562   	 1.562  	   1.85	 REVERT     	 Auto-research iteration
-exp368          	 2.204   	 2.204  	   1.87	 REVERT     	 Auto-research iteration
-exp369          	 2.204   	 2.204  	   1.87	 REVERT     	 Auto-research iteration
-exp370          	 1.559   	 1.559  	   1.85	 REVERT     	 Auto-research iteration
-exp371          	 2.005   	 2.005  	   1.87	 REVERT     	 Auto-research iteration
-exp372          	 1.453   	 1.453  	   1.30	 REVERT     	 Auto-research iteration
-exp373          	 2.110   	 2.110  	   1.87	 REVERT     	 Auto-research iteration
-exp374          	 1.559   	 1.559  	   1.85	 REVERT     	 Auto-research iteration
-exp375          	 1.559   	 1.559  	   1.85	 REVERT     	 Auto-research iteration
-exp376          	 2.204   	 2.204  	   1.87	 REVERT     	 Auto-research iteration
-exp377          	 2.174   	 2.174  	   2.49	 REVERT     	 Auto-research iteration
-exp378          	 1.498   	 1.498  	   2.47	 REVERT     	 Auto-research iteration
-exp379          	 1.425   	 1.425  	   1.20	 REVERT     	 Auto-research iteration
-exp380          	 2.146   	 2.146  	   1.24	 REVERT     	 Auto-research iteration
-exp381          	 -999.000	 1.515  	   1.12	 REVERT     	 Auto-research iteration
-exp382          	 -999.000	 1.789  	   1.72	 REVERT     	 Auto-research iteration
-exp383          	 1.594   	 1.594  	   1.20	 REVERT     	 Auto-research iteration
-exp384          	 2.066   	 2.066  	   1.79	 REVERT     	 Auto-research iteration
-exp385          	 1.713   	 1.713  	   1.48	 REVERT     	 Auto-research iteration
-exp386          	 2.340   	 2.340  	   1.60	 REVERT     	 Auto-research iteration
-exp387          	 1.678   	 1.678  	   1.57	 REVERT     	 Auto-research iteration
-exp388          	 2.324   	 2.324  	   1.63	 REVERT     	 Auto-research iteration
-exp389          	 1.742   	 1.742  	   1.39	 REVERT     	 Auto-research iteration
-exp390          	 2.356   	 2.356  	   1.57	 REVERT     	 Auto-research iteration
-exp391          	 1.785   	 1.785  	   1.29	 REVERT     	 Auto-research iteration
-exp392          	 2.368   	 2.368  	   1.55	 REVERT     	 Auto-research iteration
-exp393          	 1.830   	 1.830  	   1.20	 REVERT     	 Auto-research iteration
-exp394          	 2.378   	 2.378  	   1.52	 REVERT     	 Auto-research iteration
-exp395          	 1.874   	 1.874  	   1.11	 REVERT     	 Auto-research iteration
-exp396          	 2.381   	 2.381  	   1.49	 REVERT     	 Auto-research iteration
-exp397          	 1.959   	 1.959  	   0.93	 REVERT     	 Auto-research iteration
-exp398          	 2.358   	 2.358  	   1.43	 REVERT     	 Auto-research iteration
-exp399          	 1.785   	 1.785  	   1.29	 REVERT     	 Auto-research iteration
-exp400          	 1.816   	 1.816  	   1.29	 REVERT     	 Auto-research iteration
-exp401          	 2.399   	 2.399  	   1.55	 REVERT     	 Auto-research iteration
-exp402          	 1.832   	 1.832  	   1.29	 REVERT     	 Auto-research iteration
-exp403          	 2.403   	 2.403  	   1.55	 REVERT     	 Auto-research iteration
-exp404          	 1.834   	 1.834  	   1.29	 REVERT     	 Auto-research iteration
-exp405          	 2.398   	 2.398  	   1.55	 REVERT     	 Auto-research iteration
-exp406          	 1.832   	 1.832  	   1.29	 REVERT     	 Auto-research iteration
-exp407          	 -999.000	 1.813  	   1.29	 REVERT     	 Auto-research iteration
-exp408          	 2.403   	 2.403  	   1.55	 REVERT     	 Auto-research iteration
-exp409          	 2.403   	 2.403  	   1.55	 REVERT     	 Auto-research iteration
-exp410          	 2.206   	 2.206  	   1.58	 REVERT     	 Auto-research iteration
-exp411          	 1.832   	 1.832  	   1.29	 REVERT     	 Auto-research iteration
-exp412          	 2.403   	 2.403  	   1.55	 REVERT     	 Auto-research iteration
-exp413          	 1.666   	 1.666  	   1.61	 REVERT     	 Auto-research iteration
-exp414          	 2.179   	 2.179  	   1.82	 REVERT     	 Auto-research iteration
-exp415          	 -999.000	 1.798  	   1.29	 REVERT     	 Auto-research iteration
-exp416          	 2.403   	 2.403  	   1.55	 REVERT     	 Auto-research iteration
-exp417          	 -999.000	 2.037  	   1.18	 REVERT     	 Auto-research iteration
-exp418          	 2.068   	 2.068  	   1.55	 REVERT     	 Auto-research iteration
-exp419          	 1.832   	 1.832  	   1.29	 REVERT     	 Auto-research iteration
-exp420          	 2.403   	 2.403  	   1.55	 REVERT     	 Auto-research iteration
-exp421          	 2.206   	 2.206  	   1.58	 REVERT     	 Auto-research iteration
-exp422          	 1.854   	 1.854  	   1.29	 KEEP       	 HEAD c3bd7ae+dirty: activate short side with relaxed bear thresholds plus short_regime_ok brake; val Sharpe 1.854 PF 5.434, 2026q1 preserved at Sharpe 1.647
-exp423          	 1.855   	 1.855  	   1.36	 KEEP       	 HEAD c3bd7ae+dirty: add bull/bear conviction arbitration so longs stand down when short conviction is clearly stronger; val Sharpe 1.855 ret 7.787 PF 5.434, 2026q1 Sharpe 1.648 ret 1.087, activity preserved at 1.01/day
-exp424          	 0.662   	 0.662  	   2.48	 REVERT     	 HEAD c3bd7ae+dirty: recalibrate short thresholds to compressed meta_short_15m scale (m15_short > 0.06/0.05, short gate 0.32); val Sharpe 0.662 PF 1.608 DD 2.476 with 224 sideways short closes, so revert
-exp425          	 1.440   	 1.440  	   1.36	 REVERT     	 HEAD c3bd7ae+dirty: conviction-gated short recalibration requiring prefer_short on calibrated short path; val Sharpe 1.440 PF 3.130 DD 1.359, only modest short participation gain for too much PF loss
-exp426          	 1.855   	 1.855  	   1.36	 REVERT     	 HEAD c3bd7ae+dirty: additive bear-regime breakout short lane using shared market_regime family map; inert branch, matched exp423 on val Sharpe 1.855 PF 5.434 with no meaningful realized side-mix change
-exp427          	 1.808   	 1.808  	   1.88	 REVERT     	 HEAD c3bd7ae+dirty: half-sized calibrated short lane using generic 15m meta instead of compressed short meta; val Sharpe 1.808 PF 3.865 DD 1.879, but 2026q1 regressed to Sharpe 1.421 PF 3.207 so revert
-exp428          	 1.401   	 1.401  	   1.28	 REVERT     	 HEAD c3bd7ae+dirty: monotonic sqrt stretch on meta_short_15m to test compressed-short-meta hypothesis without rule changes; val Sharpe 1.401 PF 2.706 DD 1.279, created 106 sideways short closes so revert
-exp429          	 -999.000	 -3.625 	  84.33	 REVERT     	 HEAD c3bd7ae+dirty: model-set experiment using exp429_shortmeta_weighted with only 15m meta_short retrained under balanced class weights; val Sharpe -3.625 PF 0.930 DD 84.333 with 13000 sideways short closes, so weighted raw probabilities are unusable without stronger calibration
-exp430          	 1.544   	 1.544  	   2.83	 REVERT     	 HEAD c3bd7ae+dirty: cross-sectional top-of-bar short rank gate using current raw meta_short_15m to admit only strongest short candidate plus raw bear breakouts; val Sharpe 1.544 PF 2.970 DD 2.830 with 57 sideways short closes, so revert
-exp431          	 2.368   	 2.368  	   1.18	 REVERT     	 HEAD c3bd7ae+dirty: revive hybrid calibrated short lane using generic 15m meta and add tactical short exits (faster decay, shorter hold, stricter add); val Sharpe 2.368 PF 4.449 DD 1.178, but 2026q1 regressed to Sharpe 1.368 PF 3.080 so revert
-exp432          	 2.211   	 2.211  	   1.18	 REVERT     	 HEAD c3bd7ae+dirty: keep tactical short exits but gate extra calibrated short lane behind macro-bear only; val Sharpe 2.211 PF 4.290 DD 1.178, but 2026q1 still regressed to Sharpe 1.385 PF 3.114 so revert
-exp433          	 2.216   	 2.216  	   1.23	 KEEP       	 HEAD c3bd7ae+dirty: keep tactical short exits but gate extra calibrated short lane behind shared bear regime family only; val Sharpe 2.216 PF 6.842 DD 1.231 with just 1 sideways short close, and 2026q1 improved to Sharpe 1.724 ret 1.140 DD 0.561 PF 4.967
-exp434          	 2.216   	 2.216  	   1.23	 REVERT     	 HEAD 0080ed5+dirty: allow existing bear-regime tactical shorts to scale from half size to full size when bear regime and calibrated signal persist; inert branch, matched exp433 exactly on val so revert
-exp435          	 2.203   	 2.203  	   1.19	 KEEP       	 HEAD 0080ed5+dirty: increase bear-regime calibrated short lane from 0.50x to 0.65x initial size while keeping exp433 selection and tactical exits; val Sharpe 2.203 PF 7.236 DD 1.193, 2026q1 Sharpe 1.746 ret 1.156 DD 0.549 PF 4.888
-exp436          	 2.167   	 2.167  	   1.15	 REVERT     	 HEAD 0080ed5+dirty: raise bear-regime calibrated short lane to 0.80x initial size; val Sharpe 2.167 PF 7.618 DD 1.154 and 2026q1 Sharpe 1.767 ret 1.171 DD 0.564 PF 4.814, but lower validation score than exp435 so revert
-exp437          	 2.180   	 2.180  	   1.17	 REVERT     	 HEAD 0080ed5+dirty: midpoint test at 0.75x initial bear-regime calibrated short size; val Sharpe 2.180 PF 7.492 DD 1.167 and 2026q1 Sharpe 1.760 ret 1.166 DD 0.559 PF 4.838, but still below exp435 on primary validation score so revert
-exp438          	 2.212   	 2.212  	   1.17	 REVERT     	 HEAD 0080ed5+dirty: dynamic bear-calibrated short size using clamp(0.60,0.85,0.50 + bear_edge) so strongest bear spreads get more size; val Sharpe 2.212 PF 7.218 DD 1.166 but 2026q1 Sharpe 1.743 DD 0.552 PF 4.857, slightly behind exp435 so revert
-exp439          	 2.203   	 2.203  	   1.19	 REVERT     	 HEAD 0080ed5+dirty: keep exp435 entry sizing but let raw_bear_fortress shorts use normal hold/decay instead of tactical short exits; inert branch, matched exp435 on val within noise so revert
-exp440          	 1.817   	 1.817  	   1.22	 REVERT     	 HEAD 0080ed5+dirty: widen bear-regime calibrated short admission from m15>0.24 to m15>0.22 to catch more true-bear shorts; val Sharpe 1.817 PF 4.292 DD 1.223 with 18 bear shorts and 2 sideways shorts, so revert
-exp441          	 1.864   	 1.864  	   1.36	 REVERT     	 HEAD 0080ed5+dirty: tighten bear-regime calibrated short admission from m15>0.24 to m15>0.26 to force only highest-confidence bear shorts; val Sharpe 1.864 PF 5.459 DD 1.359 with bear short book almost gone, so revert
-exp442          	 -999.000	 1.976  	   0.58	 REVERT     	 HEAD 0080ed5+dirty: add mild sideways-long entry filter requiring clearer bull-over-bear edge before going long in chop; improved Sharpe/PF/DD but collapsed trades/day to 0.449, so revert
-exp443          	 2.226   	 2.226  	   0.99	 KEEP       	 HEAD 0080ed5+dirty: keep exp435 bear-regime short lane and reduce sideways-regime long size to 85% instead of filtering entries; val Sharpe 2.226 PF 7.690 DD 0.989, and 2026q1 improved to Sharpe 1.797 DD 0.549 PF 5.152 while preserving trades/day
-exp444          	 2.234   	 2.234  	   0.85	 KEEP       	 HEAD b49f99a+dirty: deepen sideways-regime long size reduction from 0.85x to 0.75x while leaving bear-regime short structure untouched; val Sharpe 2.234 PF 8.071 DD 0.853, and 2026q1 improved again to Sharpe 1.829 DD 0.549 PF 5.376
-exp445          	 2.233   	 2.233  	   0.72	 KEEP       	 HEAD b49f99a+dirty: deepen sideways-regime long size reduction further to 0.65x; val Sharpe 2.233 PF 8.541 DD 0.718, and 2026q1 improved again to Sharpe 1.857 DD 0.549 PF 5.654
-exp446          	 2.222   	 2.222  	   0.58	 KEEP       	 HEAD b49f99a+dirty: deepen sideways-regime long size reduction further to 0.55x; val Sharpe 2.222 PF 9.133 DD 0.582, and 2026q1 improved again to Sharpe 1.878 DD 0.549 PF 6.008 while preserving trades/day
-exp447          	 2.197   	 2.197  	   0.47	 REVERT     	 HEAD 36e2989+dirty: deepen sideways-regime long size reduction further to 0.45x; val Sharpe 2.197 PF 9.906 DD 0.470 and 2026q1 Sharpe 1.887 ret 0.873 DD 0.549 PF 6.475, but primary validation score slipped below exp446 so revert
-exp448          	 2.163   	 2.163  	   0.56	 REVERT     	 HEAD 36e2989+dirty: keep exp446 sideways-long reduction and raise bear-regime calibrated short lane from 0.65x to 0.75x; val Sharpe 2.163 PF 9.528 DD 0.564 and 2026q1 Sharpe 1.897 ret 0.935 DD 0.559 PF 5.888, but validation score still trailed exp446 so revert
-exp449          	 2.172   	 2.172  	   0.58	 REVERT     	 HEAD 36e2989+dirty: keep exp446 short logic and halve long notional in bear-family bars to curb countertrend longs; val Sharpe 2.172 PF 9.566 DD 0.582 but 2026q1 fell to Sharpe 1.425 ret 0.637 DD 0.549 PF 4.668, so revert
-exp450          	 2.243   	 2.243  	   0.58	 KEEP       	 HEAD 36e2989+dirty: keep exp446 sideways-long reduction and add a 1.10x long notional boost in bull-family bars; val Sharpe 2.243 PF 9.302 DD 0.582, while 2026q1 held flat at Sharpe 1.878 DD 0.549 PF 6.008
-exp451          	 2.252   	 2.252  	   0.58	 KEEP       	 HEAD b62c16b+dirty: increase the bull-family long notional boost from 1.10x to 1.15x on top of exp450; val Sharpe 2.252 PF 9.386 DD 0.582, while 2026q1 again held flat at Sharpe 1.878 DD 0.549 PF 6.007
-exp452          	 2.261   	 2.261  	   0.58	 KEEP       	 HEAD 36e025b+dirty: increase the bull-family long notional boost from 1.15x to 1.20x on top of exp451; val Sharpe 2.261 PF 9.470 DD 0.582, while 2026q1 again held flat at Sharpe 1.878 DD 0.549 PF 6.007
-exp453          	 2.270   	 2.270  	   0.58	 KEEP       	 HEAD a1f3d6d+dirty: increase the bull-family long notional boost from 1.20x to 1.25x on top of exp452; val Sharpe 2.270 PF 9.555 DD 0.582, while 2026q1 again held flat at Sharpe 1.878 DD 0.549 PF 6.007
-exp454          	 2.259   	 2.259  	   0.51	 KEEP       	 HEAD e31d6c7+dirty: keep exp453 bull-regime long boost at 1.25x but reduce sideways-regime long size from 0.55x to 0.50x; val Sharpe 2.259 PF 9.943 DD 0.514, and 2026q1 improved to Sharpe 1.884 win rate 53.06% PF 6.224 with trades/day still above 1.0, so keep for better OOS robustness
-exp455          	 2.220   	 2.220  	   0.52	 REVERT     	 HEAD 31b50f2+dirty: add a 1.10x bear-regime short size multiplier on top of exp454; val Sharpe 2.220 PF 10.214 DD 0.521 and 2026q1 Sharpe 1.897 PF 6.134 DD 0.556, but validation score slipped and OOS quality was mixed, so revert
-exp456          	 2.240   	 2.240  	   0.51	 REVERT     	 HEAD 31b50f2+dirty: shrink the bear-regime short size multiplier to 1.05x on top of exp454; val Sharpe 2.240 PF 10.079 DD 0.513 and 2026q1 Sharpe 1.891 PF 6.179 DD 0.552, but still only a mixed tradeoff versus exp454, so revert
-exp457          	 2.245   	 2.245  	   0.47	 KEEP       	 HEAD 31b50f2+dirty: keep exp454 bull boost at 1.25x and reduce sideways-regime long size further from 0.50x to 0.45x; val Sharpe 2.245 PF 10.391 DD 0.470, and 2026q1 improved to Sharpe 1.887 PF 6.474 with trades/day still above 1.0, so keep for tighter sideways risk
-exp458          	 2.222   	 2.222  	   0.47	 KEEP       	 HEAD 5bbc7c8+dirty: keep exp457 sizing and make sideways-regime long signal decay start one bar earlier; val Sharpe 2.222 PF 12.469 DD 0.470 with 61.52% win rate, and 2026q1 improved further to Sharpe 1.989 win rate 56.00% DD 0.549 while preserving trades/day, so keep for cleaner sideways exits
-exp459          	 2.144   	 2.144  	   0.57	 REVERT     	 HEAD 9cbc185+dirty: keep exp458 earlier sideways decay and also shorten sideways-regime long max hold by one bar; val Sharpe 2.144 PF 8.639 DD 0.567 and 2026q1 Sharpe 1.989 PF 5.777 DD 0.549, but validation quality deteriorated too much versus exp458, so revert
-exp460          	 2.222   	 2.222  	   0.47	 REVERT     	 HEAD b2a791b+dirty: disable long add-ons in sideways regime on top of exp458; inert branch, matched exp458 on validation and 2026q1, so revert
-exp461          	 2.222   	 2.222  	   0.47	 REVERT     	 HEAD b2a791b+dirty: cut sideways bull_soft long entry size from 0.50x to 0.35x on top of exp458; inert branch, matched exp458 on validation and 2026q1, so revert
-exp462          	 2.222   	 2.222  	   0.47	 REVERT     	 HEAD b2a791b+dirty: require a small extra bull-over-bear conviction edge for sideways bull_fortress entries on top of exp458; inert branch, matched exp458 on validation and 2026q1, so revert
-exp463          	 2.144   	 2.144  	   0.57	 REVERT     	 HEAD b2a791b+dirty: keep exp458 sizing but make sideways long decay exit immediately when the bull edge fades relative to bear; val Sharpe 2.144 PF 8.639 DD 0.567 and 2026q1 Sharpe 1.989 PF 5.777 DD 0.549, matching the over-aggressive exp459 footprint, so revert
-exp464          	 -999.000	 2.204  	   0.44	 REVERT     	 HEAD 131d4ca+dirty: reduce the active sideways bull_fortress long lane from 0.45x to 0.40x on top of exp458; val Sharpe 2.204 PF 13.015 DD 0.435, but trades/day slipped to 0.995 and tripped the harness floor, so revert
-exp465          	 2.213   	 2.213  	   0.45	 REVERT     	 HEAD d4ebdbb+dirty: midpoint test at 0.425x sideways long size on top of exp458; val Sharpe 2.213 PF 12.732 DD 0.453 and 2026q1 Sharpe 1.983 PF 5.907 DD 0.549, but both validation and OOS Sharpe stayed below exp458 so revert
-exp467          	 2.222   	 2.222  	   0.47	 REVERT     	 HEAD 5a6747a+dirty: slightly relax prefer_short only in bear regime by lowering the bear-only arbitration margin from 0.08 to 0.06 on top of exp458; inert branch, matched exp458 on validation and 2026q1, so revert
-exp468          	 2.147   	 2.147  	   0.47	 REVERT     	 HEAD 5a6747a+dirty: lower the active bear_calibrated admission threshold from m15>0.24 to m15>0.23 on top of exp458; val Sharpe fell to 2.147 PF 9.432 and 2026q1 collapsed to Sharpe -0.453 PF 0.966 DD 1.693, so threshold-only short expansion is unsafe and revert
-exp466          	 2.222   	 2.222  	   0.47	 REVERT     	 HEAD 5a6747a+dirty: make sideways long decay slightly stricter by raising the post-decay m15_long threshold from 0.40 to 0.45 on top of exp458; inert branch, matched exp458 on validation and 2026q1, so revert
-exp469          	 2.193   	 2.193  	   0.47	 REVERT     	 HEAD 970ba55+dirty: exit sideways longs one bar before max-hold when second-bar follow-through is weak (m15_long<0.55 and bull_edge<0.05); val Sharpe 2.193 PF 11.729 DD 0.470 with trades/day 1.011, below exp458 so revert
-exp470          	 2.162   	 2.162  	   0.56	 REVERT     	 HEAD 970ba55+dirty: shape sideways bull_fortress size by bull-edge strength (0.35x-0.55x instead of flat 0.45x); val Sharpe 2.162 PF 11.570 DD 0.565 with trades/day 1.000, below exp458 so revert
-exp471          	 2.232   	 2.232  	   0.47	 REVERT     	 HEAD a4d0001+dirty: add structure-aware sideways bull_fortress sizing using liquidity_sweep, msb_status, fvg_detected, ema_200_dist, and dist_to_vwap with both upside and downside scaling; val Sharpe 2.232 PF 12.727 DD 0.473, but 2026q1 slipped to Sharpe 1.926 PF 5.557 DD 0.549 so revert
-exp472          	 2.224   	 2.224  	   0.47	 KEEP       	 HEAD a4d0001+dirty: keep the new structure feature cache but only boost strong-structure sideways bull_fortress setups (+10% when structure_score>=2); val Sharpe 2.224 PF 12.422 DD 0.470, while 2026q1 held effectively flat at Sharpe 1.989 PF 5.778 DD 0.549
-exp473          	 2.225   	 2.225  	   0.47	 REVERT     	 HEAD eb27532+dirty: raise the strong-structure sideways bull_fortress boost from +10% to +15%; val Sharpe 2.225 PF 12.398 DD 0.470 and 2026q1 stayed effectively flat at Sharpe 1.989 PF 5.778 DD 0.549, but the gain was immaterial and not worth extra complexity, so revert
-exp474          	 2.224   	 2.224  	   0.47	 REVERT     	 HEAD 02514e9+dirty: add a +15% size reward for strong-structure bear_calibrated shorts in bear regimes; inert branch, matched exp472 on validation and 2026q1 so revert
-exp475          	 2.224   	 2.224  	   0.47	 REVERT     	 HEAD 02514e9+dirty: relax the bear structure reward threshold and use a +10% boost for moderately aligned bear_calibrated shorts; still inert, matched exp472 on validation and 2026q1 so revert
-exp476          	 2.126   	 2.126  	   0.47	 REVERT     	 HEAD 02514e9+dirty: keep exp472 sizing but let strong-structure sideways longs keep the normal decay age instead of the earlier exp458 sideways decay; val Sharpe fell to 2.126 PF 9.772 DD 0.470, so the extra edge is in sizing rather than patience and revert
-exp477          	 2.208   	 2.208  	   0.47	 REVERT     	 HEAD 02514e9+dirty: apply a 15% size penalty to bull_fortress longs that still fire in bear regimes when local structure is strongly bearish; val Sharpe slipped to 2.208 PF 12.222 DD 0.470, so selective countertrend long shrinkage did not help and revert
-exp478          	 2.224   	 2.224  	   0.47	 REVERT     	 HEAD 02514e9+dirty: lower the add_long threshold only for strong-structure sideways winners to try to wake the dead add-on lane; inert branch, matched exp472 on validation so revert
-exp479          	 2.224   	 2.224  	   0.47	 REVERT     	 HEAD 02514e9+dirty: slightly relax bear_calibrated admission only when regime is bear, prefer_short already agrees, and bearish structure is very strong; inert branch, matched exp472 on validation so revert
-exp480          	 0.250   	 0.250  	   4.83	 REVERT     	 HEAD 236371b: model-set exp480_short_platt with platt-calibrated short confidence; val Sharpe 0.250 PF 1.346 DD 4.833 with 42 bear shorts but 3331 sideways shorts, and 2026q1 collapsed to Sharpe -2.312 PF 0.574 DD 4.051, so revert
-exp481          	 -999.000	 -2.945 	  68.79	 REVERT     	 HEAD 236371b: model-set exp481_short_rank using cross-sectional short rank as normalized confidence; val Sharpe -2.945 PF 1.069 DD 68.789 with 2173 sideways shorts, and 2026q1 remained broken at Sharpe -6.948 PF 0.850 DD 24.900, so revert
-exp482          	 -0.121  	 -0.121 	   4.83	 REVERT     	 HEAD 236371b: model-set exp482_short_bear using bear-specific short meta model in bear regime; val Sharpe -0.121 PF 1.190 DD 4.833 with 3324 sideways shorts, and 2026q1 collapsed to Sharpe -2.280 PF 0.576 DD 4.010, so revert
-exp483          	 0.490   	 0.490  	   4.34	 REVERT     	 HEAD 236371b+dirty: guarded-rank retry that caps normalized short conviction to raw short meta plus 0.08 in bear regimes; val Sharpe 0.490 PF 1.438 DD 4.339 but sideways shorts exploded to 9671 and 2026q1 collapsed to Sharpe -2.464 PF 0.554 DD 5.464, so revert
-exp484          	 -0.036  	 -0.036 	   4.83	 REVERT     	 HEAD 236371b+dirty: guarded-platt retry with the same capped bear-only conviction lift; metrics matched the platt failure footprint at val Sharpe -0.036 PF 1.232 DD 4.825 and 2026q1 Sharpe -2.269 PF 0.566 DD 3.991, so revert
-exp485          	 1.001   	 1.001  	   4.06	 REVERT     	 HEAD 236371b+dirty: model-set exp485_15m_context retraining only 15m models with price_context features under the raw exp472 shell; val Sharpe 1.001 PF 1.630 DD 4.056 and 2026q1 Sharpe 1.000 PF 1.561 DD 2.123, with 1294 sideways entry_bull_fortress opens in 2026q1 and runaway turnover, so revert
-exp486          	 2.224   	 2.224  	   0.47	 REVERT     	 HEAD 236371b+dirty: model-set exp486_1h_context retraining only 1h models with price_context features under the raw exp472 shell; inert branch that reproduced control metrics at val Sharpe 2.224 PF 12.422 DD 0.470 and 2026q1 Sharpe 1.989 PF 5.778 DD 0.549, so revert
-exp487          	 2.224   	 2.224  	   0.47	 REVERT     	 HEAD 236371b+dirty: model-set exp487_4h_context retraining only 4h models with price_context features under the raw exp472 shell; inert branch that again reproduced control metrics at val Sharpe 2.224 PF 12.422 DD 0.470 and 2026q1 Sharpe 1.989 PF 5.778 DD 0.549, so revert
-exp488          	 2.214   	 2.214  	   0.43	 REVERT     	 HEAD 236371b+dirty: model-set exp488_short_meta_context retraining only meta_short_15m with price_context features under the raw exp472 shell; val Sharpe slipped to 2.214 PF 11.989 DD 0.428 while 2026q1 stayed flat at Sharpe 1.989 PF 5.778 DD 0.549, so revert
-exp489          	 -999.000	 2.040  	   0.45	 REVERT     	 HEAD 236371b+dirty: model-set exp489_short_bear_context adds a context-trained bear-only short meta and runs in bear_model mode; val PF/DD improved to 8.562/0.447 but trades/day slipped to 0.989 and 2026q1 regressed to Sharpe 1.850 ret 0.838 DD 0.488, so revert
-exp490          	 -999.000	 2.040  	   0.45	 REVERT     	 HEAD 236371b+dirty: bounded bear-model retry with 35% conviction blend, raw short decay, and 0.04 delta cap matched exp489 exactly at val Sharpe 2.040 PF 8.562 DD 0.447 and 2026q1 Sharpe 1.850 PF 6.737 DD 0.488, so the exp489 regression was not caused by short-decay use
-exp491          	 -999.000	 2.040  	   0.45	 REVERT     	 HEAD 236371b+dirty: size-only bear-model overlay with raw conviction/decay plus 10% short bonus when the bear-only model beat raw short meta had no measurable effect and matched exp489 exactly on val and 2026q1, so revert
-exp492          	 2.238   	 2.238  	   0.46	 KEEP       	 HEAD 236371b+dirty: move the 10% sideways bull_fortress size boost from structure_score>=2 to structure_score==1, based on lane diagnostics; val improved to Sharpe 2.238 PF 12.423 DD 0.456 with trades/day 1.011, while 2026q1 held effectively flat at Sharpe 1.989 PF 5.777 DD 0.549
-exp493          	 2.238   	 2.238  	   0.46	 REVERT     	 HEAD c60c2df+dirty: keep exp492 structure_score==1 boost and add a 5% sideways bull_fortress size penalty for structure_score==2; PF ticked up but val Sharpe slipped fractionally to 2.238175 and 2026q1 softened to Sharpe 1.988590, so revert
-exp494          	 2.243   	 2.243  	   0.44	 KEEP       	 CODE 7789997: keep exp492 structure routing and add a 5% sideways bull_fortress size penalty only for the weak 0.29-0.33 m15_long bucket; val improved to Sharpe 2.243 PF 12.744 DD 0.438 with trades/day 1.011, while 2026q1 stayed near-flat at Sharpe 1.983 PF 5.893 DD 0.549
-exp495          	 -999.000	 0.000  	   0.00	 REVERT     	 HEAD 5799864+dirty: full 15m price-only relative-tail bear-short retrain with bear_model mode replaced the control trigger lane and produced zero trades on both val and 2026q1, so revert
-exp496          	 2.167   	 2.167  	   0.44	 REVERT     	 HEAD 5799864+dirty: overlay only the new price-only relative-tail bear short artifact onto exp256_active via bear_overlay mode; 2026q1 stayed flat at Sharpe 1.983 PF 5.893 with 3 bear-family short closes, but val softened to Sharpe 2.167 PF 9.473 DD 0.438 with only 6 bear shorts, so revert
-exp497          	 2.234   	 2.234  	   0.44	 REVERT     	 HEAD 5799864+dirty: retry the bear_overlay using a context-plus bear short artifact with event intensity, sentiment shock, and cross-asset stress features; 2026q1 again stayed flat at Sharpe 1.983 PF 5.893 while val reached Sharpe 2.234 PF 12.078 DD 0.438 with 10 bear shorts and just 1 sideways short, but it still trailed exp494 on primary validation quality, so revert
-exp498          	 2.237   	 2.237  	   0.44	 REVERT     	 HEAD 424b1cb+dirty: keep the context-plus bear overlay but add a positive-only short-confidence rule via AUTOTRADER_BEAR_SHORT_NEGATIVE_SCALE=0.0; 2026q1 stayed pinned to control at Sharpe 1.983 PF 5.893 DD 0.549, and val improved to Sharpe 2.237 PF 12.101 DD 0.438 with 11 bear-family shorts and only 1 sideways short, but still trailed exp494 so revert
-exp499          	 2.238   	 2.238  	   0.44	 REVERT     	 HEAD 424b1cb+dirty: keep the positive-only bear overlay and add a 10% short size bonus when the bear artifact beats raw short meta by 0.02; 2026q1 again matched control at Sharpe 1.983 PF 5.893 DD 0.549, while val ticked up to Sharpe 2.238 PF 12.107 DD 0.438, still below exp494 on primary validation quality
-exp500          	 2.238   	 2.238  	   0.44	 REVERT     	 HEAD 424b1cb+dirty: keep the positive-only bear overlay and widen the 10% short size bonus to any positive bear-artifact lift (edge 0.00); 2026q1 stayed flat at Sharpe 1.983 PF 5.893 DD 0.549, but val only reached Sharpe 2.238 PF 11.947 DD 0.438, so the overlay-size axis remains a near miss and reverts
-exp501          	 -999.000	 0.000  	   0.00	 NO_BACKTEST	 HEAD 424b1cb+dirty: trained a new context-plus bear artifact with relative_tail_core labels that drop event/sentiment gates from the label, but cache diagnostics stayed negative on both val and 2026q1 bear bars and removed raw bear entries, so skipped full backtest
-exp502          	 2.237   	 2.237  	   0.44	 REVERT     	 HEAD 424b1cb+dirty: keep the positive-only bear overlay but return short decay to raw with AUTOTRADER_BEAR_SHORT_DECAY_BLEND=0.0; branch was inert versus exp498 at val Sharpe 2.237 PF 12.101 DD 0.438 and 2026q1 Sharpe 1.983 PF 5.893 DD 0.549, so revert
-exp503		 1.649   	 1.649  	   0.71	 KEEP       	 CODE d476fe3: extend training window TRAIN_END 2022-06-30→2024-06-30 and add 3 orthogonal model features (range_position, vol_trend_8h, funding_roc_4h); retrained 1h XGB directional + meta on extended window; new val window 2024-07 to 2025-09 (clean break from 492-exp history); val Sharpe 1.649 PF 3.621 DD 0.712 trades/day 1.351 on new window, 2026q1 Sharpe 1.983 PF 5.893 DD 0.549 (+0.33 vs 1.65 pre-retrain baseline on truly unseen data); vol_trend_8h direct sizing signal tested and flat-curved REVERT — XGB already captures it internally
-v2exp1        	 15.364  	 18.203 	   4.07	 CANDIDATE  	 HEAD 34c49ba: benchmarked V2 model-set v2_wave2_pair on full 8-symbol bundle_intraday_core replay; val improved versus v2_wave1_priceonly on daily Sharpe 12.583 vs 12.389, return 912.10% vs 738.19%, trades/day 13.27 vs 12.05, and top-sleeve concentration 37.68% vs 42.70%, while 2026q1 also improved on daily Sharpe 12.926 vs 12.867, return 27.80% vs 27.00%, trades/day 11.89 vs 11.45, and concentration 42.44% vs 43.60%; keep as the leading V2 breadth candidate, but not a V2 champion yet because concentration is still above the 30% target and the legacy bar-level composite score still trails the baseline
-v2exp2        	 14.379  	 18.332 	   4.89	 CANDIDATE  	 HEAD fa21893: benchmarked V2 model-set v2_wave3_orth adding basis_dislocation, macro_beta_dispersion, macro_event_drift, and bear_stress_short on top of v2_wave2_pair; val daily Sharpe held effectively flat at 12.575 vs 12.583, but return improved to 1155.83% from 912.10%, trades/day rose to 15.60 from 13.27, short share rose to 26.61% from 23.32%, and top-sleeve concentration tightened to 33.06% from 37.68%; 2026q1 improved much more clearly, with daily Sharpe 15.034 vs 12.926, return 37.96% vs 27.80%, trades/day 17.15 vs 11.89, short share 32.96% vs 21.64%, and concentration 31.41% vs 42.44%; basis_dislocation became a real second pillar, so keep as the new leading V2 breadth candidate, but still not a full V2 champion until concentration gets under 30% and replay realism survives stress
-v2exp3        	 14.999  	 18.179 	   4.77	 CANDIDATE  	 HEAD 7627b8e: fixed the V2 allocator so strategy-family clusters come from sleeve manifests instead of symbol market buckets, added sleeve/cluster override controls, and rebenchmarked v2_wave3_orth on full 8-symbol replay; val shifted into a more balanced book with daily Sharpe 11.629, return 976.09%, trades/day 15.14, short share 27.96%, and top-sleeve concentration 31.04% led by cross_asset_relative_strength rather than a mean-reversion lane, while 2026q1 improved further to daily Sharpe 14.796, return 36.27%, trades/day 16.82, short share 34.16%, and top-sleeve concentration 29.41%; this is the first V2 portfolio to clear the concentration bar on a full split, but it still misses the val target by roughly one point and needs the stress/policy follow-through before promotion
-v2exp4        	 15.031  	 18.833 	   4.77	 CANDIDATE  	 HEAD be8dc02: benchmarked v2_wave4_carry on full 8-symbol replay after adding funding_carry and post_event_mean_reversion on top of the wave3 stack; val improved versus v2exp3 on return 1068.52% vs 976.09%, trades/day 15.78 vs 15.14, short share 31.10% vs 27.96%, and concentration 30.04% vs 31.04%, while daily Sharpe held near-flat at 11.581 vs 11.629; 2026q1 also improved on return 39.74% vs 36.27%, trades/day 18.73 vs 16.82, short share 30.19% vs 34.16%, and concentration 26.96% vs 29.41%, though daily Sharpe softened to 13.305 from 14.796; funding_carry proved to be the real new sleeve contributor while post_event_mean_reversion stayed tiny, so keep as the new leading V2 breadth candidate, but still not a full V2 champion because val concentration misses the 30% bar by a hair and replay realism/stress still need confirmation
-v2exp5        	 15.059  	 18.778 	   4.77	 CANDIDATE  	 HEAD a14a62b: applied a tiny wave4 allocator trim with cross_asset_relative_strength weight 0.95 and sleeve cap 0.29 via v2_portfolio.wave4_trim_rs.json; this preserved the wave4 breadth while finally clearing the concentration bar on both full 8-symbol splits, with val at daily Sharpe 11.569, return 1042.89%, trades/day 15.93, short share 30.96%, and top-sleeve concentration 29.50%, and 2026q1 at daily Sharpe 13.395, return 40.05%, trades/day 18.85, short share 29.99%, and top-sleeve concentration 26.83%; this is the first V2 portfolio to satisfy the <=30% sleeve concentration target on both val and 2026q1, so keep as the new leading V2 benchmark candidate, with the remaining gate now being replay realism/stress rather than alpha concentration
-v2exp6        	 16.391  	 18.753 	   4.06	 KEEP       	 HEAD d955a0e+dirty: added timestamp-indexed V2 replay plus a quality-focused wave4 policy in v2_portfolio.wave4_quality2.json with cross_asset_relative_strength weight 0.92/cap 0.27, sleeve min-confidence overrides (RS 0.60, snapback 0.61, sideways 0.61), and tighter Tier-B sizing (conf 0.60, notional 0.04); full 8-symbol base replay improved to val daily Sharpe 12.040 PF 4.465 return 854.95% trades/day 14.08 short share 30.58% concentration 29.15%, and 2026q1 daily Sharpe 14.099 PF 4.634 return 37.39% trades/day 15.93 short share 31.47% concentration 28.94%; matching stress policy in v2_portfolio.wave4_stress_quality2.json also passed on both full splits, with stress val daily Sharpe 10.987 PF 4.086 concentration 29.15% and stress 2026q1 daily Sharpe 12.605 PF 4.339 concentration 28.18%, so keep as the first stress-confirmed V2 benchmark candidate
-v2exp7        	 14.737  	 16.703 	   4.19	 CANDIDATE  	 HEAD 6fe6f58+dirty: fixed the max-hold exit friction bug in execution/v2_paper.py so time-based closes now pay slippage and TAKER_FEE like signal-driven exits, then re-ran the quality2 wave4 benchmark; base replay still passed on both full splits with val daily Sharpe 11.039 PF 4.255 return 635.12% trades/day 14.37 concentration 28.96% and 2026q1 daily Sharpe 11.681 PF 4.278 return 28.84% trades/day 15.99 concentration 28.86%, but the corrected stress lens failed PF on both splits at val PF 3.607 concentration 30.00% and 2026q1 PF 3.561 concentration 27.57%, so downgrade the prior stress-confirmed claim to a candidate
-v2exp8        	 16.212  	 17.217 	   2.39	 REVERT     	 HEAD 6fe6f58+dirty: tried a stricter friction-aware quality4 policy with heavier cross-asset trim, higher sleeve confidence floors, and tighter Tier-B sizing to recover the corrected stress audit; it succeeded on stressed full splits with val daily Sharpe 10.182 PF 4.652 concentration 29.77% and 2026q1 daily Sharpe 11.143 PF 4.431 concentration 29.98%, and base PF improved to 5.478 on val and 5.351 on 2026q1, but base concentration still missed the <=30% bar at 30.21% on val and 30.99% on 2026q1, so revert as a near-miss rather than a coherent new benchmark
-v2exp9        	 5.673   	 6.084  	   9.79	 REVERT     	 HEAD edb8300: hardened V2 replay further by fixing millisecond max-hold timing, applying base-time funding drag in execution/v2_paper.py, and switching trade PF/win-rate accounting to net realized PnL including allocated entry fees and partial-reduction modifies; the old V2 benchmark story was materially inflated by the max-hold time bug. Re-ran the same v2_wave4_carry quality2 policy on full 8-symbol replay and it no longer qualifies as a replacement candidate: val fell to daily Sharpe 5.923 PF 1.983 return 473.50% trades/day 7.59 concentration 39.51%, while 2026q1 fell to daily Sharpe 3.589 PF 1.488 return 17.74% trades/day 8.69 concentration 35.93%; still directionally profitable, but concentration and PF both fail badly, so revert the benchmark claim and treat V2 as promising but not close to replacing exp503/exp494 yet
-v2exp10       	 5.729   	 6.105  	   9.79	 CANDIDATE  	 HEAD 1ddb76f: ran corrected-engine sleeve ablations on the weak/support layer and converted the best simplified book into a named wave5 seed. Basis_dislocation proved irreplaceable (ablating it cratered 2026q1 to daily Sharpe 0.741 PF 1.066 and pushed concentration to 65.32%), cross_asset_relative_strength remained a real edge/diversifier despite concentration pressure, while funding_carry and trend_1h_directional were effectively dispensable after the realism fixes. The best combined prune drops funding_carry plus trend_1h_directional via v2_portfolio.wave5_seed_pruned.json: base full-split replay moved to val daily Sharpe 5.971 PF 1.987 return 477.66% trades/day 6.99 concentration 37.16%, and 2026q1 daily Sharpe 4.009 PF 1.486 return 17.98% trades/day 7.81 concentration 41.30%; matching stress seed in v2_portfolio.wave5_seed_pruned_stress.json held up directionally at val daily Sharpe 5.119 PF 1.864 concentration 39.23% and 2026q1 daily Sharpe 3.098 PF 1.513 concentration 35.47%. Still not close to benchmark quality, but worth keeping as the wave5 redesign seed instead of the full wave4 book
-v2exp11       	 13.300  	 13.300 	   3.86	 CANDIDATE  	 HEAD ef21c3d+dirty: added opt-in stop-loss/take-profit handling to the V2 paper runtime and tested wave5_quality3, a stricter quality policy with stop loss enabled and 1.8R take-profit. This is the best corrected V2 research seed so far but still fails the strict production promotion gate. Full corrected base replay: val daily Sharpe 11.146 PF 2.921 win 60.66% trades/day 9.15 concentration 27.31%, and 2026q1 daily Sharpe 12.280 PF 2.774 win 60.84% trades/day 9.33 concentration 33.95%. Full corrected stress replay: val daily Sharpe 9.776 PF 2.795 win 60.10% trades/day 8.21 concentration 26.77%, and 2026q1 daily Sharpe 10.853 PF 2.792 win 59.94% trades/day 8.14 concentration 34.33%. Keep as research seed, not production candidate: PF remains below 4.0, Q1 concentration remains above 30%, and fresh replacement OOS is still missing
-v2exp12       	 5.290   	 5.290  	   3.30	 REVERT     	 HEAD 64527bb+dirty: rejected wave5_quality4_stoponly probe, which kept the quality3 allocator/stop-loss setup but removed the 1.8R take-profit to let winners run. Bounded 120-day val collapsed versus quality3 to daily Sharpe 5.585 PF 1.595 win 48.48% trades/day 9.33 concentration 55.43%, while full 2026q1 also weakened to daily Sharpe 5.253 PF 1.558 win 50.00% trades/day 8.81 concentration 33.59%. Conclusion: current V2 sleeves need explicit profit-taking; stop-only exits are worse and should be discarded
-v2exp13       	 16.046  	 16.046 	   3.84	 CANDIDATE  	 HEAD 64527bb+dirty: tested wave5_quality5_tp13 with stop-loss plus 1.3R take-profit. This substantially improved PF/win-rate versus quality3 but still failed the strict gate on val PF and concentration. Full base: val daily Sharpe 12.802 PF 3.602 win 66.83% trades/day 9.37 concentration 32.58%, 2026q1 daily Sharpe 13.833 PF 4.146 win 69.12% trades/day 9.61 concentration 31.45%. Stress: val PF 3.381 concentration 31.11%, 2026q1 PF 3.873 concentration 31.49%. Keep as payoff-map evidence, not active seed
-v2exp14       	 15.720  	 15.720 	   3.71	 CANDIDATE  	 HEAD 64527bb+dirty: tested wave5_quality7_tp13_postmid, a gentler post_extension_snapback trim on the 1.3R setup. It mostly solved concentration but left PF below 4.0. Full base: val daily Sharpe 12.510 PF 3.565 win 66.80% concentration 27.69%, 2026q1 daily Sharpe 13.026 PF 3.975 win 67.97% concentration 28.14%. Stress: val PF 3.302 concentration 27.45%, 2026q1 PF 3.780 concentration 30.42%. Useful near-miss; not active
-v2exp15       	 16.200  	 16.200 	   3.51	 CANDIDATE  	 HEAD 64527bb+dirty: tested wave5_quality8_tp12_postmid with 1.2R take-profit. This cleared concentration and Q1 PF but still missed val PF. Full base: val daily Sharpe 12.935 PF 3.729 win 68.64% concentration 29.46%, 2026q1 daily Sharpe 13.154 PF 4.108 win 69.75% concentration 28.92%. Stress: val PF 3.530 concentration 28.80%, 2026q1 PF 4.077 concentration 29.69%. Strong but inferior to the later 0.95R seed
-v2exp16       	 16.573  	 16.573 	   3.51	 CANDIDATE  	 HEAD 64527bb+dirty: tested wave5_quality9_tp11_postmid with 1.1R take-profit. It nearly cleared replay gates but missed val PF and barely missed val concentration. Full base: val daily Sharpe 13.355 PF 3.941 win 70.54% concentration 30.09%, 2026q1 daily Sharpe 13.554 PF 4.225 win 71.43% concentration 29.47%. Stress: val PF 3.724 concentration 30.03%, 2026q1 PF 4.343 concentration 28.63%. Keep only as trail toward quality11
-v2exp17       	 16.853  	 16.853 	   3.52	 CANDIDATE  	 HEAD 64527bb+dirty: tested wave5_quality10_tp10_postmid with 1.0R take-profit. PF cleared on base val/Q1 and stress Q1 but concentration missed by 0.2-0.6pp and stress-val PF missed by 0.06. Full base: val daily Sharpe 13.345 PF 4.076 win 72.43% concentration 30.27%, 2026q1 daily Sharpe 13.574 PF 4.362 win 72.88% concentration 30.61%. Stress: val PF 3.940 concentration 30.54%, 2026q1 PF 4.410 concentration 30.21%. Near pass; superseded by quality11
-v2exp18       	 16.790  	 16.790 	   3.52	 KEEP       	 HEAD 64527bb+dirty: first corrected V2 replay-gate pass candidate, wave5_quality11_tp095_postmicro. Added a tiny post_extension_snapback trim on top of 0.95R take-profit. Strict promotion gate now fails only on missing fresh OOS, not replay metrics. Full base: val daily Sharpe 13.160 PF 4.099 win 73.40% trades/day 9.61 concentration 29.37%, 2026q1 daily Sharpe 13.719 PF 4.617 win 74.02% trades/day 9.73 concentration 29.02%. Full stress: val daily Sharpe 12.294 PF 4.025 win 73.40% trades/day 8.45 concentration 29.24%, 2026q1 daily Sharpe 12.443 PF 4.578 win 72.90% trades/day 8.30 concentration 29.67%. KEEP as replay-gate seed only; not production-ready until fresh OOS and shadow validation pass
+exp270          	 -999.000	 0.000  	  0.00 	 REVERT     	 Medallion Remote Migration: v2.3 Precision Exits + 7.5x/2.5x Targets.
+exp271          	 -999.000	 -0.200 	  3.58 	 REVERT     	 Medallion Remote Migration: v2.3 Precision Exits + 7.5x/2.5x Targets.
+exp272          	 -999.000	 0.487  	  7.21 	 REVERT     	 Medallion Restoration: 0.25 Gates + 9x/4x Swing Exits (Reverting Decay).
+exp273          	 -999.000	 0.564  	  8.25 	 REVERT     	 Medallion MTF Resonance: 15m Signal Gating + 1.6x High-Conviction Sizing.
+exp274          	 -999.000	 0.562  	 12.18 	 REVERT     	 Medallion exp274: Funding-Aware Contrarian + State 0 Overweight (1.8x) + Meta 0.28.
+exp275          	 -999.000	 0.563  	  9.58 	 REVERT     	 Auto-research iteration
+exp276          	 -999.000	 0.563  	  9.58 	 REVERT     	 Auto-research iteration
+exp277          	 -0.310  	 0.203  	 25.27 	 REVERT     	 Auto-research iteration
+exp278          	 -0.647  	 -0.320 	 21.54 	 REVERT     	 Auto-research iteration
+exp279          	 -0.379  	 -0.050 	 21.59 	 REVERT     	 Auto-research iteration
+exp280          	 -1.065  	 -0.044 	 35.42 	 REVERT     	 Auto-research iteration
+exp281          	 -1.311  	 -0.024 	 40.74 	 REVERT     	 Auto-research iteration
+exp282          	 -999.000	 0.848  	  2.63 	 REVERT     	 Auto-research iteration
+exp283          	 -999.000	 0.143  	 10.42 	 REVERT     	 Auto-research iteration
+exp284          	 -999.000	 0.813  	  4.30 	 REVERT     	 Auto-research iteration
+exp285          	 -999.000	 0.795  	  2.10 	 REVERT     	 Auto-research iteration
+exp286          	 -0.688  	 -0.564 	 17.49 	 REVERT     	 Auto-research iteration
+exp287          	 -999.000	 0.667  	  2.44 	 REVERT     	 Auto-research iteration
+exp288          	 -999.000	 0.666  	  3.40 	 REVERT     	 Auto-research iteration
+exp289          	 -999.000	 0.452  	  6.41 	 REVERT     	 Auto-research iteration
+exp290          	 -999.000	 0.431  	  6.10 	 REVERT     	 Auto-research iteration
+exp291          	 -999.000	 1.745  	  1.04 	 REVERT     	 Auto-research iteration
+exp292          	 -0.901  	 -0.678 	 19.46 	 REVERT     	 Auto-research iteration
+exp293          	 -999.000	 0.452  	  6.41 	 REVERT     	 Auto-research iteration
+exp294          	 -999.000	 0.452  	  6.41 	 REVERT     	 Auto-research iteration
+exp295          	 -999.000	 0.187  	  8.14 	 REVERT     	 Auto-research iteration
+exp296          	 -999.000	 -0.121 	  9.10 	 REVERT     	 Auto-research iteration
+exp297          	 -999.000	 0.131  	  9.47 	 REVERT     	 Auto-research iteration
+exp298          	 -999.000	 -0.018 	 10.73 	 REVERT     	 Properly enforced 3-position limit. Performance collapsed, suggesting first-come gating is suboptimal.
+exp300          	 -999.000	 0.991  	  5.61 	 SUCCESS    	 Vol-Adaptive Fix + 0.45 Meta. Sharpe jumped to 0.99, DD fell to 5.6%. Elite quality, but likely under-trading.
+exp301          	 0.667   	 0.667  	  2.69 	 REVERT     	 exp338: Quantum Medallion Hybrid (Sizing 0.03-0.15 + 5-D RSI HMM)
+exp302          	 0.681   	 0.681  	  2.60 	 REVERT     	 exp339: Ratchet Trailing Stops (Lock-at-Entry 1.0x ATR + Non-Retreating Standard Trail)
+exp303          	 0.506   	 0.506  	  4.17 	 REVERT     	 exp340: Short-Side Symmetry + Funding Filter (Relaxed short gates by 0.02 + Contrarian funding < 0.03% abs)
+exp304          	 0.391   	 0.391  	  4.56 	 REVERT     	 exp341: Adaptive Vol-Stop Scaling (State 2: 2.5x ATR, State 1: 1.8x ATR)
+exp305          	 0.392   	 0.392  	  5.66 	 REVERT     	 exp342: Specialist Council Voting (15m/1h/4h confluence boost 1.25x)
+exp306          	 -2.108  	 -1.028 	 36.61 	 REVERT     	 exp344: Alpha Density Push (Loosened gates ~0.05, 1.5x ATR stops, TTP armed 3.0x ATR)
+exp307          	 0.437   	 0.437  	  3.95 	 REVERT     	 exp347: Precision Alpha + Vol-Spike Filter (Restore Gates, ATR 1.8x Skip, 1.5x Ratchet)
+exp308          	 -999.000	 0.461  	  2.06 	 REVERT     	 exp348: Macro-Regime Resonance (Longs only in S1, Shorts only in S2)
+exp309          	 0.238   	 0.238  	  3.73 	 REVERT     	 exp349: Soft Macro Resonance (0.5x size penalty for counter-trend trades)
+exp310          	 -999.000	 0.461  	  1.65 	 REVERT     	 Auto-research iteration
+exp311          	 -999.000	 0.461  	  1.65 	 REVERT     	 Auto-research iteration
+exp312          	 0.180   	 0.180  	  1.21 	 REVERT     	 apr08-vast4090 remote baseline
+exp313          	 0.180   	 0.180  	  1.21 	 REVERT     	 apr08-vast4090 restore state routing
+exp314          	 -999.000	 -0.525 	 24.91 	 REVERT     	 apr08-vast4090 restore exp269 logic v3
+exp315          	 -4.191  	 -2.950 	 39.83 	 REVERT     	 apr08-vast4090 zero macro fallback
+exp316          	 0.091   	 0.091  	  1.23 	 REVERT     	 apr08-vast4090 add XAU 1h anchor v3
+exp317          	 0.091   	 0.091  	  1.23 	 REVERT     	 apr08-vast4090 retrain 1h+hmm specialists
+exp318          	 -999.000	 0.000  	  0.00 	 REVERT     	 apr08-vast4090 activate macro+funding cache
+exp319          	 0.170   	 0.170  	  2.58 	 REVERT     	 apr08-vast4090 calibrated hmm semantics
+exp320          	 0.212   	 0.212  	  2.39 	 REVERT     	 apr08-vast4090 balanced retrain calibrated hmm
+exp321          	 -999.000	 -0.590 	  2.64 	 REVERT     	 apr08-vast4090 exp320 oos retest
+exp322          	 0.093   	 0.093  	  1.26 	 REVERT     	 apr08-vast4090 pretrain models live regime wiring
+exp323          	 -999.000	 -0.590 	  2.64 	 REVERT     	 apr08-vast4090 1h retrain old 4h oos
+exp324          	 -999.000	 -0.590 	  2.64 	 REVERT     	 apr08-vast4090 pretrain wiring oos
+exp325          	 -0.375  	 -0.375 	  7.73 	 REVERT     	 apr08-vast4090 1h core gate simplification
+exp326          	 -999.000	 0.036  	  1.44 	 REVERT     	 apr08-vast4090 1h core gate tightening
+exp327          	 -0.145  	 -0.145 	  3.74 	 REVERT     	 apr08-vast4090 1h budgeted allocator
+exp328          	 -0.158  	 -0.158 	  2.41 	 REVERT     	 apr08-vast4090 1h 15m timing filter
+exp329          	 -0.274  	 -0.274 	  4.23 	 REVERT     	 apr08-vast4090 restore 15m directional specialists
+exp330          	 -999.000	 -0.279 	  1.89 	 REVERT     	 apr08-vast4090 15m specialist confirmation
+exp331          	 -999.000	 -0.096 	  1.78 	 REVERT     	 apr08-vast4090 asymmetric short gate
+exp332          	 -999.000	 -0.096 	  1.78 	 REVERT     	 apr08-vast4090 long only diagnostic
+exp333          	 -999.000	 -0.519 	 21.87 	 REVERT     	 apr08-vast4090 exp269 architecture retest
+exp334          	 -999.000	 0.000  	  0.00 	 REVERT     	 apr08-vast4090 15m architecture probe
+exp335          	 0.045   	 0.045  	  4.20 	 REVERT     	 apr08-vast4090 15m long bias calibration
+exp336          	 0.242   	 0.242  	  5.84 	 REVERT     	 apr08-vast4090 15m long bias trim
+exp337          	 -999.000	 0.056  	  5.46 	 REVERT     	 apr08-vast4090 15m long bias trim v2
+exp338          	 -999.000	 0.470  	  2.85 	 REVERT     	 apr08-vast4090 15m flow recovery
+exp339          	 -999.000	 0.470  	  2.85 	 REVERT     	 apr08-vast4090 15m add-on unlock
+exp340          	 0.672   	 0.672  	  2.85 	 REVERT     	 apr08-vast4090 15m push unlock
+exp341          	 0.786   	 0.786  	  2.44 	 REVERT     	 apr08-vast4090 15m trend push reweight
+exp342          	 -999.000	 0.132  	  5.46 	 REVERT     	 apr08-vast4090 15m longer hold
+exp343          	 -999.000	 0.657  	  2.85 	 REVERT     	 apr08-vast4090 15m scalein clamp
+exp344          	 -999.000	 0.657  	  2.85 	 REVERT     	 apr08-vast4090 15m ranked entry allocator
+exp345          	 -999.000	 0.657  	  2.85 	 REVERT     	 apr08-vast4090 15m push priority allocator
+exp346          	 -999.000	 0.774  	  2.44 	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 control push_bias
+exp347          	 0.858   	 0.858  	  2.85 	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 push_relax control
+exp348          	 1.001   	 1.001  	  2.44 	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 push_relax push_bias
+exp349          	 -999.000	 1.029  	  2.45 	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 hybrid control
+exp350          	 -999.000	 1.143  	  2.25 	 REVERT     	 apr08-vast4090 15m campaign push_priority p4 hybrid push_bias
+exp351          	 -999.000	 0.657  	  2.85 	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 control control
+exp352          	 -999.000	 0.774  	  2.44 	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 control push_bias
+exp353          	 0.858   	 0.858  	  2.85 	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 push_relax control
+exp354          	 1.002   	 1.002  	  2.44 	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 push_relax push_bias
+exp355          	 -999.000	 1.029  	  2.45 	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 hybrid control
+exp356          	 -999.000	 1.143  	  2.25 	 REVERT     	 apr08-vast4090 15m campaign push_priority p3 hybrid push_bias
+exp357          	 -999.000	 0.657  	  2.85 	 REVERT     	 apr08-vast4090 15m campaign ranked p4 control control
+exp358          	 -999.000	 0.774  	  2.44 	 REVERT     	 apr08-vast4090 15m campaign ranked p4 control push_bias
+exp359          	 0.858   	 0.858  	  2.85 	 REVERT     	 apr08-vast4090 15m campaign ranked p4 push_relax control
+exp360          	 1.001   	 1.001  	  2.44 	 REVERT     	 apr08-vast4090 15m campaign ranked p4 push_relax push_bias
+exp361          	 0.613   	 0.613  	  5.08 	 CANDIDATE  	 apr08-vast4090 15m infra reset soft slow-tf ranking
+exp362          	 0.937   	 0.937  	  4.36 	 CANDIDATE  	 apr08-vast4090 15m soft slow-tf ranked p4 push_relax push_bias
+exp363          	 0.937   	 0.937  	  4.36 	 CANDIDATE  	 apr08-vast4090 15m soft slow-tf ranked p3 push_relax push_bias
+exp364          	 1.502   	 1.502  	  1.86 	 REVERT     	 Auto-research iteration
+exp365          	 1.502   	 1.502  	  1.86 	 REVERT     	 Auto-research iteration
+exp366          	 2.201   	 2.201  	  1.87 	 REVERT     	 Auto-research iteration
+exp367          	 1.562   	 1.562  	  1.85 	 REVERT     	 Auto-research iteration
+exp368          	 2.204   	 2.204  	  1.87 	 REVERT     	 Auto-research iteration
+exp369          	 2.204   	 2.204  	  1.87 	 REVERT     	 Auto-research iteration
+exp370          	 1.559   	 1.559  	  1.85 	 REVERT     	 Auto-research iteration
+exp371          	 2.005   	 2.005  	  1.87 	 REVERT     	 Auto-research iteration
+exp372          	 1.453   	 1.453  	  1.30 	 REVERT     	 Auto-research iteration
+exp373          	 2.110   	 2.110  	  1.87 	 REVERT     	 Auto-research iteration
+exp374          	 1.559   	 1.559  	  1.85 	 REVERT     	 Auto-research iteration
+exp375          	 1.559   	 1.559  	  1.85 	 REVERT     	 Auto-research iteration
+exp376          	 2.204   	 2.204  	  1.87 	 REVERT     	 Auto-research iteration
+exp377          	 2.174   	 2.174  	  2.49 	 REVERT     	 Auto-research iteration
+exp378          	 1.498   	 1.498  	  2.47 	 REVERT     	 Auto-research iteration
+exp379          	 1.425   	 1.425  	  1.20 	 REVERT     	 Auto-research iteration
+exp380          	 2.146   	 2.146  	  1.24 	 REVERT     	 Auto-research iteration
+exp381          	 -999.000	 1.515  	  1.12 	 REVERT     	 Auto-research iteration
+exp382          	 -999.000	 1.789  	  1.72 	 REVERT     	 Auto-research iteration
+exp383          	 1.594   	 1.594  	  1.20 	 REVERT     	 Auto-research iteration
+exp384          	 2.066   	 2.066  	  1.79 	 REVERT     	 Auto-research iteration
+exp385          	 1.713   	 1.713  	  1.48 	 REVERT     	 Auto-research iteration
+exp386          	 2.340   	 2.340  	  1.60 	 REVERT     	 Auto-research iteration
+exp387          	 1.678   	 1.678  	  1.57 	 REVERT     	 Auto-research iteration
+exp388          	 2.324   	 2.324  	  1.63 	 REVERT     	 Auto-research iteration
+exp389          	 1.742   	 1.742  	  1.39 	 REVERT     	 Auto-research iteration
+exp390          	 2.356   	 2.356  	  1.57 	 REVERT     	 Auto-research iteration
+exp391          	 1.785   	 1.785  	  1.29 	 REVERT     	 Auto-research iteration
+exp392          	 2.368   	 2.368  	  1.55 	 REVERT     	 Auto-research iteration
+exp393          	 1.830   	 1.830  	  1.20 	 REVERT     	 Auto-research iteration
+exp394          	 2.378   	 2.378  	  1.52 	 REVERT     	 Auto-research iteration
+exp395          	 1.874   	 1.874  	  1.11 	 REVERT     	 Auto-research iteration
+exp396          	 2.381   	 2.381  	  1.49 	 REVERT     	 Auto-research iteration
+exp397          	 1.959   	 1.959  	  0.93 	 REVERT     	 Auto-research iteration
+exp398          	 2.358   	 2.358  	  1.43 	 REVERT     	 Auto-research iteration
+exp399          	 1.785   	 1.785  	  1.29 	 REVERT     	 Auto-research iteration
+exp400          	 1.816   	 1.816  	  1.29 	 REVERT     	 Auto-research iteration
+exp401          	 2.399   	 2.399  	  1.55 	 REVERT     	 Auto-research iteration
+exp402          	 1.832   	 1.832  	  1.29 	 REVERT     	 Auto-research iteration
+exp403          	 2.403   	 2.403  	  1.55 	 REVERT     	 Auto-research iteration
+exp404          	 1.834   	 1.834  	  1.29 	 REVERT     	 Auto-research iteration
+exp405          	 2.398   	 2.398  	  1.55 	 REVERT     	 Auto-research iteration
+exp406          	 1.832   	 1.832  	  1.29 	 REVERT     	 Auto-research iteration
+exp407          	 -999.000	 1.813  	  1.29 	 REVERT     	 Auto-research iteration
+exp408          	 2.403   	 2.403  	  1.55 	 REVERT     	 Auto-research iteration
+exp409          	 2.403   	 2.403  	  1.55 	 REVERT     	 Auto-research iteration
+exp410          	 2.206   	 2.206  	  1.58 	 REVERT     	 Auto-research iteration
+exp411          	 1.832   	 1.832  	  1.29 	 REVERT     	 Auto-research iteration
+exp412          	 2.403   	 2.403  	  1.55 	 REVERT     	 Auto-research iteration
+exp413          	 1.666   	 1.666  	  1.61 	 REVERT     	 Auto-research iteration
+exp414          	 2.179   	 2.179  	  1.82 	 REVERT     	 Auto-research iteration
+exp415          	 -999.000	 1.798  	  1.29 	 REVERT     	 Auto-research iteration
+exp416          	 2.403   	 2.403  	  1.55 	 REVERT     	 Auto-research iteration
+exp417          	 -999.000	 2.037  	  1.18 	 REVERT     	 Auto-research iteration
+exp418          	 2.068   	 2.068  	  1.55 	 REVERT     	 Auto-research iteration
+exp419          	 1.832   	 1.832  	  1.29 	 REVERT     	 Auto-research iteration
+exp420          	 2.403   	 2.403  	  1.55 	 REVERT     	 Auto-research iteration
+exp421          	 2.206   	 2.206  	  1.58 	 REVERT     	 Auto-research iteration
+exp422          	 1.854   	 1.854  	  1.29 	 KEEP       	 HEAD c3bd7ae+dirty: activate short side with relaxed bear thresholds plus short_regime_ok brake; val Sharpe 1.854 PF 5.434, 2026q1 preserved at Sharpe 1.647
+exp423          	 1.855   	 1.855  	  1.36 	 KEEP       	 HEAD c3bd7ae+dirty: add bull/bear conviction arbitration so longs stand down when short conviction is clearly stronger; val Sharpe 1.855 ret 7.787 PF 5.434, 2026q1 Sharpe 1.648 ret 1.087, activity preserved at 1.01/day
+exp424          	 0.662   	 0.662  	  2.48 	 REVERT     	 HEAD c3bd7ae+dirty: recalibrate short thresholds to compressed meta_short_15m scale (m15_short > 0.06/0.05, short gate 0.32); val Sharpe 0.662 PF 1.608 DD 2.476 with 224 sideways short closes, so revert
+exp425          	 1.440   	 1.440  	  1.36 	 REVERT     	 HEAD c3bd7ae+dirty: conviction-gated short recalibration requiring prefer_short on calibrated short path; val Sharpe 1.440 PF 3.130 DD 1.359, only modest short participation gain for too much PF loss
+exp426          	 1.855   	 1.855  	  1.36 	 REVERT     	 HEAD c3bd7ae+dirty: additive bear-regime breakout short lane using shared market_regime family map; inert branch, matched exp423 on val Sharpe 1.855 PF 5.434 with no meaningful realized side-mix change
+exp427          	 1.808   	 1.808  	  1.88 	 REVERT     	 HEAD c3bd7ae+dirty: half-sized calibrated short lane using generic 15m meta instead of compressed short meta; val Sharpe 1.808 PF 3.865 DD 1.879, but 2026q1 regressed to Sharpe 1.421 PF 3.207 so revert
+exp428          	 1.401   	 1.401  	  1.28 	 REVERT     	 HEAD c3bd7ae+dirty: monotonic sqrt stretch on meta_short_15m to test compressed-short-meta hypothesis without rule changes; val Sharpe 1.401 PF 2.706 DD 1.279, created 106 sideways short closes so revert
+exp429          	 -999.000	 -3.625 	 84.33 	 REVERT     	 HEAD c3bd7ae+dirty: model-set experiment using exp429_shortmeta_weighted with only 15m meta_short retrained under balanced class weights; val Sharpe -3.625 PF 0.930 DD 84.333 with 13000 sideways short closes, so weighted raw probabilities are unusable without stronger calibration
+exp430          	 1.544   	 1.544  	  2.83 	 REVERT     	 HEAD c3bd7ae+dirty: cross-sectional top-of-bar short rank gate using current raw meta_short_15m to admit only strongest short candidate plus raw bear breakouts; val Sharpe 1.544 PF 2.970 DD 2.830 with 57 sideways short closes, so revert
+exp431          	 2.368   	 2.368  	  1.18 	 REVERT     	 HEAD c3bd7ae+dirty: revive hybrid calibrated short lane using generic 15m meta and add tactical short exits (faster decay, shorter hold, stricter add); val Sharpe 2.368 PF 4.449 DD 1.178, but 2026q1 regressed to Sharpe 1.368 PF 3.080 so revert
+exp432          	 2.211   	 2.211  	  1.18 	 REVERT     	 HEAD c3bd7ae+dirty: keep tactical short exits but gate extra calibrated short lane behind macro-bear only; val Sharpe 2.211 PF 4.290 DD 1.178, but 2026q1 still regressed to Sharpe 1.385 PF 3.114 so revert
+exp433          	 2.216   	 2.216  	  1.23 	 KEEP       	 HEAD c3bd7ae+dirty: keep tactical short exits but gate extra calibrated short lane behind shared bear regime family only; val Sharpe 2.216 PF 6.842 DD 1.231 with just 1 sideways short close, and 2026q1 improved to Sharpe 1.724 ret 1.140 DD 0.561 PF 4.967
+exp434          	 2.216   	 2.216  	  1.23 	 REVERT     	 HEAD 0080ed5+dirty: allow existing bear-regime tactical shorts to scale from half size to full size when bear regime and calibrated signal persist; inert branch, matched exp433 exactly on val so revert
+exp435          	 2.203   	 2.203  	  1.19 	 KEEP       	 HEAD 0080ed5+dirty: increase bear-regime calibrated short lane from 0.50x to 0.65x initial size while keeping exp433 selection and tactical exits; val Sharpe 2.203 PF 7.236 DD 1.193, 2026q1 Sharpe 1.746 ret 1.156 DD 0.549 PF 4.888
+exp436          	 2.167   	 2.167  	  1.15 	 REVERT     	 HEAD 0080ed5+dirty: raise bear-regime calibrated short lane to 0.80x initial size; val Sharpe 2.167 PF 7.618 DD 1.154 and 2026q1 Sharpe 1.767 ret 1.171 DD 0.564 PF 4.814, but lower validation score than exp435 so revert
+exp437          	 2.180   	 2.180  	  1.17 	 REVERT     	 HEAD 0080ed5+dirty: midpoint test at 0.75x initial bear-regime calibrated short size; val Sharpe 2.180 PF 7.492 DD 1.167 and 2026q1 Sharpe 1.760 ret 1.166 DD 0.559 PF 4.838, but still below exp435 on primary validation score so revert
+exp438          	 2.212   	 2.212  	  1.17 	 REVERT     	 HEAD 0080ed5+dirty: dynamic bear-calibrated short size using clamp(0.60,0.85,0.50 + bear_edge) so strongest bear spreads get more size; val Sharpe 2.212 PF 7.218 DD 1.166 but 2026q1 Sharpe 1.743 DD 0.552 PF 4.857, slightly behind exp435 so revert
+exp439          	 2.203   	 2.203  	  1.19 	 REVERT     	 HEAD 0080ed5+dirty: keep exp435 entry sizing but let raw_bear_fortress shorts use normal hold/decay instead of tactical short exits; inert branch, matched exp435 on val within noise so revert
+exp440          	 1.817   	 1.817  	  1.22 	 REVERT     	 HEAD 0080ed5+dirty: widen bear-regime calibrated short admission from m15>0.24 to m15>0.22 to catch more true-bear shorts; val Sharpe 1.817 PF 4.292 DD 1.223 with 18 bear shorts and 2 sideways shorts, so revert
+exp441          	 1.864   	 1.864  	  1.36 	 REVERT     	 HEAD 0080ed5+dirty: tighten bear-regime calibrated short admission from m15>0.24 to m15>0.26 to force only highest-confidence bear shorts; val Sharpe 1.864 PF 5.459 DD 1.359 with bear short book almost gone, so revert
+exp442          	 -999.000	 1.976  	  0.58 	 REVERT     	 HEAD 0080ed5+dirty: add mild sideways-long entry filter requiring clearer bull-over-bear edge before going long in chop; improved Sharpe/PF/DD but collapsed trades/day to 0.449, so revert
+exp443          	 2.226   	 2.226  	  0.99 	 KEEP       	 HEAD 0080ed5+dirty: keep exp435 bear-regime short lane and reduce sideways-regime long size to 85% instead of filtering entries; val Sharpe 2.226 PF 7.690 DD 0.989, and 2026q1 improved to Sharpe 1.797 DD 0.549 PF 5.152 while preserving trades/day
+exp444          	 2.234   	 2.234  	  0.85 	 KEEP       	 HEAD b49f99a+dirty: deepen sideways-regime long size reduction from 0.85x to 0.75x while leaving bear-regime short structure untouched; val Sharpe 2.234 PF 8.071 DD 0.853, and 2026q1 improved again to Sharpe 1.829 DD 0.549 PF 5.376
+exp445          	 2.233   	 2.233  	  0.72 	 KEEP       	 HEAD b49f99a+dirty: deepen sideways-regime long size reduction further to 0.65x; val Sharpe 2.233 PF 8.541 DD 0.718, and 2026q1 improved again to Sharpe 1.857 DD 0.549 PF 5.654
+exp446          	 2.222   	 2.222  	  0.58 	 KEEP       	 HEAD b49f99a+dirty: deepen sideways-regime long size reduction further to 0.55x; val Sharpe 2.222 PF 9.133 DD 0.582, and 2026q1 improved again to Sharpe 1.878 DD 0.549 PF 6.008 while preserving trades/day
+exp447          	 2.197   	 2.197  	  0.47 	 REVERT     	 HEAD 36e2989+dirty: deepen sideways-regime long size reduction further to 0.45x; val Sharpe 2.197 PF 9.906 DD 0.470 and 2026q1 Sharpe 1.887 ret 0.873 DD 0.549 PF 6.475, but primary validation score slipped below exp446 so revert
+exp448          	 2.163   	 2.163  	  0.56 	 REVERT     	 HEAD 36e2989+dirty: keep exp446 sideways-long reduction and raise bear-regime calibrated short lane from 0.65x to 0.75x; val Sharpe 2.163 PF 9.528 DD 0.564 and 2026q1 Sharpe 1.897 ret 0.935 DD 0.559 PF 5.888, but validation score still trailed exp446 so revert
+exp449          	 2.172   	 2.172  	  0.58 	 REVERT     	 HEAD 36e2989+dirty: keep exp446 short logic and halve long notional in bear-family bars to curb countertrend longs; val Sharpe 2.172 PF 9.566 DD 0.582 but 2026q1 fell to Sharpe 1.425 ret 0.637 DD 0.549 PF 4.668, so revert
+exp450          	 2.243   	 2.243  	  0.58 	 KEEP       	 HEAD 36e2989+dirty: keep exp446 sideways-long reduction and add a 1.10x long notional boost in bull-family bars; val Sharpe 2.243 PF 9.302 DD 0.582, while 2026q1 held flat at Sharpe 1.878 DD 0.549 PF 6.008
+exp451          	 2.252   	 2.252  	  0.58 	 KEEP       	 HEAD b62c16b+dirty: increase the bull-family long notional boost from 1.10x to 1.15x on top of exp450; val Sharpe 2.252 PF 9.386 DD 0.582, while 2026q1 again held flat at Sharpe 1.878 DD 0.549 PF 6.007
+exp452          	 2.261   	 2.261  	  0.58 	 KEEP       	 HEAD 36e025b+dirty: increase the bull-family long notional boost from 1.15x to 1.20x on top of exp451; val Sharpe 2.261 PF 9.470 DD 0.582, while 2026q1 again held flat at Sharpe 1.878 DD 0.549 PF 6.007
+exp453          	 2.270   	 2.270  	  0.58 	 KEEP       	 HEAD a1f3d6d+dirty: increase the bull-family long notional boost from 1.20x to 1.25x on top of exp452; val Sharpe 2.270 PF 9.555 DD 0.582, while 2026q1 again held flat at Sharpe 1.878 DD 0.549 PF 6.007
+exp454          	 2.259   	 2.259  	  0.51 	 KEEP       	 HEAD e31d6c7+dirty: keep exp453 bull-regime long boost at 1.25x but reduce sideways-regime long size from 0.55x to 0.50x; val Sharpe 2.259 PF 9.943 DD 0.514, and 2026q1 improved to Sharpe 1.884 win rate 53.06% PF 6.224 with trades/day still above 1.0, so keep for better OOS robustness
+exp455          	 2.220   	 2.220  	  0.52 	 REVERT     	 HEAD 31b50f2+dirty: add a 1.10x bear-regime short size multiplier on top of exp454; val Sharpe 2.220 PF 10.214 DD 0.521 and 2026q1 Sharpe 1.897 PF 6.134 DD 0.556, but validation score slipped and OOS quality was mixed, so revert
+exp456          	 2.240   	 2.240  	  0.51 	 REVERT     	 HEAD 31b50f2+dirty: shrink the bear-regime short size multiplier to 1.05x on top of exp454; val Sharpe 2.240 PF 10.079 DD 0.513 and 2026q1 Sharpe 1.891 PF 6.179 DD 0.552, but still only a mixed tradeoff versus exp454, so revert
+exp457          	 2.245   	 2.245  	  0.47 	 KEEP       	 HEAD 31b50f2+dirty: keep exp454 bull boost at 1.25x and reduce sideways-regime long size further from 0.50x to 0.45x; val Sharpe 2.245 PF 10.391 DD 0.470, and 2026q1 improved to Sharpe 1.887 PF 6.474 with trades/day still above 1.0, so keep for tighter sideways risk
+exp458          	 2.222   	 2.222  	  0.47 	 KEEP       	 HEAD 5bbc7c8+dirty: keep exp457 sizing and make sideways-regime long signal decay start one bar earlier; val Sharpe 2.222 PF 12.469 DD 0.470 with 61.52% win rate, and 2026q1 improved further to Sharpe 1.989 win rate 56.00% DD 0.549 while preserving trades/day, so keep for cleaner sideways exits
+exp459          	 2.144   	 2.144  	  0.57 	 REVERT     	 HEAD 9cbc185+dirty: keep exp458 earlier sideways decay and also shorten sideways-regime long max hold by one bar; val Sharpe 2.144 PF 8.639 DD 0.567 and 2026q1 Sharpe 1.989 PF 5.777 DD 0.549, but validation quality deteriorated too much versus exp458, so revert
+exp460          	 2.222   	 2.222  	  0.47 	 REVERT     	 HEAD b2a791b+dirty: disable long add-ons in sideways regime on top of exp458; inert branch, matched exp458 on validation and 2026q1, so revert
+exp461          	 2.222   	 2.222  	  0.47 	 REVERT     	 HEAD b2a791b+dirty: cut sideways bull_soft long entry size from 0.50x to 0.35x on top of exp458; inert branch, matched exp458 on validation and 2026q1, so revert
+exp462          	 2.222   	 2.222  	  0.47 	 REVERT     	 HEAD b2a791b+dirty: require a small extra bull-over-bear conviction edge for sideways bull_fortress entries on top of exp458; inert branch, matched exp458 on validation and 2026q1, so revert
+exp463          	 2.144   	 2.144  	  0.57 	 REVERT     	 HEAD b2a791b+dirty: keep exp458 sizing but make sideways long decay exit immediately when the bull edge fades relative to bear; val Sharpe 2.144 PF 8.639 DD 0.567 and 2026q1 Sharpe 1.989 PF 5.777 DD 0.549, matching the over-aggressive exp459 footprint, so revert
+exp464          	 -999.000	 2.204  	  0.44 	 REVERT     	 HEAD 131d4ca+dirty: reduce the active sideways bull_fortress long lane from 0.45x to 0.40x on top of exp458; val Sharpe 2.204 PF 13.015 DD 0.435, but trades/day slipped to 0.995 and tripped the harness floor, so revert
+exp465          	 2.213   	 2.213  	  0.45 	 REVERT     	 HEAD d4ebdbb+dirty: midpoint test at 0.425x sideways long size on top of exp458; val Sharpe 2.213 PF 12.732 DD 0.453 and 2026q1 Sharpe 1.983 PF 5.907 DD 0.549, but both validation and OOS Sharpe stayed below exp458 so revert
+exp467          	 2.222   	 2.222  	  0.47 	 REVERT     	 HEAD 5a6747a+dirty: slightly relax prefer_short only in bear regime by lowering the bear-only arbitration margin from 0.08 to 0.06 on top of exp458; inert branch, matched exp458 on validation and 2026q1, so revert
+exp468          	 2.147   	 2.147  	  0.47 	 REVERT     	 HEAD 5a6747a+dirty: lower the active bear_calibrated admission threshold from m15>0.24 to m15>0.23 on top of exp458; val Sharpe fell to 2.147 PF 9.432 and 2026q1 collapsed to Sharpe -0.453 PF 0.966 DD 1.693, so threshold-only short expansion is unsafe and revert
+exp466          	 2.222   	 2.222  	  0.47 	 REVERT     	 HEAD 5a6747a+dirty: make sideways long decay slightly stricter by raising the post-decay m15_long threshold from 0.40 to 0.45 on top of exp458; inert branch, matched exp458 on validation and 2026q1, so revert
+exp469          	 2.193   	 2.193  	  0.47 	 REVERT     	 HEAD 970ba55+dirty: exit sideways longs one bar before max-hold when second-bar follow-through is weak (m15_long<0.55 and bull_edge<0.05); val Sharpe 2.193 PF 11.729 DD 0.470 with trades/day 1.011, below exp458 so revert
+exp470          	 2.162   	 2.162  	  0.56 	 REVERT     	 HEAD 970ba55+dirty: shape sideways bull_fortress size by bull-edge strength (0.35x-0.55x instead of flat 0.45x); val Sharpe 2.162 PF 11.570 DD 0.565 with trades/day 1.000, below exp458 so revert
+exp471          	 2.232   	 2.232  	  0.47 	 REVERT     	 HEAD a4d0001+dirty: add structure-aware sideways bull_fortress sizing using liquidity_sweep, msb_status, fvg_detected, ema_200_dist, and dist_to_vwap with both upside and downside scaling; val Sharpe 2.232 PF 12.727 DD 0.473, but 2026q1 slipped to Sharpe 1.926 PF 5.557 DD 0.549 so revert
+exp472          	 2.224   	 2.224  	  0.47 	 KEEP       	 HEAD a4d0001+dirty: keep the new structure feature cache but only boost strong-structure sideways bull_fortress setups (+10% when structure_score>=2); val Sharpe 2.224 PF 12.422 DD 0.470, while 2026q1 held effectively flat at Sharpe 1.989 PF 5.778 DD 0.549
+exp473          	 2.225   	 2.225  	  0.47 	 REVERT     	 HEAD eb27532+dirty: raise the strong-structure sideways bull_fortress boost from +10% to +15%; val Sharpe 2.225 PF 12.398 DD 0.470 and 2026q1 stayed effectively flat at Sharpe 1.989 PF 5.778 DD 0.549, but the gain was immaterial and not worth extra complexity, so revert
+exp474          	 2.224   	 2.224  	  0.47 	 REVERT     	 HEAD 02514e9+dirty: add a +15% size reward for strong-structure bear_calibrated shorts in bear regimes; inert branch, matched exp472 on validation and 2026q1 so revert
+exp475          	 2.224   	 2.224  	  0.47 	 REVERT     	 HEAD 02514e9+dirty: relax the bear structure reward threshold and use a +10% boost for moderately aligned bear_calibrated shorts; still inert, matched exp472 on validation and 2026q1 so revert
+exp476          	 2.126   	 2.126  	  0.47 	 REVERT     	 HEAD 02514e9+dirty: keep exp472 sizing but let strong-structure sideways longs keep the normal decay age instead of the earlier exp458 sideways decay; val Sharpe fell to 2.126 PF 9.772 DD 0.470, so the extra edge is in sizing rather than patience and revert
+exp477          	 2.208   	 2.208  	  0.47 	 REVERT     	 HEAD 02514e9+dirty: apply a 15% size penalty to bull_fortress longs that still fire in bear regimes when local structure is strongly bearish; val Sharpe slipped to 2.208 PF 12.222 DD 0.470, so selective countertrend long shrinkage did not help and revert
+exp478          	 2.224   	 2.224  	  0.47 	 REVERT     	 HEAD 02514e9+dirty: lower the add_long threshold only for strong-structure sideways winners to try to wake the dead add-on lane; inert branch, matched exp472 on validation so revert
+exp479          	 2.224   	 2.224  	  0.47 	 REVERT     	 HEAD 02514e9+dirty: slightly relax bear_calibrated admission only when regime is bear, prefer_short already agrees, and bearish structure is very strong; inert branch, matched exp472 on validation so revert
+exp480          	 0.250   	 0.250  	  4.83 	 REVERT     	 HEAD 236371b: model-set exp480_short_platt with platt-calibrated short confidence; val Sharpe 0.250 PF 1.346 DD 4.833 with 42 bear shorts but 3331 sideways shorts, and 2026q1 collapsed to Sharpe -2.312 PF 0.574 DD 4.051, so revert
+exp481          	 -999.000	 -2.945 	 68.79 	 REVERT     	 HEAD 236371b: model-set exp481_short_rank using cross-sectional short rank as normalized confidence; val Sharpe -2.945 PF 1.069 DD 68.789 with 2173 sideways shorts, and 2026q1 remained broken at Sharpe -6.948 PF 0.850 DD 24.900, so revert
+exp482          	 -0.121  	 -0.121 	  4.83 	 REVERT     	 HEAD 236371b: model-set exp482_short_bear using bear-specific short meta model in bear regime; val Sharpe -0.121 PF 1.190 DD 4.833 with 3324 sideways shorts, and 2026q1 collapsed to Sharpe -2.280 PF 0.576 DD 4.010, so revert
+exp483          	 0.490   	 0.490  	  4.34 	 REVERT     	 HEAD 236371b+dirty: guarded-rank retry that caps normalized short conviction to raw short meta plus 0.08 in bear regimes; val Sharpe 0.490 PF 1.438 DD 4.339 but sideways shorts exploded to 9671 and 2026q1 collapsed to Sharpe -2.464 PF 0.554 DD 5.464, so revert
+exp484          	 -0.036  	 -0.036 	  4.83 	 REVERT     	 HEAD 236371b+dirty: guarded-platt retry with the same capped bear-only conviction lift; metrics matched the platt failure footprint at val Sharpe -0.036 PF 1.232 DD 4.825 and 2026q1 Sharpe -2.269 PF 0.566 DD 3.991, so revert
+exp485          	 1.001   	 1.001  	  4.06 	 REVERT     	 HEAD 236371b+dirty: model-set exp485_15m_context retraining only 15m models with price_context features under the raw exp472 shell; val Sharpe 1.001 PF 1.630 DD 4.056 and 2026q1 Sharpe 1.000 PF 1.561 DD 2.123, with 1294 sideways entry_bull_fortress opens in 2026q1 and runaway turnover, so revert
+exp486          	 2.224   	 2.224  	  0.47 	 REVERT     	 HEAD 236371b+dirty: model-set exp486_1h_context retraining only 1h models with price_context features under the raw exp472 shell; inert branch that reproduced control metrics at val Sharpe 2.224 PF 12.422 DD 0.470 and 2026q1 Sharpe 1.989 PF 5.778 DD 0.549, so revert
+exp487          	 2.224   	 2.224  	  0.47 	 REVERT     	 HEAD 236371b+dirty: model-set exp487_4h_context retraining only 4h models with price_context features under the raw exp472 shell; inert branch that again reproduced control metrics at val Sharpe 2.224 PF 12.422 DD 0.470 and 2026q1 Sharpe 1.989 PF 5.778 DD 0.549, so revert
+exp488          	 2.214   	 2.214  	  0.43 	 REVERT     	 HEAD 236371b+dirty: model-set exp488_short_meta_context retraining only meta_short_15m with price_context features under the raw exp472 shell; val Sharpe slipped to 2.214 PF 11.989 DD 0.428 while 2026q1 stayed flat at Sharpe 1.989 PF 5.778 DD 0.549, so revert
+exp489          	 -999.000	 2.040  	  0.45 	 REVERT     	 HEAD 236371b+dirty: model-set exp489_short_bear_context adds a context-trained bear-only short meta and runs in bear_model mode; val PF/DD improved to 8.562/0.447 but trades/day slipped to 0.989 and 2026q1 regressed to Sharpe 1.850 ret 0.838 DD 0.488, so revert
+exp490          	 -999.000	 2.040  	  0.45 	 REVERT     	 HEAD 236371b+dirty: bounded bear-model retry with 35% conviction blend, raw short decay, and 0.04 delta cap matched exp489 exactly at val Sharpe 2.040 PF 8.562 DD 0.447 and 2026q1 Sharpe 1.850 PF 6.737 DD 0.488, so the exp489 regression was not caused by short-decay use
+exp491          	 -999.000	 2.040  	  0.45 	 REVERT     	 HEAD 236371b+dirty: size-only bear-model overlay with raw conviction/decay plus 10% short bonus when the bear-only model beat raw short meta had no measurable effect and matched exp489 exactly on val and 2026q1, so revert
+exp492          	 2.238   	 2.238  	  0.46 	 KEEP       	 HEAD 236371b+dirty: move the 10% sideways bull_fortress size boost from structure_score>=2 to structure_score==1, based on lane diagnostics; val improved to Sharpe 2.238 PF 12.423 DD 0.456 with trades/day 1.011, while 2026q1 held effectively flat at Sharpe 1.989 PF 5.777 DD 0.549
+exp493          	 2.238   	 2.238  	  0.46 	 REVERT     	 HEAD c60c2df+dirty: keep exp492 structure_score==1 boost and add a 5% sideways bull_fortress size penalty for structure_score==2; PF ticked up but val Sharpe slipped fractionally to 2.238175 and 2026q1 softened to Sharpe 1.988590, so revert
+exp494          	 2.243   	 2.243  	  0.44 	 KEEP       	 CODE 7789997: keep exp492 structure routing and add a 5% sideways bull_fortress size penalty only for the weak 0.29-0.33 m15_long bucket; val improved to Sharpe 2.243 PF 12.744 DD 0.438 with trades/day 1.011, while 2026q1 stayed near-flat at Sharpe 1.983 PF 5.893 DD 0.549
+exp495          	 -999.000	 0.000  	  0.00 	 REVERT     	 HEAD 5799864+dirty: full 15m price-only relative-tail bear-short retrain with bear_model mode replaced the control trigger lane and produced zero trades on both val and 2026q1, so revert
+exp496          	 2.167   	 2.167  	  0.44 	 REVERT     	 HEAD 5799864+dirty: overlay only the new price-only relative-tail bear short artifact onto exp256_active via bear_overlay mode; 2026q1 stayed flat at Sharpe 1.983 PF 5.893 with 3 bear-family short closes, but val softened to Sharpe 2.167 PF 9.473 DD 0.438 with only 6 bear shorts, so revert
+exp497          	 2.234   	 2.234  	  0.44 	 REVERT     	 HEAD 5799864+dirty: retry the bear_overlay using a context-plus bear short artifact with event intensity, sentiment shock, and cross-asset stress features; 2026q1 again stayed flat at Sharpe 1.983 PF 5.893 while val reached Sharpe 2.234 PF 12.078 DD 0.438 with 10 bear shorts and just 1 sideways short, but it still trailed exp494 on primary validation quality, so revert
+exp498          	 2.237   	 2.237  	  0.44 	 REVERT     	 HEAD 424b1cb+dirty: keep the context-plus bear overlay but add a positive-only short-confidence rule via AUTOTRADER_BEAR_SHORT_NEGATIVE_SCALE=0.0; 2026q1 stayed pinned to control at Sharpe 1.983 PF 5.893 DD 0.549, and val improved to Sharpe 2.237 PF 12.101 DD 0.438 with 11 bear-family shorts and only 1 sideways short, but still trailed exp494 so revert
+exp499          	 2.238   	 2.238  	  0.44 	 REVERT     	 HEAD 424b1cb+dirty: keep the positive-only bear overlay and add a 10% short size bonus when the bear artifact beats raw short meta by 0.02; 2026q1 again matched control at Sharpe 1.983 PF 5.893 DD 0.549, while val ticked up to Sharpe 2.238 PF 12.107 DD 0.438, still below exp494 on primary validation quality
+exp500          	 2.238   	 2.238  	  0.44 	 REVERT     	 HEAD 424b1cb+dirty: keep the positive-only bear overlay and widen the 10% short size bonus to any positive bear-artifact lift (edge 0.00); 2026q1 stayed flat at Sharpe 1.983 PF 5.893 DD 0.549, but val only reached Sharpe 2.238 PF 11.947 DD 0.438, so the overlay-size axis remains a near miss and reverts
+exp501          	 -999.000	 0.000  	  0.00 	 NO_BACKTEST	 HEAD 424b1cb+dirty: trained a new context-plus bear artifact with relative_tail_core labels that drop event/sentiment gates from the label, but cache diagnostics stayed negative on both val and 2026q1 bear bars and removed raw bear entries, so skipped full backtest
+exp502          	 2.237   	 2.237  	  0.44 	 REVERT     	 HEAD 424b1cb+dirty: keep the positive-only bear overlay but return short decay to raw with AUTOTRADER_BEAR_SHORT_DECAY_BLEND=0.0; branch was inert versus exp498 at val Sharpe 2.237 PF 12.101 DD 0.438 and 2026q1 Sharpe 1.983 PF 5.893 DD 0.549, so revert
+exp503          	         	 1.649  	  1.649	 0.71       	 KEEP                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  	 CODE d476fe3: extend training window TRAIN_END 2022-06-30→2024-06-30 and add 3 orthogonal model features (range_position, vol_trend_8h, funding_roc_4h); retrained 1h XGB directional + meta on extended window; new val window 2024-07 to 2025-09 (clean break from 492-exp history); val Sharpe 1.649 PF 3.621 DD 0.712 trades/day 1.351 on new window, 2026q1 Sharpe 1.983 PF 5.893 DD 0.549 (+0.33 vs 1.65 pre-retrain baseline on truly unseen data); vol_trend_8h direct sizing signal tested and flat-curved REVERT — XGB already captures it internally
+v2exp1          	 15.364  	 18.203 	  4.07 	 CANDIDATE  	 HEAD 34c49ba: benchmarked V2 model-set v2_wave2_pair on full 8-symbol bundle_intraday_core replay; val improved versus v2_wave1_priceonly on daily Sharpe 12.583 vs 12.389, return 912.10% vs 738.19%, trades/day 13.27 vs 12.05, and top-sleeve concentration 37.68% vs 42.70%, while 2026q1 also improved on daily Sharpe 12.926 vs 12.867, return 27.80% vs 27.00%, trades/day 11.89 vs 11.45, and concentration 42.44% vs 43.60%; keep as the leading V2 breadth candidate, but not a V2 champion yet because concentration is still above the 30% target and the legacy bar-level composite score still trails the baseline
+v2exp2          	 14.379  	 18.332 	  4.89 	 CANDIDATE  	 HEAD fa21893: benchmarked V2 model-set v2_wave3_orth adding basis_dislocation, macro_beta_dispersion, macro_event_drift, and bear_stress_short on top of v2_wave2_pair; val daily Sharpe held effectively flat at 12.575 vs 12.583, but return improved to 1155.83% from 912.10%, trades/day rose to 15.60 from 13.27, short share rose to 26.61% from 23.32%, and top-sleeve concentration tightened to 33.06% from 37.68%; 2026q1 improved much more clearly, with daily Sharpe 15.034 vs 12.926, return 37.96% vs 27.80%, trades/day 17.15 vs 11.89, short share 32.96% vs 21.64%, and concentration 31.41% vs 42.44%; basis_dislocation became a real second pillar, so keep as the new leading V2 breadth candidate, but still not a full V2 champion until concentration gets under 30% and replay realism survives stress
+v2exp3          	 14.999  	 18.179 	  4.77 	 CANDIDATE  	 HEAD 7627b8e: fixed the V2 allocator so strategy-family clusters come from sleeve manifests instead of symbol market buckets, added sleeve/cluster override controls, and rebenchmarked v2_wave3_orth on full 8-symbol replay; val shifted into a more balanced book with daily Sharpe 11.629, return 976.09%, trades/day 15.14, short share 27.96%, and top-sleeve concentration 31.04% led by cross_asset_relative_strength rather than a mean-reversion lane, while 2026q1 improved further to daily Sharpe 14.796, return 36.27%, trades/day 16.82, short share 34.16%, and top-sleeve concentration 29.41%; this is the first V2 portfolio to clear the concentration bar on a full split, but it still misses the val target by roughly one point and needs the stress/policy follow-through before promotion
+v2exp4          	 15.031  	 18.833 	  4.77 	 CANDIDATE  	 HEAD be8dc02: benchmarked v2_wave4_carry on full 8-symbol replay after adding funding_carry and post_event_mean_reversion on top of the wave3 stack; val improved versus v2exp3 on return 1068.52% vs 976.09%, trades/day 15.78 vs 15.14, short share 31.10% vs 27.96%, and concentration 30.04% vs 31.04%, while daily Sharpe held near-flat at 11.581 vs 11.629; 2026q1 also improved on return 39.74% vs 36.27%, trades/day 18.73 vs 16.82, short share 30.19% vs 34.16%, and concentration 26.96% vs 29.41%, though daily Sharpe softened to 13.305 from 14.796; funding_carry proved to be the real new sleeve contributor while post_event_mean_reversion stayed tiny, so keep as the new leading V2 breadth candidate, but still not a full V2 champion because val concentration misses the 30% bar by a hair and replay realism/stress still need confirmation
+v2exp5          	 15.059  	 18.778 	  4.77 	 CANDIDATE  	 HEAD a14a62b: applied a tiny wave4 allocator trim with cross_asset_relative_strength weight 0.95 and sleeve cap 0.29 via v2_portfolio.wave4_trim_rs.json; this preserved the wave4 breadth while finally clearing the concentration bar on both full 8-symbol splits, with val at daily Sharpe 11.569, return 1042.89%, trades/day 15.93, short share 30.96%, and top-sleeve concentration 29.50%, and 2026q1 at daily Sharpe 13.395, return 40.05%, trades/day 18.85, short share 29.99%, and top-sleeve concentration 26.83%; this is the first V2 portfolio to satisfy the <=30% sleeve concentration target on both val and 2026q1, so keep as the new leading V2 benchmark candidate, with the remaining gate now being replay realism/stress rather than alpha concentration
+v2exp6          	 16.391  	 18.753 	  4.06 	 KEEP       	 HEAD d955a0e+dirty: added timestamp-indexed V2 replay plus a quality-focused wave4 policy in v2_portfolio.wave4_quality2.json with cross_asset_relative_strength weight 0.92/cap 0.27, sleeve min-confidence overrides (RS 0.60, snapback 0.61, sideways 0.61), and tighter Tier-B sizing (conf 0.60, notional 0.04); full 8-symbol base replay improved to val daily Sharpe 12.040 PF 4.465 return 854.95% trades/day 14.08 short share 30.58% concentration 29.15%, and 2026q1 daily Sharpe 14.099 PF 4.634 return 37.39% trades/day 15.93 short share 31.47% concentration 28.94%; matching stress policy in v2_portfolio.wave4_stress_quality2.json also passed on both full splits, with stress val daily Sharpe 10.987 PF 4.086 concentration 29.15% and stress 2026q1 daily Sharpe 12.605 PF 4.339 concentration 28.18%, so keep as the first stress-confirmed V2 benchmark candidate
+v2exp7          	 14.737  	 16.703 	  4.19 	 CANDIDATE  	 HEAD 6fe6f58+dirty: fixed the max-hold exit friction bug in execution/v2_paper.py so time-based closes now pay slippage and TAKER_FEE like signal-driven exits, then re-ran the quality2 wave4 benchmark; base replay still passed on both full splits with val daily Sharpe 11.039 PF 4.255 return 635.12% trades/day 14.37 concentration 28.96% and 2026q1 daily Sharpe 11.681 PF 4.278 return 28.84% trades/day 15.99 concentration 28.86%, but the corrected stress lens failed PF on both splits at val PF 3.607 concentration 30.00% and 2026q1 PF 3.561 concentration 27.57%, so downgrade the prior stress-confirmed claim to a candidate
+v2exp8          	 16.212  	 17.217 	  2.39 	 REVERT     	 HEAD 6fe6f58+dirty: tried a stricter friction-aware quality4 policy with heavier cross-asset trim, higher sleeve confidence floors, and tighter Tier-B sizing to recover the corrected stress audit; it succeeded on stressed full splits with val daily Sharpe 10.182 PF 4.652 concentration 29.77% and 2026q1 daily Sharpe 11.143 PF 4.431 concentration 29.98%, and base PF improved to 5.478 on val and 5.351 on 2026q1, but base concentration still missed the <=30% bar at 30.21% on val and 30.99% on 2026q1, so revert as a near-miss rather than a coherent new benchmark
+v2exp9          	 5.673   	 6.084  	  9.79 	 REVERT     	 HEAD edb8300: hardened V2 replay further by fixing millisecond max-hold timing, applying base-time funding drag in execution/v2_paper.py, and switching trade PF/win-rate accounting to net realized PnL including allocated entry fees and partial-reduction modifies; the old V2 benchmark story was materially inflated by the max-hold time bug. Re-ran the same v2_wave4_carry quality2 policy on full 8-symbol replay and it no longer qualifies as a replacement candidate: val fell to daily Sharpe 5.923 PF 1.983 return 473.50% trades/day 7.59 concentration 39.51%, while 2026q1 fell to daily Sharpe 3.589 PF 1.488 return 17.74% trades/day 8.69 concentration 35.93%; still directionally profitable, but concentration and PF both fail badly, so revert the benchmark claim and treat V2 as promising but not close to replacing exp503/exp494 yet
+v2exp10         	 5.729   	 6.105  	  9.79 	 CANDIDATE  	 HEAD 1ddb76f: ran corrected-engine sleeve ablations on the weak/support layer and converted the best simplified book into a named wave5 seed. Basis_dislocation proved irreplaceable (ablating it cratered 2026q1 to daily Sharpe 0.741 PF 1.066 and pushed concentration to 65.32%), cross_asset_relative_strength remained a real edge/diversifier despite concentration pressure, while funding_carry and trend_1h_directional were effectively dispensable after the realism fixes. The best combined prune drops funding_carry plus trend_1h_directional via v2_portfolio.wave5_seed_pruned.json: base full-split replay moved to val daily Sharpe 5.971 PF 1.987 return 477.66% trades/day 6.99 concentration 37.16%, and 2026q1 daily Sharpe 4.009 PF 1.486 return 17.98% trades/day 7.81 concentration 41.30%; matching stress seed in v2_portfolio.wave5_seed_pruned_stress.json held up directionally at val daily Sharpe 5.119 PF 1.864 concentration 39.23% and 2026q1 daily Sharpe 3.098 PF 1.513 concentration 35.47%. Still not close to benchmark quality, but worth keeping as the wave5 redesign seed instead of the full wave4 book
+v2exp11         	 13.300  	 13.300 	  3.86 	 CANDIDATE  	 HEAD ef21c3d+dirty: added opt-in stop-loss/take-profit handling to the V2 paper runtime and tested wave5_quality3, a stricter quality policy with stop loss enabled and 1.8R take-profit. This is the best corrected V2 research seed so far but still fails the strict production promotion gate. Full corrected base replay: val daily Sharpe 11.146 PF 2.921 win 60.66% trades/day 9.15 concentration 27.31%, and 2026q1 daily Sharpe 12.280 PF 2.774 win 60.84% trades/day 9.33 concentration 33.95%. Full corrected stress replay: val daily Sharpe 9.776 PF 2.795 win 60.10% trades/day 8.21 concentration 26.77%, and 2026q1 daily Sharpe 10.853 PF 2.792 win 59.94% trades/day 8.14 concentration 34.33%. Keep as research seed, not production candidate: PF remains below 4.0, Q1 concentration remains above 30%, and fresh replacement OOS is still missing
+v2exp12         	 5.290   	 5.290  	  3.30 	 REVERT     	 HEAD 64527bb+dirty: rejected wave5_quality4_stoponly probe, which kept the quality3 allocator/stop-loss setup but removed the 1.8R take-profit to let winners run. Bounded 120-day val collapsed versus quality3 to daily Sharpe 5.585 PF 1.595 win 48.48% trades/day 9.33 concentration 55.43%, while full 2026q1 also weakened to daily Sharpe 5.253 PF 1.558 win 50.00% trades/day 8.81 concentration 33.59%. Conclusion: current V2 sleeves need explicit profit-taking; stop-only exits are worse and should be discarded
+v2exp13         	 16.046  	 16.046 	  3.84 	 CANDIDATE  	 HEAD 64527bb+dirty: tested wave5_quality5_tp13 with stop-loss plus 1.3R take-profit. This substantially improved PF/win-rate versus quality3 but still failed the strict gate on val PF and concentration. Full base: val daily Sharpe 12.802 PF 3.602 win 66.83% trades/day 9.37 concentration 32.58%, 2026q1 daily Sharpe 13.833 PF 4.146 win 69.12% trades/day 9.61 concentration 31.45%. Stress: val PF 3.381 concentration 31.11%, 2026q1 PF 3.873 concentration 31.49%. Keep as payoff-map evidence, not active seed
+v2exp14         	 15.720  	 15.720 	  3.71 	 CANDIDATE  	 HEAD 64527bb+dirty: tested wave5_quality7_tp13_postmid, a gentler post_extension_snapback trim on the 1.3R setup. It mostly solved concentration but left PF below 4.0. Full base: val daily Sharpe 12.510 PF 3.565 win 66.80% concentration 27.69%, 2026q1 daily Sharpe 13.026 PF 3.975 win 67.97% concentration 28.14%. Stress: val PF 3.302 concentration 27.45%, 2026q1 PF 3.780 concentration 30.42%. Useful near-miss; not active
+v2exp15         	 16.200  	 16.200 	  3.51 	 CANDIDATE  	 HEAD 64527bb+dirty: tested wave5_quality8_tp12_postmid with 1.2R take-profit. This cleared concentration and Q1 PF but still missed val PF. Full base: val daily Sharpe 12.935 PF 3.729 win 68.64% concentration 29.46%, 2026q1 daily Sharpe 13.154 PF 4.108 win 69.75% concentration 28.92%. Stress: val PF 3.530 concentration 28.80%, 2026q1 PF 4.077 concentration 29.69%. Strong but inferior to the later 0.95R seed
+v2exp16         	 16.573  	 16.573 	  3.51 	 CANDIDATE  	 HEAD 64527bb+dirty: tested wave5_quality9_tp11_postmid with 1.1R take-profit. It nearly cleared replay gates but missed val PF and barely missed val concentration. Full base: val daily Sharpe 13.355 PF 3.941 win 70.54% concentration 30.09%, 2026q1 daily Sharpe 13.554 PF 4.225 win 71.43% concentration 29.47%. Stress: val PF 3.724 concentration 30.03%, 2026q1 PF 4.343 concentration 28.63%. Keep only as trail toward quality11
+v2exp17         	 16.853  	 16.853 	  3.52 	 CANDIDATE  	 HEAD 64527bb+dirty: tested wave5_quality10_tp10_postmid with 1.0R take-profit. PF cleared on base val/Q1 and stress Q1 but concentration missed by 0.2-0.6pp and stress-val PF missed by 0.06. Full base: val daily Sharpe 13.345 PF 4.076 win 72.43% concentration 30.27%, 2026q1 daily Sharpe 13.574 PF 4.362 win 72.88% concentration 30.61%. Stress: val PF 3.940 concentration 30.54%, 2026q1 PF 4.410 concentration 30.21%. Near pass; superseded by quality11
+v2exp18         	 16.790  	 16.790 	  3.52 	 KEEP       	 HEAD 64527bb+dirty: first corrected V2 replay-gate pass candidate, wave5_quality11_tp095_postmicro. Added a tiny post_extension_snapback trim on top of 0.95R take-profit. Strict promotion gate now fails only on missing fresh OOS, not replay metrics. Full base: val daily Sharpe 13.160 PF 4.099 win 73.40% trades/day 9.61 concentration 29.37%, 2026q1 daily Sharpe 13.719 PF 4.617 win 74.02% trades/day 9.73 concentration 29.02%. Full stress: val daily Sharpe 12.294 PF 4.025 win 73.40% trades/day 8.45 concentration 29.24%, 2026q1 daily Sharpe 12.443 PF 4.578 win 72.90% trades/day 8.30 concentration 29.67%. KEEP as replay-gate seed only; not production-ready until fresh OOS and shadow validation pass
+v2exp19         	 9.997   	 8.074  	  1.34 	 CANDIDATE  	 HEAD 4fb2fea+dirty: set up a never-used new-asset OOS lane, newasset_oos2y from 2024-04-01 to 2026-03-31, and tested wave5_quality11_tp095_postmicro on LTC/BCH only. Base fresh OOS: bar Sharpe 9.997, daily Sharpe 8.074, daily Sortino 9.645, PF 5.358, win 75.06%, return 61.44%, trades/day 1.65, DD 1.34%, concentration 30.34%. Stress fresh OOS with the stress config: bar Sharpe 8.826, daily Sharpe 7.208, daily Sortino 8.792, PF 4.748, win 73.77%, return 49.68%, trades/day 1.51, DD 1.35%, concentration 29.46%. This is encouraging clean cross-sectional OOS evidence, but not a promotion pass yet because the base concentration misses by 0.34pp and the basket has only 2 never-used assets; expand to 6-8 new symbols before treating this as a real fresh-OOS gate

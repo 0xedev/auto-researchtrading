@@ -93,10 +93,11 @@ def main() -> None:
     parser.add_argument("--model-set", required=True)
     parser.add_argument("--portfolio-config", required=True)
     parser.add_argument("--stress-portfolio-config", default=None)
-    parser.add_argument("--val-split", default="val", choices=["val", "2026q1", "holdout"])
-    parser.add_argument("--oos-split", default="2026q1", choices=["val", "2026q1", "holdout"])
+    parser.add_argument("--val-split", default="val", choices=["val", "2026q1", "holdout", "newasset_oos2y"])
+    parser.add_argument("--oos-split", default="2026q1", choices=["val", "2026q1", "holdout", "newasset_oos2y"])
     parser.add_argument("--fresh-oos-label", default="")
     parser.add_argument("--sleeve", action="append", default=[], help="Repeat to restrict active sleeves.")
+    parser.add_argument("--symbol", action="append", default=[], help="Repeat to restrict the symbol universe.")
     parser.add_argument("--max-days", type=int, default=None)
     parser.add_argument("--max-symbols", type=int, default=None)
     parser.add_argument("--output", default=None, help="Optional JSON report path.")
@@ -137,6 +138,7 @@ def main() -> None:
             active_sleeves=active_sleeves,
             max_days=args.max_days,
             max_symbols=args.max_symbols,
+            symbols=args.symbol or None,
         )
         stress_runs[split] = run_v2_backtest(
             bundle_name=args.bundle,
@@ -146,6 +148,7 @@ def main() -> None:
             active_sleeves=active_sleeves,
             max_days=args.max_days,
             max_symbols=args.max_symbols,
+            symbols=args.symbol or None,
         )
 
     report = build_promotion_report(

@@ -23,7 +23,8 @@ This is the checklist that must be green before V2 can be considered production-
 - [x] V2 clears PF target on corrected stress replay for the current replay-gate seed.
 - [x] V2 clears win-rate or equivalent payoff-quality target after fees, slippage, funding, and partial reductions for the current replay-gate seed.
 - [ ] V2 beats the legacy line on an apples-to-apples replacement standard.
-- [ ] V2 survives a fresh OOS split that was not consumed during wave selection.
+- [x] A first never-used new-asset OOS lane exists for V2 validation.
+- [ ] V2 survives an expanded fresh OOS split that was not consumed during wave selection.
 - [ ] Final holdout remains untouched until explicit final sign-off.
 
 ### B. Replay And Backtest Realism
@@ -61,7 +62,8 @@ This is the checklist that must be green before V2 can be considered production-
 - [x] V2 has `18` manifests live in code: `15` experimental sleeves plus `3` legacy foundation sleeves.
 - [x] External context and funding/context features are available in the pipeline.
 - [ ] Current V2 model waves have consumed `val` and `2026q1`; they are no longer pristine OOS for V2.
-- [ ] Need a fresh clean OOS slice or forward paper period for V2 promotion.
+- [x] A clean new-asset OOS split has been added as `newasset_oos2y`.
+- [ ] Need a broader fresh clean OOS basket or forward paper period for V2 promotion.
 - [ ] Need scheduled champion/challenger retraining instead of ad hoc wave selection.
 - [ ] Need feature/sleeve drift diagnostics before paper-live promotion.
 - [ ] Need stronger short-side sleeve breadth; current short sleeves are still too thin.
@@ -103,10 +105,18 @@ This is the checklist that must be green before V2 can be considered production-
 ### Next Production Milestone
 The next meaningful milestone is **not live trading**. It is a fresh-OOS / forward-paper validation pass for the current replay-gate seed:
 - freeze `wave5_quality11_tp095_postmicro` as the replay-gate seed
-- designate a clean replacement OOS or forward paper period
+- expand the clean replacement OOS beyond the first LTC/BCH smoke basket
 - rerun the strict promotion gate with a non-empty fresh-OOS label only after that period exists
 - run multi-day paper shadow with restart and kill-switch proof
 - keep the final untouched holdout locked until explicit final sign-off
+
+Fresh OOS lane added:
+- `newasset_oos2y` covers `2024-04-01` to `2026-03-31`
+- the first smoke basket uses `LTC` and `BCH`, which are not part of the V2 training universe
+- base replay on `wave5_quality11_tp095_postmicro` produced daily Sharpe `8.07`, Sortino `9.65`, PF `5.36`, trades/day `1.65`, DD `1.34%`, concentration `30.34%`
+- stress replay produced daily Sharpe `7.21`, Sortino `8.79`, PF `4.75`, trades/day `1.51`, DD `1.35%`, concentration `29.46%`
+- a 5-day symbol-scoped shadow smoke also ran successfully and wrote [tmp/v2_shadow_newasset_oos_dashboard.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/tmp/v2_shadow_newasset_oos_dashboard.md)
+- status: encouraging cross-sectional OOS evidence, but **not a promotion pass** because the basket is only two assets and base concentration misses by `0.34pp`
 
 ## Current Research State
 What is already true:
