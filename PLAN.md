@@ -1,8 +1,115 @@
 # V2 Renaissance-Style Multi-Alpha Platform
 
 ## Current Stage
-As of `2026-04-23`, this plan is in the **reality-check and V2 rebuild stage**.
+As of `2026-04-24`, this plan is in the **reality-check and V2 rebuild stage**.
 
+Production readiness rating:
+- **Current production readiness:** `3/10`
+- **Research platform maturity:** `5-7/10`, depending on whether we mean infrastructure or validated alpha
+- **Reason:** the system now has serious research and replay infrastructure, but the latest corrected V2 candidate still fails production gates on PF, concentration, win rate, clean OOS discipline, and live-shadow proof.
+
+## Production Checklist
+This is the checklist that must be green before V2 can be considered production-ready. The current goal is **paper-production readiness first**, not real-capital autonomy.
+
+### A. Strategy Quality
+- [x] Legacy benchmark exists and is tracked in `results.tsv`.
+- [x] V2 multi-sleeve framework exists beside the legacy control.
+- [x] V2 has multiple candidate sleeves, not only one dominant strategy idea.
+- [x] V2 remains directionally profitable after replay hardening.
+- [x] Corrected ablations identify which sleeves are real pillars versus weak support.
+- [ ] V2 has `5-8` genuinely live-quality independent sleeves.
+- [ ] No sleeve contributes more than `30%` of PnL on full corrected `val` and full corrected `2026q1`.
+- [ ] V2 clears PF target on corrected base replay.
+- [ ] V2 clears PF target on corrected stress replay.
+- [ ] V2 clears win-rate or equivalent payoff-quality target after fees, slippage, funding, and partial reductions.
+- [ ] V2 beats the legacy line on an apples-to-apples replacement standard.
+- [ ] V2 survives a fresh OOS split that was not consumed during wave selection.
+- [ ] Final holdout remains untouched until explicit final sign-off.
+
+### B. Replay And Backtest Realism
+- [x] V2 has full-period benchmark replay via `v2_backtest.py`.
+- [x] V2 uses daily Sharpe and daily Sortino as credibility checks.
+- [x] V2 no longer relies only on short probe windows.
+- [x] V2 max-hold exits now use real millisecond-aware clock timing.
+- [x] V2 max-hold exits now pay slippage and taker fees.
+- [x] V2 applies base-time funding drag in replay.
+- [x] V2 PF and win-rate now use net realized PnL including allocated entry fees and partial reductions.
+- [x] V2 replay uses timestamp-indexed lookups instead of repeated per-bar DataFrame filtering.
+- [ ] V2 has nonlinear market-impact modeling, not only fixed bps slippage plus participation rejection.
+- [ ] V2 has borrow/short financing assumptions beyond funding-rate cashflows.
+- [ ] V2 reports bar Sharpe, daily Sharpe, Sortino, PF, win rate, DD, turnover, trade density, and concentration in a consistent results schema.
+- [ ] V2 results columns in `results.tsv` are clearly separated from legacy columns where metrics are not directly comparable.
+- [ ] V2 stress tests cover multiple fee/slippage/participation regimes, not one harsh config.
+
+### C. Portfolio Construction
+- [x] Portfolio allocator exists and consumes standardized V2 sleeve signals.
+- [x] Allocator supports sleeve caps, cluster caps, symbol caps, gross/net exposure limits, tier sizing, and short-share pressure.
+- [x] Strategy-family clustering was fixed to use sleeve manifests instead of symbol market buckets.
+- [x] Corrected ablations identified `basis_dislocation`, `cross_asset_relative_strength`, and `post_extension_snapback` as the current core sleeve family.
+- [x] Weak corrected sleeves `funding_carry` and `trend_1h_directional` were pruned into the wave5 seed.
+- [ ] Current wave5 seed still fails concentration target.
+- [ ] Current wave5 seed still fails PF target.
+- [ ] Mean-reversion sleeves need redesigned hold/exit behavior under real clock timing.
+- [ ] Cross-asset and basis sleeves need concentration controls that do not collapse return.
+- [ ] Carry sleeves need to be rebuilt under actual funding drag before they can re-enter the book.
+- [ ] Portfolio promotion requires sleeve ablation, pairwise ablation, and cluster-level ablation.
+
+### D. Data And Modeling
+- [x] The old `15m` train split mismatch was fixed before V2 sleeve work continued.
+- [x] Role-based `fast/base/slow` bundle architecture exists.
+- [x] Clock-time features exist for V2.
+- [x] V2 has `18` manifests live in code: `15` experimental sleeves plus `3` legacy foundation sleeves.
+- [x] External context and funding/context features are available in the pipeline.
+- [ ] Current V2 model waves have consumed `val` and `2026q1`; they are no longer pristine OOS for V2.
+- [ ] Need a fresh clean OOS slice or forward paper period for V2 promotion.
+- [ ] Need scheduled champion/challenger retraining instead of ad hoc wave selection.
+- [ ] Need feature/sleeve drift diagnostics before paper-live promotion.
+- [ ] Need stronger short-side sleeve breadth; current short sleeves are still too thin.
+- [ ] Need a second bundle proof, especially `fast=1h, base=4h, slow=1d`, before claiming timeframe portability.
+
+### E. Shadow Execution And Operations
+- [x] Shadow runtime exists for V2.
+- [x] Shadow state is restart-safe.
+- [x] Operator dashboard and JSON summaries exist.
+- [x] Kill-switch handling exists.
+- [x] Logs include sleeve, bundle, cluster, rationale, fees, realized PnL, and portfolio context.
+- [ ] Need a multi-day continuous shadow run for the current corrected seed.
+- [ ] Need restart/reconciliation proof on the current corrected seed, not only earlier smoke runs.
+- [ ] Need kill-switch, stale-data, duplicate-order, and orphan-position validation in realistic shadow sessions.
+- [ ] Need alert thresholds for PF deterioration, sleeve concentration drift, funding drag, and rejection spikes.
+- [ ] Need daily operator report comparing expected replay behavior versus paper-shadow behavior.
+- [ ] Need explicit real-capital ban until shadow gates are passed.
+
+### F. Governance And Promotion
+- [x] `results.tsv` tracks legacy and V2 experiment history.
+- [x] Historical overstated V2 rows were preserved rather than rewritten.
+- [x] Corrected follow-up rows `v2exp9` and `v2exp10` document the realism downgrade.
+- [x] `PLAN.md` now treats V2 as a rebuild candidate, not a production candidate.
+- [ ] Promotion gates must be written as code, not only prose.
+- [ ] V2 experiment rows need a richer schema or sidecar JSON so daily Sharpe, PF, concentration, stress metrics, active sleeves, and config path are machine-readable.
+- [ ] Need a formal rule for when `2026q1` is considered consumed and which split replaces it.
+- [ ] Need a champion registry for portfolio-level candidates, not only sleeve-level candidates.
+- [ ] Need a retirement policy for weak sleeves and stale artifacts.
+
+### Done Right
+- We did **not** bury the replay bugs. The max-hold timing issue, max-hold friction issue, funding omission, and fee-blind PF accounting were fixed and then rebenchmarked.
+- We preserved historical V2 rows in `results.tsv` and added corrected follow-up rows instead of rewriting the past.
+- We moved from hypey Sharpe readings to a stricter view using daily metrics, net trade accounting, funding drag, and full-period replay.
+- We found that V2 still has real directional edge after correction, but we downgraded the production claim when PF and concentration failed.
+- We turned ablation findings into named seed configs rather than leaving them as vague notes:
+  - [v2_portfolio.wave5_seed_pruned.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave5_seed_pruned.json)
+  - [v2_portfolio.wave5_seed_pruned_stress.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave5_seed_pruned_stress.json)
+
+### Next Production Milestone
+The next meaningful milestone is **not live trading**. It is a corrected V2 paper candidate that clears:
+- full `val` and full replacement OOS daily Sharpe target
+- PF target after net fees, slippage, funding, and partial reductions
+- concentration `<=30%`
+- stress replay under multiple friction profiles
+- multi-day paper-shadow run with restart and kill-switch proof
+- no untouched holdout usage before explicit final sign-off
+
+## Current Research State
 What is already true:
 - the parallel V2 platform exists beside the frozen `exp494` control
 - role-based `fast/base/slow` bundles are implemented
