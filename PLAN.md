@@ -42,6 +42,11 @@ Latest V2 read worth tracking:
   - the V2 edge is probably real
   - the old Sharpe/PF story was materially overstated
   - V2 is back to “promising prototype” rather than “near-replacement benchmark”
+  - the corrected ablation read is now clearer too:
+    - `basis_dislocation` is non-negotiable
+    - `cross_asset_relative_strength` is still a real edge sleeve even though it drives concentration
+    - `funding_carry` and `trend_1h_directional` are weak enough to prune from the next seed
+    - `post_extension_snapback` and `sideways_mean_reversion` still carry edge, but are the main redesign targets for hold/exit logic rather than obvious sleeves to delete
 
 Current leading V2 candidate:
 - there is no trustworthy promotion-ready V2 benchmark candidate right now
@@ -50,9 +55,20 @@ Current leading V2 candidate:
     - PF
     - concentration
     - win rate
+- the current best **wave5 seed** is now:
+  - [v2_portfolio.wave5_seed_pruned.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave5_seed_pruned.json)
+  - this drops `funding_carry` and `trend_1h_directional` from the full wave4 book
+  - full corrected base replay:
+    - `val`: legacy score `5.73`, daily Sharpe `5.97`, PF `1.99`, return `477.66%`, trades/day `6.99`, concentration `37.16%`
+    - `2026q1`: legacy score `3.77`, daily Sharpe `4.01`, PF `1.49`, return `17.98%`, trades/day `7.81`, concentration `41.30%`
+  - matching stress seed:
+    - [v2_portfolio.wave5_seed_pruned_stress.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave5_seed_pruned_stress.json)
+    - `val`: daily Sharpe `5.12`, PF `1.86`, concentration `39.23%`
+    - `2026q1`: daily Sharpe `3.10`, PF `1.51`, concentration `35.47%`
 - interpretation:
   - `basis_dislocation`, `cross_asset_relative_strength`, and `post_extension_snapback` still look like the main real sleeves
   - `funding_carry` is no longer strong enough to save the book once funding is actually charged
+  - the legacy directional foundation sleeve is now mostly ballast / narrative, not a material alpha contributor
   - V2 now needs another true research wave, not just another promotion pass
 
 Useful research note:
@@ -64,10 +80,11 @@ Useful research note:
 Immediate next focus:
 - redesign around the corrected reality instead of trying to rescue the old wave4 policy by tiny allocator nudges
 - specifically:
+  - start from the new wave5 pruned seed instead of the full wave4 book
   - inspect why max-hold-corrected sleeves are still profitable in aggregate but now over-concentrated and low-PF
   - reduce dependence on `cross_asset_relative_strength`, `basis_dislocation`, and `post_extension_snapback`
   - retune hold horizons and sleeve exit behavior now that max-hold uses the real clock
-  - rebuild stress-aware carry sleeves with actual funding charged
+  - rebuild stress-aware carry sleeves with actual funding charged if carry is to remain in V2 at all
 - run a longer paper-shadow validation pass only after a single policy clears corrected base and corrected stress bars again
 - compare any rebuilt V2 candidate against the legacy control on explicit replacement criteria, not just standalone V2 strength
 - keep using the stricter V2 benchmark audit in `v2_evaluate.py`:
