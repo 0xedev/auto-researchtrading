@@ -4,9 +4,9 @@
 As of `2026-04-24`, this plan is in the **reality-check and V2 rebuild stage**.
 
 Production readiness rating:
-- **Current production readiness:** `3/10`
-- **Research platform maturity:** `5-7/10`, depending on whether we mean infrastructure or validated alpha
-- **Reason:** the system now has serious research and replay infrastructure, but the latest corrected V2 candidate still fails production gates on PF, concentration, win rate, clean OOS discipline, and live-shadow proof.
+- **Current production readiness:** `4/10`
+- **Research platform maturity:** `7/10`, but validated deployability is lower
+- **Reason:** the current corrected V2 replay-gate seed clears base/stress replay gates on `val` and `2026q1`, but those splits have been consumed by research. Fresh OOS / forward paper validation and multi-day shadow proof are now the main blockers.
 
 ## Production Checklist
 This is the checklist that must be green before V2 can be considered production-ready. The current goal is **paper-production readiness first**, not real-capital autonomy.
@@ -18,10 +18,10 @@ This is the checklist that must be green before V2 can be considered production-
 - [x] V2 remains directionally profitable after replay hardening.
 - [x] Corrected ablations identify which sleeves are real pillars versus weak support.
 - [ ] V2 has `5-8` genuinely live-quality independent sleeves.
-- [ ] No sleeve contributes more than `30%` of PnL on full corrected `val` and full corrected `2026q1`.
-- [ ] V2 clears PF target on corrected base replay.
-- [ ] V2 clears PF target on corrected stress replay.
-- [ ] V2 clears win-rate or equivalent payoff-quality target after fees, slippage, funding, and partial reductions.
+- [x] No sleeve contributes more than `30%` of PnL on full corrected `val` and full corrected `2026q1` for the current replay-gate seed.
+- [x] V2 clears PF target on corrected base replay for the current replay-gate seed.
+- [x] V2 clears PF target on corrected stress replay for the current replay-gate seed.
+- [x] V2 clears win-rate or equivalent payoff-quality target after fees, slippage, funding, and partial reductions for the current replay-gate seed.
 - [ ] V2 beats the legacy line on an apples-to-apples replacement standard.
 - [ ] V2 survives a fresh OOS split that was not consumed during wave selection.
 - [ ] Final holdout remains untouched until explicit final sign-off.
@@ -47,8 +47,8 @@ This is the checklist that must be green before V2 can be considered production-
 - [x] Strategy-family clustering was fixed to use sleeve manifests instead of symbol market buckets.
 - [x] Corrected ablations identified `basis_dislocation`, `cross_asset_relative_strength`, and `post_extension_snapback` as the current core sleeve family.
 - [x] Weak corrected sleeves `funding_carry` and `trend_1h_directional` were pruned into the wave5 seed.
-- [ ] Current wave5 seed still fails concentration target.
-- [ ] Current wave5 seed still fails PF target.
+- [x] Current replay-gate seed clears concentration target on corrected `val` and `2026q1`.
+- [x] Current replay-gate seed clears PF target on corrected base and stress replay.
 - [ ] Mean-reversion sleeves need redesigned hold/exit behavior under real clock timing.
 - [ ] Cross-asset and basis sleeves need concentration controls that do not collapse return.
 - [ ] Carry sleeves need to be rebuilt under actual funding drag before they can re-enter the book.
@@ -101,13 +101,12 @@ This is the checklist that must be green before V2 can be considered production-
   - [v2_portfolio.wave5_seed_pruned_stress.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave5_seed_pruned_stress.json)
 
 ### Next Production Milestone
-The next meaningful milestone is **not live trading**. It is a corrected V2 paper candidate that clears:
-- full `val` and full replacement OOS daily Sharpe target
-- PF target after net fees, slippage, funding, and partial reductions
-- concentration `<=30%`
-- stress replay under multiple friction profiles
-- multi-day paper-shadow run with restart and kill-switch proof
-- no untouched holdout usage before explicit final sign-off
+The next meaningful milestone is **not live trading**. It is a fresh-OOS / forward-paper validation pass for the current replay-gate seed:
+- freeze `wave5_quality11_tp095_postmicro` as the replay-gate seed
+- designate a clean replacement OOS or forward paper period
+- rerun the strict promotion gate with a non-empty fresh-OOS label only after that period exists
+- run multi-day paper shadow with restart and kill-switch proof
+- keep the final untouched holdout locked until explicit final sign-off
 
 ## Current Research State
 What is already true:
@@ -126,7 +125,7 @@ What is already true:
 
 What is not true yet:
 - we do **not** have `5-8` live-quality independent sleeves
-- the latest fully corrected V2 benchmark candidate no longer satisfies the `<=30%` sleeve concentration target, and it also fails the PF gate badly
+- the latest fully corrected V2 replay-gate seed clears corrected replay metrics, but it is not clean OOS because `val` and `2026q1` were used during the research loop
 - V2 still does not use the legacy `backtest.py` engine, but it now has its own benchmark-style replay/backtest path
 - most historical V2 reads were still probe or rolling-window evaluations, so the new full-period backtest path now needs to become part of the normal research loop
 
@@ -193,7 +192,7 @@ Current leading V2 candidate:
   - this adds opt-in stop-loss / take-profit exits to the stricter wave5 quality policy
   - formal gate report:
     - [tmp/v2_promotion_wave5_quality3.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/tmp/v2_promotion_wave5_quality3.json)
-    - gate status: **FAIL**, but it is the best corrected research seed so far
+  - gate status: **FAIL**, superseded by `quality11`
   - full corrected base replay:
     - `val`: daily Sharpe `11.15`, PF `2.92`, win rate `60.66%`, trades/day `9.15`, concentration `27.31%`
     - `2026q1`: daily Sharpe `12.28`, PF `2.77`, win rate `60.84%`, trades/day `9.33`, concentration `33.95%`
@@ -204,6 +203,22 @@ Current leading V2 candidate:
     - enforcing the existing `stop_distance` signal was a real improvement
     - the remaining blocker is now mostly Q1 concentration plus PF still below `4.0`
     - the next branch should tune payoff exits and reduce `basis_dislocation` / `post_extension_snapback` Q1 dominance without killing the new win-rate improvement
+- current replay-gate seed:
+  - [v2_portfolio.wave5_quality11_tp095_postmicro.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave5_quality11_tp095_postmicro.json)
+  - [v2_portfolio.wave5_quality11_tp095_postmicro_stress.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave5_quality11_tp095_postmicro_stress.json)
+  - formal gate report:
+    - [tmp/v2_promotion_wave5_quality11_tp095_postmicro.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/tmp/v2_promotion_wave5_quality11_tp095_postmicro.json)
+    - gate status: **FAIL only because fresh OOS is missing**
+  - full corrected base replay:
+    - `val`: daily Sharpe `13.16`, PF `4.10`, win rate `73.40%`, trades/day `9.61`, concentration `29.37%`
+    - `2026q1`: daily Sharpe `13.72`, PF `4.62`, win rate `74.02%`, trades/day `9.73`, concentration `29.02%`
+  - full corrected stress replay:
+    - `val`: daily Sharpe `12.29`, PF `4.03`, win rate `73.40%`, trades/day `8.45`, concentration `29.24%`
+    - `2026q1`: daily Sharpe `12.44`, PF `4.58`, win rate `72.90%`, trades/day `8.30`, concentration `29.67%`
+  - conclusion:
+    - this is the first corrected V2 seed to clear replay PF, win-rate, drawdown, density, and concentration gates on base and stress `val` / `2026q1`
+    - it is **not production-ready** because the research loop used `val` and `2026q1`; fresh replacement OOS / forward paper validation is now mandatory
+    - next production step is fresh-OOS designation plus multi-day shadow validation, not more val/Q1 tuning
 
 Useful research note:
 - `post_event_mean_reversion` currently looks more like a policy-gated sleeve than a bad model:
