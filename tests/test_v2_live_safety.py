@@ -92,6 +92,33 @@ class V2LiveSafetyTests(unittest.TestCase):
             self.assertEqual(entry_prices["LTC"], 50.0)
             self.assertEqual(meta["LTC"]["exchange_symbol"], "LTCUSDT")
 
+    def test_binance_reconcile_allows_mark_to_market_notional_drift_when_qty_matches(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_path = Path(tmpdir) / "state.json"
+            save_v2_shadow_state(
+                state_path,
+                V2ShadowState(
+                    positions={"XAU": 105.0},
+                    entry_prices={"XAU": 4496.05},
+                    position_meta={"XAU": {"exchange_symbol": "XAUUSDT", "position_amt": 0.023}},
+                ),
+            )
+            client = _FakeBinanceClient(
+                [
+                    {
+                        "symbol": "XAUUSDT",
+                        "positionAmt": "0.023",
+                        "entryPrice": "4496.05",
+                        "markPrice": "4602.62",
+                        "notional": "105.86",
+                    }
+                ]
+            )
+
+            _, _, _, mismatch = reconcile_binance_positions(client, {"XAU": "XAUUSDT"}, str(state_path))
+
+            self.assertFalse(mismatch)
+
     def test_deriv_reconcile_rebuilds_tracked_contracts_and_flags_unknowns(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             state_path = Path(tmpdir) / "state.json"

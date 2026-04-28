@@ -441,9 +441,22 @@ def reconcile_binance_positions(
         }
 
     local = load_v2_shadow_state(state_path)
-    local_positions = {k: round(float(v), 6) for k, v in local.positions.items() if abs(float(v)) >= MIN_NOTIONAL}
-    exchange_positions = {k: round(float(v), 6) for k, v in positions.items() if abs(float(v)) >= MIN_NOTIONAL}
-    mismatch = local_positions != exchange_positions
+    local_positions = {k: float(v) for k, v in local.positions.items() if abs(float(v)) >= MIN_NOTIONAL}
+    exchange_positions = {k: float(v) for k, v in positions.items() if abs(float(v)) >= MIN_NOTIONAL}
+    mismatch = set(local_positions) != set(exchange_positions)
+    if not mismatch:
+        for sym in exchange_positions:
+            local_meta = (local.position_meta or {}).get(sym, {}) or {}
+            local_qty = local_meta.get("position_amt")
+            exchange_qty = position_meta.get(sym, {}).get("position_amt")
+            if local_qty is not None and exchange_qty is not None:
+                if abs(float(local_qty) - float(exchange_qty)) > 1e-9:
+                    mismatch = True
+                    break
+                continue
+            if (local_positions[sym] >= 0) != (exchange_positions[sym] >= 0):
+                mismatch = True
+                break
     return positions, entry_prices, position_meta, mismatch
 
 
