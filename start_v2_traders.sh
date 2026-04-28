@@ -4,6 +4,7 @@
 #
 # Usage:
 #   ./start_v2_traders.sh              # Binance testnet (BTC/ETH/SOL) + Deriv demo
+#   ./start_v2_traders.sh --dry-run    # fetch/compute only, no testnet/demo orders
 #   ALLOW_REAL_MONEY=YES_I_UNDERSTAND ./start_v2_traders.sh --live
 #   ./start_v2_traders.sh --deriv-only # Deriv only (no Binance)
 #   ./start_v2_traders.sh --binance-only
@@ -19,6 +20,7 @@ BUNDLE="${BUNDLE:-bundle_intraday_core}"
 mkdir -p logs state
 
 LIVE_FLAG="--testnet"
+DRY_RUN_FLAG=""
 RUN_BINANCE=1
 RUN_DERIV=1
 
@@ -26,13 +28,21 @@ for arg in "$@"; do
   case "$arg" in
     --testnet)       LIVE_FLAG="--testnet" ;;
     --live)          LIVE_FLAG="--live" ;;
+    --dry-run)       DRY_RUN_FLAG="--dry-run" ;;
     --binance-only)  RUN_DERIV=0 ;;
     --deriv-only)    RUN_BINANCE=0 ;;
+    *)
+      echo "Unknown argument: $arg" >&2
+      exit 2
+      ;;
   esac
 done
 
 echo "Starting V2 traders  config=$PORTFOLIO_CONFIG  model_set=$MODEL_SET"
 echo "  Binance: ${LIVE_FLAG}"
+if [ -n "$DRY_RUN_FLAG" ]; then
+  echo "  Mode: dry-run, no orders"
+fi
 echo ""
 
 if [ "$RUN_BINANCE" -eq 1 ]; then
@@ -41,6 +51,7 @@ if [ "$RUN_BINANCE" -eq 1 ]; then
     --model-set "$MODEL_SET" \
     --state-path state/v2_binance_live.json \
     $LIVE_FLAG \
+    $DRY_RUN_FLAG \
     >> logs/v2_binance.log 2>&1 &
   echo $! > logs/v2_binance.pid
   echo "  Binance trader started  PID=$(cat logs/v2_binance.pid)"
@@ -52,6 +63,7 @@ if [ "$RUN_DERIV" -eq 1 ]; then
     --model-set "$MODEL_SET" \
     --bundle "$BUNDLE" \
     --state-path state/v2_deriv_live.json \
+    $DRY_RUN_FLAG \
     >> logs/v2_deriv.log 2>&1 &
   echo $! > logs/v2_deriv.pid
   echo "  Deriv trader started   PID=$(cat logs/v2_deriv.pid)"
