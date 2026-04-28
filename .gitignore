@@ -11,5 +11,7 @@ tmp/
 v2_sleeve_registry.json
 AGENTS.md
 20??-*-this-session-is-being-continued-from-a-previous-c.txt
+project.tar.gz
+*.tar.gz
 models/exp*/
 models/v2_*/
