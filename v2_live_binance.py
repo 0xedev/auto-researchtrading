@@ -234,7 +234,7 @@ class BinanceFutures:
                 code = r.json().get("code", 0)
             except Exception:
                 code = 0
-            if code not in (-4046,):
+            if code not in (-4046, -4161):
                 log.error("POST %s %d: %s", path, r.status_code, r.text[:300])
             r.raise_for_status()
         return r.json()
