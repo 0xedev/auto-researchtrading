@@ -44,6 +44,8 @@ DERIV_SYMBOL_MAP: dict[str, str] = {
     "R_50":   "DERIV_V50",
     "R_75":   "DERIV_V75",
     "R_100":  "DERIV_V100",
+    "CRASH300N": "DERIV_CRASH300",
+    "BOOM300N":  "DERIV_BOOM300",
     "JD25":   "DERIV_JUMP25",
     "JD100":  "DERIV_JUMP100",
     "stpRNG": "DERIV_STEP",

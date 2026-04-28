@@ -98,6 +98,8 @@ DERIV_SYMBOL_MAP: dict[str, str] = {
     "DERIV_V50":    "R_50",    # Volatility 50 Index
     "DERIV_V75":    "R_75",    # Volatility 75 Index
     "DERIV_V100":   "R_100",   # Volatility 100 Index
+    "DERIV_CRASH300": "CRASH300N",  # Crash 300 Index
+    "DERIV_BOOM300":  "BOOM300N",   # Boom 300 Index
     "DERIV_JUMP25":  "JD25",   # Jump 25 Index
     "DERIV_JUMP100": "JD100",  # Jump 100 Index
     "DERIV_STEP":   "stpRNG",  # Step Index
@@ -112,6 +114,8 @@ DEFAULT_MULTIPLIERS: dict[str, int] = {
     "DERIV_V50":     50,
     "DERIV_V75":     50,
     "DERIV_V100":    20,
+    "DERIV_CRASH300": 20,
+    "DERIV_BOOM300":  20,
     "DERIV_JUMP25":  50,
     "DERIV_JUMP100": 30,
     "DERIV_STEP":   750,

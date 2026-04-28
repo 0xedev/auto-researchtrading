@@ -4,7 +4,8 @@ from pathlib import Path
 
 from execution.v2_paper import V2ShadowState, save_v2_shadow_state
 from v2_live_binance import live_mode_unlocked, reconcile_binance_positions
-from v2_live_deriv import _reconcile_deriv_positions
+from v2_live_deriv import DEFAULT_MULTIPLIERS, DERIV_SYMBOL_MAP, _reconcile_deriv_positions
+from v2.live_data import DERIV_SYMBOL_MAP as LIVE_DATA_DERIV_SYMBOL_MAP
 
 
 class _FakeBinanceClient:
@@ -16,6 +17,14 @@ class _FakeBinanceClient:
 
 
 class V2LiveSafetyTests(unittest.TestCase):
+    def test_deriv_live_map_includes_confirmed_crash_boom_300_multipliers(self):
+        self.assertEqual(DERIV_SYMBOL_MAP["DERIV_CRASH300"], "CRASH300N")
+        self.assertEqual(DERIV_SYMBOL_MAP["DERIV_BOOM300"], "BOOM300N")
+        self.assertEqual(LIVE_DATA_DERIV_SYMBOL_MAP["CRASH300N"], "DERIV_CRASH300")
+        self.assertEqual(LIVE_DATA_DERIV_SYMBOL_MAP["BOOM300N"], "DERIV_BOOM300")
+        self.assertEqual(DEFAULT_MULTIPLIERS["DERIV_CRASH300"], 20)
+        self.assertEqual(DEFAULT_MULTIPLIERS["DERIV_BOOM300"], 20)
+
     def test_noninteractive_live_requires_explicit_unlock(self):
         self.assertFalse(live_mode_unlocked(False, env={}))
         self.assertFalse(live_mode_unlocked(False, env={"ALLOW_REAL_MONEY": "yes"}))
