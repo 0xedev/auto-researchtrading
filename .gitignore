@@ -1,5 +1,7 @@
 results.tsv
 run.log
+logs/
+state/
 __pycache__/
 *.pyc
 .cache/

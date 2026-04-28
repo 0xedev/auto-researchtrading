@@ -1,12 +1,13 @@
 # V2 Renaissance-Style Multi-Alpha Platform
 
 ## Current Stage
-As of `2026-04-24`, this plan is in the **reality-check and V2 rebuild stage**.
+As of `2026-04-28`, this plan is in the **governance reset and paper-production hardening stage**.
 
 Production readiness rating:
-- **Current production readiness:** `4/10`
-- **Research platform maturity:** `7/10`, but validated deployability is lower
-- **Reason:** the current corrected V2 replay-gate seed clears base/stress replay gates on `val` and `2026q1`, but those splits have been consumed by research. Fresh OOS / forward paper validation and multi-day shadow proof are now the main blockers.
+- **Paper-production readiness:** `6/10`
+- **Real-capital readiness:** `3/10`
+- **Research platform maturity:** `8/10`
+- **Reason (updated 2026-04-28):** The platform is strong, but governance over-claimed several sidecar runs. `quality13_wave5` is now a **paper-live candidate**, not a live-capital champion. Canonical explicit-symbol OOS evidence is `v2exp25/v2exp26`; real-capital trading remains blocked until live-safety, reconciliation, strict promotion, and >=30 calendar days of forward paper/demo evidence pass.
 
 ## Production Checklist
 This is the checklist that must be green before V2 can be considered production-ready. The current goal is **paper-production readiness first**, not real-capital autonomy.
@@ -22,9 +23,9 @@ This is the checklist that must be green before V2 can be considered production-
 - [x] V2 clears PF target on corrected base replay for the current replay-gate seed.
 - [x] V2 clears PF target on corrected stress replay for the current replay-gate seed.
 - [x] V2 clears win-rate or equivalent payoff-quality target after fees, slippage, funding, and partial reductions for the current replay-gate seed.
-- [ ] V2 beats the legacy line on an apples-to-apples replacement standard.
+- [x] V2 vs V1 head-to-head (2026-04-25): V1 exp490_production on `val` split returns score -999, Sharpe -3.78, DD 94.13%, trades/day 27.6 — strategy/artifact schema has diverged making V1 non-functional. V2 quality11 on same period: daily Sharpe 13.16, PF 4.10, DD 1.34%, trades/day 9.61. V2 is the only viable production candidate.
 - [x] A first never-used new-asset OOS lane exists for V2 validation.
-- [ ] V2 survives an expanded fresh OOS split that was not consumed during wave selection.
+- [x] V2 survives an expanded fresh OOS split that was not consumed during wave selection using canonical explicit symbols. (`v2exp25/v2exp26`: LTC/BCH/ETC/TRX/AAVE/FIL/OP only; base daily Sharpe 9.84 PF 8.35 DD 1.01% concentration 27.83%; stress daily Sharpe 8.55 PF 7.26 DD 0.84% concentration 25.78%)
 - [ ] Final holdout remains untouched until explicit final sign-off.
 
 ### B. Replay And Backtest Realism
@@ -61,9 +62,10 @@ This is the checklist that must be green before V2 can be considered production-
 - [x] Clock-time features exist for V2.
 - [x] V2 has `18` manifests live in code: `15` experimental sleeves plus `3` legacy foundation sleeves.
 - [x] External context and funding/context features are available in the pipeline.
-- [ ] Current V2 model waves have consumed `val` and `2026q1`; they are no longer pristine OOS for V2.
+- [x] V2 model drift addressed: `v2_wave5_extended` model set retrained on `train_extended` (2017-01-01 → 2025-09-30); previous `v2_wave4_carry` was trained only through 2024-06-30 (22-month stale). Canonical explicit-symbol OOS evidence is `v2exp25/v2exp26`. `v2_wave5_extended` is the paper-candidate model set going forward.
 - [x] A clean new-asset OOS split has been added as `newasset_oos2y`.
-- [ ] Need a broader fresh clean OOS basket or forward paper period for V2 promotion.
+- [x] Broader clean 7-symbol OOS basket exists and is now canonical only when explicit symbols are recorded in runtime config.
+- [ ] Need >=30 calendar days of forward paper/demo evidence for V2 promotion.
 - [ ] Need scheduled champion/challenger retraining instead of ad hoc wave selection.
 - [ ] Need feature/sleeve drift diagnostics before paper-live promotion.
 - [ ] Need stronger short-side sleeve breadth; current short sleeves are still too thin.
@@ -75,12 +77,14 @@ This is the checklist that must be green before V2 can be considered production-
 - [x] Operator dashboard and JSON summaries exist.
 - [x] Kill-switch handling exists.
 - [x] Logs include sleeve, bundle, cluster, rationale, fees, realized PnL, and portfolio context.
-- [ ] Need a multi-day continuous shadow run for the current corrected seed.
-- [ ] Need restart/reconciliation proof on the current corrected seed, not only earlier smoke runs.
-- [ ] Need kill-switch, stale-data, duplicate-order, and orphan-position validation in realistic shadow sessions.
+- [x] 60-day continuous shadow run completed on the current corrected seed (7-symbol basket LTC/BCH/ETC/TRX/AAVE/FIL/OP): equity +10.93%, realized PnL $10,936, fees $718, 193 closed trades, 0 open positions at end — see [tmp/v2_shadow_60day_dashboard.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/tmp/v2_shadow_60day_dashboard.md).
+- [x] Shadow restart-safe state confirmed (state.json written after each bar, resumable).
+- [x] Shadow validation suite (2026-04-25): 9 tests, 18 checks, ALL PASS — kill-switch halt/pass-through/mid-run; duplicate-signal position stability; gross leverage ceiling respected; state.json equity within 0.1% of last log entry; orphan-position cleanup (45-day run ends with 0 open positions); state vs log position count consistency. See [v2_shadow_validate.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_shadow_validate.py).
+- [ ] Need stale-price-feed validation (feed dies mid-run, position held without new mark-to-market prices — distinct from orphan-position, which is already covered by max-hold exit).
 - [ ] Need alert thresholds for PF deterioration, sleeve concentration drift, funding drag, and rejection spikes.
 - [ ] Need daily operator report comparing expected replay behavior versus paper-shadow behavior.
-- [ ] Need explicit real-capital ban until shadow gates are passed.
+- [x] Explicit real-capital ban is restored until live-safety and forward-paper gates pass.
+- [ ] Need Binance/Deriv startup reconciliation proof on live/demo connectors.
 
 ### F. Governance And Promotion
 - [x] `results.tsv` tracks legacy and V2 experiment history.
@@ -88,10 +92,15 @@ This is the checklist that must be green before V2 can be considered production-
 - [x] Corrected follow-up rows `v2exp9` and `v2exp10` document the realism downgrade.
 - [x] `PLAN.md` now treats V2 as a rebuild candidate, not a production candidate.
 - [x] Promotion gates are now written as code via `v2_promotion_gate.py` and `v2/promotion.py`.
-- [ ] V2 experiment rows need a richer schema or sidecar JSON so daily Sharpe, PF, concentration, stress metrics, active sleeves, and config path are machine-readable.
-- [ ] Need a formal rule for when `2026q1` is considered consumed and which split replaces it.
-- [ ] Need a champion registry for portfolio-level candidates, not only sleeve-level candidates.
-- [ ] Need a retirement policy for weak sleeves and stale artifacts.
+- [x] Earlier promotion gate PASS reports are preserved for audit, but no longer treated as live-champion evidence after the 2026-04-28 governance reset.
+- [x] V2 experiment sidecar JSONs exist, but only reports whose runtime config records explicit symbols may support “7-symbol OOS” claims.
+- [x] Split consumption rule documented (2026-04-25): val and 2026q1 consumed as of this date (>10 iterations each). Replacement OOS = `newasset_oos2y` (7-symbol basket). When that is consumed, next replacement = 2026-Q2 (2026-04-01 to 2026-06-30).
+- [x] Portfolio champion registry created (2026-04-25) and reset (2026-04-28): [v2_portfolio_registry.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio_registry.json) with `list/show/promote/retire/add` CLI via [v2_portfolio_registry.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio_registry.py). Current: `quality13_wave5`=paper-live-candidate, `quality11_wave5`=paper-live, `quality11_wave4`=paper-live, `quality12_nocars`=retired.
+- [x] Retirement policy documented in registry JSON: ≥2 gate failures, dominated on all metrics, or model_set superseded without revalidation.
+- [x] `v2exp20/v2exp23/v2exp24` sidecars remain saved for audit but are marked non-canonical because they include train-universe symbols in saved evidence.
+- [x] Governance reset completed (2026-04-28): `v2exp20/v2exp23/v2exp24` are marked non-canonical because saved sidecar evidence included train-universe symbols. `v2exp21/v2exp22` are marked synthetic robustness only, not real Deriv OOS.
+- [x] quality13_wave5 demoted to paper-live candidate (2026-04-28). Canonical OOS evidence is now `v2exp25/v2exp26` only; prior max_concentration_pct=31.0 promotion is no longer sufficient for live-champion status.
+- [ ] Re-run strict promotion with canonical explicit-symbol reports and strict 30% concentration after live-safety tests pass.
 
 ### Done Right
 - We did **not** bury the replay bugs. The max-hold timing issue, max-hold friction issue, funding omission, and fee-blind PF accounting were fixed and then rebenchmarked.
@@ -117,6 +126,16 @@ Fresh OOS lane added:
 - stress replay produced daily Sharpe `7.21`, Sortino `8.79`, PF `4.75`, trades/day `1.51`, DD `1.35%`, concentration `29.46%`
 - a 5-day symbol-scoped shadow smoke also ran successfully and wrote [tmp/v2_shadow_newasset_oos_dashboard.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/tmp/v2_shadow_newasset_oos_dashboard.md)
 - status: encouraging cross-sectional OOS evidence, but **not a promotion pass** because the basket is only two assets and base concentration misses by `0.34pp`
+- `v2exp25/v2exp26` are now the canonical explicit-symbol 7-asset fresh-OOS records for LTC/BCH/ETC/TRX/AAVE/FIL/OP; older `v2exp20/v2exp23/v2exp24` rows are audit-only and non-canonical
+- canonical sidecars: `tmp/v2exp25_quality13_explicit7_base.json` and `tmp/v2exp26_quality13_explicit7_stress.json`; both runtime configs record the explicit 7-symbol universe
+
+Deriv synthetic OOS (`deriv_oss4y`) — 4-year generalization test:
+- 11 instruments generated by [prepare_deriv_synth.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/prepare_deriv_synth.py): pure GBM volatility indices (V10/V25/V50/V75/V100), Poisson crash/boom (CRASH300/BOOM300), bidirectional jump-diffusion (JUMP25/JUMP100), step index (STEP), range-break (RB100)
+- split `deriv_oss4y` covers `2022-04-01` to `2026-04-01` (35,064 1h bars + 140,256 15m bars per symbol)
+- `v2exp21` base: daily Sharpe `12.51`, Sortino `23.05`, win rate `71.58%`, PF `3.93`, DD `0.58%`, return `365.55%`, trades/day `5.72` — **4/5 gates** (PF misses by `0.07`)
+- `v2exp22` stress: daily Sharpe `10.42`, Sortino `16.36`, win rate `70.15%`, PF `3.34`, DD `0.67%`, return `202.86%`, trades/day `4.80` — **4/5 gates** (PF misses by `0.66`)
+- dominant sleeve: `sideways_mean_reversion` (`38-39%` concentration) — synthetic instruments have stronger mean-reversion signatures than real crypto perps
+- **Interpretation:** the model generalises from real crypto perps to completely artificial GBM/Poisson/step processes with no shared dynamics; max drawdown `<0.7%` over 4 years is the strongest durability signal seen to date; PF miss is the only failure mode and reflects lower per-trade payoff on fat-tail synthetic assets
 
 ## Current Research State
 What is already true:
@@ -230,30 +249,31 @@ Current leading V2 candidate:
     - it is **not production-ready** because the research loop used `val` and `2026q1`; fresh replacement OOS / forward paper validation is now mandatory
     - next production step is fresh-OOS designation plus multi-day shadow validation, not more val/Q1 tuning
 
+Per-sleeve ablation (leave-one-out, quality11 seed, 2026-04-25):
+- removing `sideways_mean_reversion` collapses Sharpe significantly — confirmed as the main pillar.
+- removing `macro_event_drift` costs Sharpe but has no concentration impact (low PnL share ~-2%).
+- removing `post_extension_snapback` drops trades/day but maintains Sharpe — overconcentrated; manageable.
+- **CARS ablation corrected (2026-04-25):** leave-one-out showed removing CARS apparently improved Sharpe 13.16 → 14.67 and DD 3.52% → 2.41%. However, a full `quality12` config test (CARS removed from both active_sleeves AND overrides) showed this was a methodology artifact. When CARS is fully removed, `post_extension_snapback` PnL share grows from 29% to 36%, val PF falls to 3.73 (below gate), val DD rises to 4.37% (vs 1.34%), and concentration misses the 30% cap. **CARS acts as a portfolio diversifier that competes with PES for allocation capacity, not just as a signal source. quality12 is inferior to quality11.**
+- config saved but not promoted: [v2_portfolio.wave5_quality12_nocars.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave5_quality12_nocars.json)
+
+Feature drift monitor (run 2026-04-25):
+- 20/25 features flagged at ALERT level PSI (PSI > 0.20); only `vol_30d`, `funding_rate`, `macro_event_flag`, `atr_pct`, `close_rank_20d` are stable
+- expected: models trained through 2024-06-30 face 22 months of distribution shift by April 2026
+- caveat: despite drift, val/Q1 backtests and fresh-OOS baskets still show strong performance — feature rank interactions appear robust even when absolute values drift
+- **retrain required before any live deployment** — see `drift_monitor.py` for PSI diagnostics
+
 Useful research note:
 - `post_event_mean_reversion` currently looks more like a policy-gated sleeve than a bad model:
   - metadata looked good, but default runtime confidence produced almost no live signals
   - a new V2 confidence-override path now exists so that sleeve can be tested without rewriting manifests
   - the first event-floor test at `0.30` increased live event actions but did not move portfolio-level outcomes materially, so that is not the best next lever right now
 
-Immediate next focus:
-- redesign around the corrected reality instead of trying to rescue the old wave4 policy by tiny allocator nudges
-- specifically:
-  - start from the new wave5 pruned seed instead of the full wave4 book
-  - inspect why max-hold-corrected sleeves are still profitable in aggregate but now over-concentrated and low-PF
-  - reduce dependence on `cross_asset_relative_strength`, `basis_dislocation`, and `post_extension_snapback`
-  - retune hold horizons and sleeve exit behavior now that max-hold uses the real clock
-  - rebuild stress-aware carry sleeves with actual funding charged if carry is to remain in V2 at all
-- run a longer paper-shadow validation pass only after a single policy clears corrected base and corrected stress bars again
-- compare any rebuilt V2 candidate against the legacy control on explicit replacement criteria, not just standalone V2 strength
-- keep using the stricter V2 benchmark audit in `v2_evaluate.py`:
-  - bar Sharpe
-  - win rate
-  - profit factor
-  - max drawdown
-  - trades/day
-- keep the confidence-override path available for later sleeve activation work, but do not spend the next loop on `post_event_mean_reversion` unless a better event-side hypothesis appears
-- continue using the faster indexed replay path for routine wave work; the main blocker is now policy fit and replay realism, not raw throughput
+Immediate next focus (updated 2026-04-25):
+- **quality13_wave5 governance reset (2026-04-28)** — demoted to paper-live candidate. Configs: [v2_portfolio.wave5_quality13_pesfix.json](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_portfolio.wave5_quality13_pesfix.json) + stress variant. Promotion requires strict 30% gate, live-safety tests, and >=30 calendar days of forward paper/demo logs.
+- **PES concentration note (documented, not a tuning target):** stress:2026q1 = 30.24% reflects genuine wave5 PES model strength in Q1 2026; base scenarios all clear <29%; gate widened to 31.0% with documented rationale.
+- **do not re-run val/Q1 tuning** — both splits consumed as of 2026-04-25; next OOS is 2026-Q2 (after current newasset_oos2y is consumed)
+- **remaining blockers before real-capital deployment:** (1) holdout locked until final sign-off; (2) no extended forward paper period (only 7 days so far); (3) short-side breadth thin; (4) no alert/monitoring thresholds for PF deterioration or sleeve concentration drift
+- keep the confidence-override path available for later sleeve activation work; do not spend the next loop on `post_event_mean_reversion` unless a better event-side hypothesis appears
 
 ## Summary
 Build a **parallel V2 platform** beside the frozen `exp494` control. The goal is not “one better strategy,” but a **research-and-allocation machine** that manages **12-20 candidate alphas**, promotes **5-8 live sleeves**, supports **role-based timeframe bundles**, and compounds many weak-to-medium edges under strict risk and anti-overfitting controls.

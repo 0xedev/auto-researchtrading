@@ -277,6 +277,7 @@ def next_v2_results_id(path: str | Path = "results.tsv", prefix: str = "v2exp") 
         return f"{prefix}1"
     try:
         df = pd.read_csv(target, sep="\t")
+        df.columns = df.columns.str.strip()
         commits = df.get("commit", pd.Series(dtype=str)).astype(str).str.strip()
         matches = commits.str.extract(rf"^{prefix}(\d+)$").dropna()
         if matches.empty:

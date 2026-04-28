@@ -60,6 +60,7 @@ def train_sleeve(
     model_set: str,
     feature_profile: str = "price_context_plus",
     max_symbols: int | None = None,
+    split: str = "train",
 ) -> dict:
     bundle = BUNDLE_MANIFESTS[bundle_name]
     manifest = manifest_by_name(sleeve_name)
@@ -115,7 +116,7 @@ def train_sleeve(
             **metrics,
         }
 
-    dataset = build_bundle_dataset(bundle_name, split="train", feature_profile=feature_profile, max_symbols=max_symbols)
+    dataset = build_bundle_dataset(bundle_name, split=split, feature_profile=feature_profile, max_symbols=max_symbols)
     if dataset.empty:
         return {"status": "skipped", "reason": "empty_dataset", "sleeve": sleeve_name, "bundle": bundle_name}
 

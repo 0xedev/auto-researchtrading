@@ -12,6 +12,7 @@ def main():
     parser.add_argument("--sleeve", action="append", default=[], help="Repeat for multiple sleeves; omit to train all.")
     parser.add_argument("--model-set", required=True)
     parser.add_argument("--feature-profile", default="price_context_plus", choices=["price_only", "price_context", "price_context_plus"])
+    parser.add_argument("--split", default="train", help="Training split name (e.g. train, train_extended).")
     parser.add_argument("--max-symbols", type=int, default=None, help="Optional smoke-test cap on symbol count.")
     parser.add_argument("--registry-path", default="v2_sleeve_registry.json")
     args = parser.parse_args()
@@ -25,6 +26,7 @@ def main():
             sleeve_name=sleeve_name,
             model_set=args.model_set,
             feature_profile=args.feature_profile,
+            split=args.split,
             max_symbols=args.max_symbols,
         )
         results.append(result)

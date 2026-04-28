@@ -38,8 +38,18 @@ def _split_bounds(split: str) -> tuple[str, str]:
         "2026q1_15m": ("2026-01-01", "2026-03-31"),
         "newasset_oos2y": ("2024-04-01", "2026-03-31"),
         "newasset_oos2y_15m": ("2024-04-01", "2026-03-31"),
+        "deriv_oss4y": ("2022-04-01", "2026-04-01"),
+        "deriv_oss4y_15m": ("2022-04-01", "2026-04-01"),
         "holdout": (prepare.HOLDOUT_START, prepare.HOLDOUT_END),
         "holdout_15m": (prepare.HOLDOUT_START, prepare.HOLDOUT_END),
+        # Live trading window — starts before holdout end to include context bars.
+        # Add fresh bars to the parquet cache then prepare("live") to get current signals.
+        "live": ("2025-07-01", "2030-12-31"),
+        "live_15m": ("2025-07-01", "2030-12-31"),
+        # Extended training window: includes val period (consumed by research, safe to train on).
+        # Use newasset_oos2y as the OOS gate for any model trained on this split.
+        "train_extended": (prepare.TRAIN_START, prepare.VAL_END),
+        "train_extended_15m": (prepare.TRAIN_START, prepare.VAL_END),
     }
     return splits[split]
 
