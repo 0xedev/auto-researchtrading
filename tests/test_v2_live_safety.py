@@ -1,8 +1,10 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
 
 from execution.v2_paper import V2ShadowState, save_v2_shadow_state
+from v2_live_binance import BinanceFutures
 from v2_live_binance import configure_file_logging as configure_binance_file_logging
 from v2_live_binance import LIVE_SYMBOLS, SYMBOL_MAP, TESTNET_SYMBOLS
 from v2_live_binance import live_mode_unlocked, reconcile_binance_positions
@@ -40,6 +42,15 @@ class V2LiveSafetyTests(unittest.TestCase):
         self.assertFalse(live_mode_unlocked(False, env={"ALLOW_REAL_MONEY": "yes"}))
         self.assertTrue(live_mode_unlocked(False, env={"ALLOW_REAL_MONEY": "YES_I_UNDERSTAND"}))
         self.assertTrue(live_mode_unlocked(True, env={}))
+
+    def test_binance_leverage_open_position_error_continues_to_reconciliation(self):
+        client = BinanceFutures("key", "secret", "https://example.test")
+        response = Mock()
+        response.json.return_value = {"code": -4161, "msg": "Leverage reduction is not supported"}
+        exc = __import__("requests").HTTPError("bad request", response=response)
+        client._post = Mock(side_effect=exc)  # type: ignore[method-assign]
+
+        self.assertEqual(client.set_leverage("XAUUSDT", 3), {})
 
     def test_live_runners_can_log_to_files_while_console_dashboard_stays_visible(self):
         with tempfile.TemporaryDirectory() as tmpdir:

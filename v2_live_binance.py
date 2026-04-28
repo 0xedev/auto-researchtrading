@@ -269,7 +269,17 @@ class BinanceFutures:
         return self._get("/fapi/v1/openOrders", params, signed=True)
 
     def set_leverage(self, symbol: str, leverage: int) -> dict:
-        return self._post("/fapi/v1/leverage", {"symbol": symbol, "leverage": leverage})
+        try:
+            return self._post("/fapi/v1/leverage", {"symbol": symbol, "leverage": leverage})
+        except requests.HTTPError as exc:
+            if _binance_error_code(exc) == -4161:
+                log.warning(
+                    "  %s leverage not reduced because exchange reports open isolated position; "
+                    "continuing to startup reconciliation",
+                    symbol,
+                )
+                return {}
+            raise
 
     def set_margin_type(self, symbol: str, margin_type: str) -> dict:
         try:
@@ -308,6 +318,15 @@ class BinanceFutures:
             "type": "TAKE_PROFIT_MARKET", "triggerPrice": f"{stop_price:.4f}",
             "workingType": "CONTRACT_PRICE", "closePosition": "true",
         })
+
+
+def _binance_error_code(exc: requests.HTTPError) -> int | None:
+    if exc.response is None:
+        return None
+    try:
+        return int(exc.response.json().get("code"))
+    except Exception:
+        return None
 
 
 # ── Market data helpers ───────────────────────────────────────────────────────
