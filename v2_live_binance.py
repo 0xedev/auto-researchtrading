@@ -11,7 +11,7 @@ Demo (testnet):
 Live (real money — requires explicit --live flag):
     uv run v2_live_binance.py --portfolio-config v2_portfolio.wave5_quality13_pesfix.json --live
 
-Symbols available on testnet: BTC, ETH, SOL
+Symbols used on testnet: BTC, ETH, SOL, quality13 OOS basket, and XAU when exchangeInfo lists them.
 Symbols used on live endpoint: quality13 basket (LTC, BCH, ETC, TRX, AAVE, FIL, OP)
 
 Background:
@@ -77,10 +77,12 @@ SYMBOL_MAP: dict[str, str] = {
     "AAVE": "AAVEUSDT",
     "FIL":  "FILUSDT",
     "OP":   "OPUSDT",
+    "XAU":  "XAUUSDT",
 }
 
-# Testnet only reliably supports BTC/ETH/SOL
-TESTNET_SYMBOLS  = ["BTC", "ETH", "SOL"]
+# Testnet supports the canonical fresh-OOS basket plus XAUUSDT as of 2026-04-28.
+# The runner still filters this list through exchangeInfo on startup.
+TESTNET_SYMBOLS  = ["BTC", "ETH", "SOL", "LTC", "BCH", "ETC", "TRX", "AAVE", "FIL", "OP", "XAU"]
 # Full quality13 champion basket (live endpoint)
 LIVE_SYMBOLS     = ["LTC", "BCH", "ETC", "TRX", "AAVE", "FIL", "OP"]
 

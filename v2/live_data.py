@@ -34,6 +34,7 @@ BINANCE_SYMBOL_MAP: dict[str, str] = {
     "AAVE": "AAVEUSDT",
     "FIL":  "FILUSDT",
     "OP":   "OPUSDT",
+    "XAU":  "XAUUSDT",
 }
 
 # Deriv API symbol → V2 cache symbol (parquet key)
