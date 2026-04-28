@@ -90,6 +90,7 @@ This is the checklist that must be green before V2 can be considered production-
 - [x] Side-by-side operator dashboards added (2026-04-28): [run_v2_dashboards.sh](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/run_v2_dashboards.sh) launches Binance testnet and Deriv demo dashboards in tmux panes and refuses `--live`.
 - [x] Clean forward-paper log rotation added (2026-04-28): [rotate_v2_logs.sh](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/rotate_v2_logs.sh) archives contaminated historical logs before the 30-day evidence clock starts.
 - [x] Binance testnet universe expanded (2026-04-28): exchangeInfo confirms `LTC/BCH/ETC/TRX/AAVE/FIL/OP` and `XAUUSDT` are tradable on testnet, so the testnet dashboard now covers the canonical fresh-OOS basket plus XAU; real live Binance remains restricted to the 7-symbol crypto basket.
+- [x] Binance tier leverage added (2026-04-28): Tier A opens set exchange leverage to `10x`, Tier B opens set `5x`, and Tier C remains non-tradable/ignored until explicitly approved for a separate paper experiment.
 - [ ] Need Binance/Deriv startup reconciliation proof on live/demo connectors.
 
 ### F. Governance And Promotion

@@ -6,7 +6,9 @@ from unittest.mock import Mock
 from execution.v2_paper import V2ShadowState, save_v2_shadow_state
 from v2_live_binance import BinanceFutures
 from v2_live_binance import configure_file_logging as configure_binance_file_logging
+from v2_live_binance import execute_opens
 from v2_live_binance import LIVE_SYMBOLS, SYMBOL_MAP, TESTNET_SYMBOLS
+from v2_live_binance import TIER_A_LEVERAGE, TIER_B_LEVERAGE, leverage_for_allocation_tier
 from v2_live_binance import live_mode_unlocked, reconcile_binance_positions
 from v2_live_deriv import DEFAULT_MULTIPLIERS, DERIV_SYMBOL_MAP, _reconcile_deriv_positions
 from v2_live_deriv import configure_file_logging as configure_deriv_file_logging
@@ -30,6 +32,27 @@ class _FakeBinanceMarkClient:
         ]
 
 
+class _FakeBinanceExecutionClient:
+    def __init__(self):
+        self.calls = []
+
+    def cancel_all_orders(self, symbol):
+        self.calls.append(("cancel", symbol))
+
+    def set_leverage(self, symbol, leverage):
+        self.calls.append(("leverage", symbol, leverage))
+
+    def market_order(self, symbol, side, qty):
+        self.calls.append(("market", symbol, side, qty))
+        return {"orderId": 123, "status": "FILLED", "avgPrice": "100.0"}
+
+    def stop_market_order(self, symbol, side, stop_price):
+        self.calls.append(("stop", symbol, side, stop_price))
+
+    def take_profit_order(self, symbol, side, stop_price):
+        self.calls.append(("tp", symbol, side, stop_price))
+
+
 class V2LiveSafetyTests(unittest.TestCase):
     def test_binance_testnet_map_includes_fresh_oos_and_xau_without_live_xau(self):
         for symbol in ["LTC", "BCH", "ETC", "TRX", "AAVE", "FIL", "OP", "XAU"]:
@@ -51,6 +74,59 @@ class V2LiveSafetyTests(unittest.TestCase):
         self.assertFalse(live_mode_unlocked(False, env={"ALLOW_REAL_MONEY": "yes"}))
         self.assertTrue(live_mode_unlocked(False, env={"ALLOW_REAL_MONEY": "YES_I_UNDERSTAND"}))
         self.assertTrue(live_mode_unlocked(True, env={}))
+
+    def test_binance_tier_leverage_mapping_excludes_tier_c(self):
+        self.assertEqual(TIER_A_LEVERAGE, 10)
+        self.assertEqual(TIER_B_LEVERAGE, 5)
+        self.assertEqual(leverage_for_allocation_tier("A"), 10)
+        self.assertEqual(leverage_for_allocation_tier("B"), 5)
+        self.assertIsNone(leverage_for_allocation_tier("C"))
+        self.assertEqual(leverage_for_allocation_tier(None), 5)
+
+    def test_binance_execute_open_sets_tier_a_leverage_before_order(self):
+        client = _FakeBinanceExecutionClient()
+
+        fills = execute_opens(
+            client,  # type: ignore[arg-type]
+            opens=[
+                {
+                    "symbol": "BTC",
+                    "target_notional_usd": 250.0,
+                    "allocation_tier": "A",
+                    "meta": {"allocation_tier": "A"},
+                }
+            ],
+            close_prices={"BTC": 100.0},
+            lot_rules={"BTCUSDT": {"step": 0.001, "min_qty": 0.001}},
+            active_map={"BTC": "BTCUSDT"},
+            dry_run=False,
+        )
+
+        self.assertIn(("leverage", "BTCUSDT", 10), client.calls)
+        self.assertLess(client.calls.index(("leverage", "BTCUSDT", 10)), client.calls.index(("market", "BTCUSDT", "BUY", 2.5)))
+        self.assertEqual(fills["BTC"]["meta"]["exchange_leverage"], 10)
+
+    def test_binance_execute_open_skips_tier_c(self):
+        client = _FakeBinanceExecutionClient()
+
+        fills = execute_opens(
+            client,  # type: ignore[arg-type]
+            opens=[
+                {
+                    "symbol": "BTC",
+                    "target_notional_usd": 250.0,
+                    "allocation_tier": "C",
+                    "meta": {"allocation_tier": "C"},
+                }
+            ],
+            close_prices={"BTC": 100.0},
+            lot_rules={"BTCUSDT": {"step": 0.001, "min_qty": 0.001}},
+            active_map={"BTC": "BTCUSDT"},
+            dry_run=False,
+        )
+
+        self.assertEqual(fills, {})
+        self.assertEqual(client.calls, [])
 
     def test_binance_leverage_open_position_error_continues_to_reconciliation(self):
         client = BinanceFutures("key", "secret", "https://example.test")

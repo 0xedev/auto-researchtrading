@@ -87,7 +87,9 @@ TESTNET_SYMBOLS  = ["BTC", "ETH", "SOL", "LTC", "BCH", "ETC", "TRX", "AAVE", "FI
 # Full quality13 champion basket (live endpoint)
 LIVE_SYMBOLS     = ["LTC", "BCH", "ETC", "TRX", "AAVE", "FIL", "OP"]
 
-LEVERAGE              = 3           # conservative for paper validation
+TIER_A_LEVERAGE       = 10
+TIER_B_LEVERAGE       = 5
+DEFAULT_LEVERAGE      = TIER_B_LEVERAGE
 MARGIN_MODE           = "ISOLATED"
 MIN_NOTIONAL          = 10.0        # USD
 EXCHANGE_MIN_NOTIONAL = 100.0       # Binance minimum per order
@@ -121,6 +123,15 @@ def _cpnl(v: float) -> str:
 def live_mode_unlocked(stdin_is_tty: bool, env: dict | None = None) -> bool:
     env = env or os.environ
     return stdin_is_tty or env.get("ALLOW_REAL_MONEY") == "YES_I_UNDERSTAND"
+
+
+def leverage_for_allocation_tier(tier: str | None) -> int | None:
+    normalized = str(tier or "B").upper()
+    if normalized == "A":
+        return TIER_A_LEVERAGE
+    if normalized == "B":
+        return TIER_B_LEVERAGE
+    return None
 
 
 def configure_file_logging(log_path: str) -> None:
@@ -511,12 +522,18 @@ def execute_opens(
         if qty * price < EXCHANGE_MIN_NOTIONAL:
             qty = math.ceil(EXCHANGE_MIN_NOTIONAL / price / rules["step"]) * rules["step"]
         side = "BUY" if target_usd > 0 else "SELL"
+        allocation_tier = str(action.get("allocation_tier") or action.get("meta", {}).get("allocation_tier") or "B").upper()
+        order_leverage = leverage_for_allocation_tier(allocation_tier)
+        if order_leverage is None:
+            log.warning("  OPEN %-6s — unsupported allocation tier %s, skip", sym, allocation_tier)
+            continue
 
-        log.info("  OPEN   %-6s  %-4s  qty=%.4f  ~$%.0f  @ %.4f%s",
-                 sym, side, qty, qty * price, price, "  [DRY]" if dry_run else "")
+        log.info("  OPEN   %-6s  %-4s  tier=%s  lev=%dx  qty=%.4f  ~$%.0f  @ %.4f%s",
+                 sym, side, allocation_tier, order_leverage, qty, qty * price, price, "  [DRY]" if dry_run else "")
         if not dry_run:
             try:
                 client.cancel_all_orders(bn_sym)
+                client.set_leverage(bn_sym, order_leverage)
                 res = client.market_order(bn_sym, side, qty)
                 log.info("         orderId=%s  status=%s", res.get("orderId"), res.get("status"))
                 fill_price = _order_avg_price(res, price)
@@ -543,6 +560,7 @@ def execute_opens(
             "filled_qty": qty,
             "requested_notional": target_usd,
             "fill_price": fill_price,
+            "exchange_leverage": order_leverage,
         })
         fills[sym] = {"entry_price": fill_price, "notional": target_usd, "meta": meta}
     return fills
@@ -639,8 +657,8 @@ def run(
         for sym, bn_sym in active_map.items():
             try:
                 client.set_margin_type(bn_sym, MARGIN_MODE)
-                client.set_leverage(bn_sym, LEVERAGE)
-                log.info("  %-6s  %s  %dx leverage", sym, MARGIN_MODE, LEVERAGE)
+                client.set_leverage(bn_sym, DEFAULT_LEVERAGE)
+                log.info("  %-6s  %s  %dx default leverage", sym, MARGIN_MODE, DEFAULT_LEVERAGE)
             except Exception as exc:
                 log.error("  Setup %s failed: %s", sym, exc)
                 sys.exit(2)
