@@ -89,7 +89,7 @@ def summarize_connector(
             counters["errors"] += 1
         if " WARNING" in line:
             counters["warnings"] += 1
-        if "V2 signals" in line:
+        if "V2 signals" in line or (" Equity=$" in line and "opens=" in line and "exits=" in line):
             counters["signal_bars"] += 1
         if "  OPEN" in line or "V2 OPEN" in line or "OPENED" in line:
             counters["opens"] += 1

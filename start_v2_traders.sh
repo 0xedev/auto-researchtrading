@@ -50,9 +50,10 @@ if [ "$RUN_BINANCE" -eq 1 ]; then
     --portfolio-config "$PORTFOLIO_CONFIG" \
     --model-set "$MODEL_SET" \
     --state-path state/v2_binance_live.json \
+    --log-path logs/v2_binance.log \
     $LIVE_FLAG \
     $DRY_RUN_FLAG \
-    >> logs/v2_binance.log 2>&1 &
+    >> logs/v2_binance.console.log 2>&1 &
   echo $! > logs/v2_binance.pid
   echo "  Binance trader started  PID=$(cat logs/v2_binance.pid)"
 fi
@@ -63,8 +64,9 @@ if [ "$RUN_DERIV" -eq 1 ]; then
     --model-set "$MODEL_SET" \
     --bundle "$BUNDLE" \
     --state-path state/v2_deriv_live.json \
+    --log-path logs/v2_deriv.log \
     $DRY_RUN_FLAG \
-    >> logs/v2_deriv.log 2>&1 &
+    >> logs/v2_deriv.console.log 2>&1 &
   echo $! > logs/v2_deriv.pid
   echo "  Deriv trader started   PID=$(cat logs/v2_deriv.pid)"
 fi

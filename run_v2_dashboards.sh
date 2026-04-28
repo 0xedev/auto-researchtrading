@@ -74,6 +74,7 @@ BINANCE_CMD=(
   --portfolio-config "$PORTFOLIO_CONFIG"
   --model-set "$MODEL_SET"
   --state-path state/v2_binance_live.json
+  --log-path logs/v2_binance.log
   --testnet
 )
 DERIV_CMD=(
@@ -82,6 +83,7 @@ DERIV_CMD=(
   --model-set "$MODEL_SET"
   --bundle "$BUNDLE"
   --state-path state/v2_deriv_live.json
+  --log-path logs/v2_deriv.log
 )
 
 if [ -n "$DRY_RUN_FLAG" ]; then

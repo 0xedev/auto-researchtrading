@@ -88,6 +88,7 @@ This is the checklist that must be green before V2 can be considered production-
 - [x] Explicit real-capital ban is restored until live-safety and forward-paper gates pass.
 - [x] Safe forward-paper launcher added (2026-04-28): [run_v2_forward_paper.sh](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/run_v2_forward_paper.sh) starts Binance testnet + Deriv demo/virtual-token runners and immediately writes the canonical readiness report; it refuses `--live`.
 - [x] Side-by-side operator dashboards added (2026-04-28): [run_v2_dashboards.sh](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/run_v2_dashboards.sh) launches Binance testnet and Deriv demo dashboards in tmux panes and refuses `--live`.
+- [x] Clean forward-paper log rotation added (2026-04-28): [rotate_v2_logs.sh](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/rotate_v2_logs.sh) archives contaminated historical logs before the 30-day evidence clock starts.
 - [ ] Need Binance/Deriv startup reconciliation proof on live/demo connectors.
 
 ### F. Governance And Promotion

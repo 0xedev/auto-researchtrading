@@ -41,6 +41,15 @@ class V2ForwardPaperScriptTests(unittest.TestCase):
         self.assertIn("tmux new-session", text)
         self.assertIn("--testnet", text)
         self.assertIn("DERIV DEMO DASHBOARD", text)
+        self.assertIn("--log-path logs/v2_binance.log", text)
+        self.assertIn("--log-path logs/v2_deriv.log", text)
+
+    def test_rotate_logs_script_can_stop_and_archive(self) -> None:
+        text = Path("rotate_v2_logs.sh").read_text(encoding="utf-8")
+
+        self.assertIn("logs/archive", text)
+        self.assertIn("tmux kill-session -t v2_forward", text)
+        self.assertIn("touch logs/v2_binance.log logs/v2_deriv.log", text)
 
 
 if __name__ == "__main__":

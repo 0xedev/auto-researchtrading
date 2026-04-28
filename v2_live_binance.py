@@ -94,10 +94,13 @@ RECV_WINDOW           = 5000
 BAR_BUFFER_SECS       = 8           # wait after candle close before reading
 FETCH_LIMIT_1H        = 600         # enough bars for V2 feature lookback
 
+LOG_FORMAT = "%(asctime)s  %(levelname)-7s  %(message)s"
+LOG_DATEFMT = "%Y-%m-%d %H:%M:%S"
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s  %(levelname)-7s  %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+    format=LOG_FORMAT,
+    datefmt=LOG_DATEFMT,
 )
 log = logging.getLogger("v2_binance")
 
@@ -114,6 +117,23 @@ def _cpnl(v: float) -> str:
 def live_mode_unlocked(stdin_is_tty: bool, env: dict | None = None) -> bool:
     env = env or os.environ
     return stdin_is_tty or env.get("ALLOW_REAL_MONEY") == "YES_I_UNDERSTAND"
+
+
+def configure_file_logging(log_path: str) -> None:
+    if not log_path:
+        return
+    target = Path(log_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    abs_target = str(target.resolve())
+    root = logging.getLogger()
+    for handler in root.handlers:
+        if isinstance(handler, logging.FileHandler) and getattr(handler, "baseFilename", "") == abs_target:
+            return
+    handler = logging.FileHandler(abs_target, mode="a", encoding="utf-8")
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATEFMT))
+    root.addHandler(handler)
+    log.info("File logging enabled: %s", abs_target)
 
 
 def _render_binance_dashboard(
@@ -765,6 +785,7 @@ if __name__ == "__main__":
             sys.exit(2)
 
     os.makedirs("logs", exist_ok=True)
+    configure_file_logging(args.log_path)
     run(
         portfolio_config_path=args.portfolio_config,
         model_set=args.model_set,

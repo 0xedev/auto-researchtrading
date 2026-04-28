@@ -109,6 +109,25 @@ class V2ForwardReportTests(unittest.TestCase):
         self.assertIn("### binance", md)
         self.assertIn("insufficient_connector_days", md)
 
+    def test_binance_equity_summary_counts_as_signal_bar(self) -> None:
+        now = datetime(2026, 4, 28, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = self._write_state(root, "binance", now)
+            log = self._write_log(
+                root,
+                "binance",
+                ["2026-04-28 11:33:51  INFO       Equity=$4978.51  ts=1777370400000  opens=0  exits=0"],
+            )
+            report = build_report(
+                connectors=[{"name": "binance", "state_path": str(state), "log_path": str(log)}],
+                min_days=30.0,
+                now=now,
+            )
+
+        self.assertEqual(report["connectors"][0]["counters"]["signal_bars"], 1)
+        self.assertNotIn("no_signal_bars", {alert["code"] for alert in report["alerts"]})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -123,12 +123,31 @@ DEFAULT_MULTIPLIERS: dict[str, int] = {
 }
 
 # ── Logging ───────────────────────────────────────────────────────────────────
+LOG_FORMAT = "%(asctime)s  %(levelname)-8s %(message)s"
+LOG_DATEFMT = "%Y-%m-%d %H:%M:%S"
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s  %(levelname)-8s %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+    format=LOG_FORMAT,
+    datefmt=LOG_DATEFMT,
 )
 log = logging.getLogger("v2_deriv")
+
+
+def configure_file_logging(log_path: str) -> None:
+    if not log_path:
+        return
+    target = os.path.abspath(log_path)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    root = logging.getLogger()
+    for handler in root.handlers:
+        if isinstance(handler, logging.FileHandler) and getattr(handler, "baseFilename", "") == target:
+            return
+    handler = logging.FileHandler(target, mode="a", encoding="utf-8")
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATEFMT))
+    root.addHandler(handler)
+    log.info("File logging enabled: %s", target)
 
 
 # ── Deriv WebSocket client ────────────────────────────────────────────────────
@@ -899,6 +918,11 @@ def main():
         help="Path to V2 shadow state JSON (created if absent)",
     )
     ap.add_argument(
+        "--log-path",
+        default="logs/v2_deriv.log",
+        help="Structured operator log path",
+    )
+    ap.add_argument(
         "--active-sleeves",
         default="",
         help="Comma-separated sleeve names (default: use portfolio config list)",
@@ -920,6 +944,7 @@ def main():
     )
 
     os.makedirs("logs", exist_ok=True)
+    configure_file_logging(args.log_path)
     state_dir = os.path.dirname(os.path.abspath(args.state_path))
     os.makedirs(state_dir, exist_ok=True)
 

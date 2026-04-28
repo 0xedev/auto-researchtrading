@@ -3,8 +3,10 @@ import unittest
 from pathlib import Path
 
 from execution.v2_paper import V2ShadowState, save_v2_shadow_state
+from v2_live_binance import configure_file_logging as configure_binance_file_logging
 from v2_live_binance import live_mode_unlocked, reconcile_binance_positions
 from v2_live_deriv import DEFAULT_MULTIPLIERS, DERIV_SYMBOL_MAP, _reconcile_deriv_positions
+from v2_live_deriv import configure_file_logging as configure_deriv_file_logging
 from v2.live_data import DERIV_SYMBOL_MAP as LIVE_DATA_DERIV_SYMBOL_MAP
 
 
@@ -30,6 +32,17 @@ class V2LiveSafetyTests(unittest.TestCase):
         self.assertFalse(live_mode_unlocked(False, env={"ALLOW_REAL_MONEY": "yes"}))
         self.assertTrue(live_mode_unlocked(False, env={"ALLOW_REAL_MONEY": "YES_I_UNDERSTAND"}))
         self.assertTrue(live_mode_unlocked(True, env={}))
+
+    def test_live_runners_can_log_to_files_while_console_dashboard_stays_visible(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            binance_log = Path(tmpdir) / "binance.log"
+            deriv_log = Path(tmpdir) / "deriv.log"
+
+            configure_binance_file_logging(str(binance_log))
+            configure_deriv_file_logging(str(deriv_log))
+
+            self.assertTrue(binance_log.exists())
+            self.assertTrue(deriv_log.exists())
 
     def test_binance_reconcile_flags_state_exchange_mismatch(self):
         with tempfile.TemporaryDirectory() as tmpdir:
