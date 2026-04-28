@@ -87,6 +87,7 @@ This is the checklist that must be green before V2 can be considered production-
 - [ ] Need daily operator report comparing expected replay behavior versus paper-shadow behavior.
 - [x] Explicit real-capital ban is restored until live-safety and forward-paper gates pass.
 - [x] Safe forward-paper launcher added (2026-04-28): [run_v2_forward_paper.sh](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/run_v2_forward_paper.sh) starts Binance testnet + Deriv demo/virtual-token runners and immediately writes the canonical readiness report; it refuses `--live`.
+- [x] Side-by-side operator dashboards added (2026-04-28): [run_v2_dashboards.sh](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/run_v2_dashboards.sh) launches Binance testnet and Deriv demo dashboards in tmux panes and refuses `--live`.
 - [ ] Need Binance/Deriv startup reconciliation proof on live/demo connectors.
 
 ### F. Governance And Promotion
@@ -122,6 +123,7 @@ The next meaningful milestone is **not live trading**. It is a fresh-OOS / forwa
 - run multi-day paper shadow with restart and kill-switch proof
 - keep [v2_forward_report.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_forward_report.py) as the canonical 30-day forward-paper readiness gate; it must pass before any `paper-live-candidate` can be promoted
 - use [run_v2_forward_paper.sh](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/run_v2_forward_paper.sh) as the default operator entrypoint for safe Binance testnet + Deriv demo forward-paper runs
+- use [run_v2_dashboards.sh](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/run_v2_dashboards.sh) when a visible always-on Binance + Deriv dashboard is needed
 - keep the final untouched holdout locked until explicit final sign-off
 
 Fresh OOS lane added:
