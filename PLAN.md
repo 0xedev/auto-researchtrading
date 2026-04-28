@@ -80,6 +80,8 @@ This is the checklist that must be green before V2 can be considered production-
 - [x] 60-day continuous shadow run completed on the current corrected seed (7-symbol basket LTC/BCH/ETC/TRX/AAVE/FIL/OP): equity +10.93%, realized PnL $10,936, fees $718, 193 closed trades, 0 open positions at end — see [tmp/v2_shadow_60day_dashboard.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/tmp/v2_shadow_60day_dashboard.md).
 - [x] Shadow restart-safe state confirmed (state.json written after each bar, resumable).
 - [x] Shadow validation suite (2026-04-25): 9 tests, 18 checks, ALL PASS — kill-switch halt/pass-through/mid-run; duplicate-signal position stability; gross leverage ceiling respected; state.json equity within 0.1% of last log entry; orphan-position cleanup (45-day run ends with 0 open positions); state vs log position count consistency. See [v2_shadow_validate.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_shadow_validate.py).
+- [x] Forward-paper readiness reporter added (2026-04-28): [v2_forward_report.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_forward_report.py) reads Binance/Deriv state and logs, checks stale state, auth failures, signal activity, per-connector log span, and 30-day portfolio evidence, then writes JSON + markdown reports.
+- [ ] Current forward-paper readiness report is **FAIL**: [tmp/v2_forward_report.md](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/tmp/v2_forward_report.md) shows Binance stale state/auth errors and only `0.05` observed log days versus the required `30.00`.
 - [ ] Need stale-price-feed validation (feed dies mid-run, position held without new mark-to-market prices — distinct from orphan-position, which is already covered by max-hold exit).
 - [ ] Need alert thresholds for PF deterioration, sleeve concentration drift, funding drag, and rejection spikes.
 - [ ] Need daily operator report comparing expected replay behavior versus paper-shadow behavior.
@@ -117,6 +119,7 @@ The next meaningful milestone is **not live trading**. It is a fresh-OOS / forwa
 - expand the clean replacement OOS beyond the first LTC/BCH smoke basket
 - rerun the strict promotion gate with a non-empty fresh-OOS label only after that period exists
 - run multi-day paper shadow with restart and kill-switch proof
+- keep [v2_forward_report.py](/Users/ayobamiadefolalu/Downloads/auto-researchtrading/v2_forward_report.py) as the canonical 30-day forward-paper readiness gate; it must pass before any `paper-live-candidate` can be promoted
 - keep the final untouched holdout locked until explicit final sign-off
 
 Fresh OOS lane added:
