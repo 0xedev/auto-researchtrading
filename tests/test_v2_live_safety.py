@@ -21,6 +21,15 @@ class _FakeBinanceClient:
         return self._positions
 
 
+class _FakeBinanceMarkClient:
+    def _get(self, path, params=None, signed=False):
+        self.path = path
+        return [
+            {"symbol": "BTCUSDT", "markPrice": "76500.5"},
+            {"symbol": "XAUUSDT", "markPrice": "4602.25"},
+        ]
+
+
 class V2LiveSafetyTests(unittest.TestCase):
     def test_binance_testnet_map_includes_fresh_oos_and_xau_without_live_xau(self):
         for symbol in ["LTC", "BCH", "ETC", "TRX", "AAVE", "FIL", "OP", "XAU"]:
@@ -51,6 +60,15 @@ class V2LiveSafetyTests(unittest.TestCase):
         client._post = Mock(side_effect=exc)  # type: ignore[method-assign]
 
         self.assertEqual(client.set_leverage("XAUUSDT", 3), {})
+
+    def test_binance_mark_prices_parse_premium_index_rows(self):
+        client = _FakeBinanceMarkClient()
+
+        marks = BinanceFutures.mark_prices(client)  # type: ignore[arg-type]
+
+        self.assertEqual(client.path, "/fapi/v1/premiumIndex")
+        self.assertEqual(marks["BTCUSDT"], 76500.5)
+        self.assertEqual(marks["XAUUSDT"], 4602.25)
 
     def test_live_runners_can_log_to_files_while_console_dashboard_stays_visible(self):
         with tempfile.TemporaryDirectory() as tmpdir:

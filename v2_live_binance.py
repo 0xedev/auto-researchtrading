@@ -30,6 +30,7 @@ import logging
 import math
 import os
 import sys
+import threading
 import time
 import urllib.parse
 from dataclasses import asdict
@@ -95,6 +96,7 @@ TP_PCT                = 0.060       # 6.0% favorable move → TAKE_PROFIT_MARKET
 RECV_WINDOW           = 5000
 BAR_BUFFER_SECS       = 8           # wait after candle close before reading
 FETCH_LIMIT_1H        = 600         # enough bars for V2 feature lookback
+MARK_PRICE_POLL_SECS  = 5           # dashboard-only price refresh between bars
 
 LOG_FORMAT = "%(asctime)s  %(levelname)-7s  %(message)s"
 LOG_DATEFMT = "%Y-%m-%d %H:%M:%S"
@@ -250,6 +252,17 @@ class BinanceFutures:
 
     def funding_rate(self, symbol: str, limit: int = 100) -> list:
         return self._get("/fapi/v1/fundingRate", {"symbol": symbol, "limit": limit})
+
+    def mark_prices(self) -> dict[str, float]:
+        payload = self._get("/fapi/v1/premiumIndex")
+        rows = payload if isinstance(payload, list) else [payload]
+        out: dict[str, float] = {}
+        for row in rows:
+            try:
+                out[str(row["symbol"])] = float(row.get("markPrice") or row.get("indexPrice") or 0.0)
+            except (KeyError, TypeError, ValueError):
+                continue
+        return out
 
     def exchange_info(self) -> dict:
         return self._get("/fapi/v1/exchangeInfo")
@@ -672,6 +685,29 @@ def run(
         "next_bar_ts": (int(time.time() / 3600) + 1) * 3600 + BAR_BUFFER_SECS,
     }
     endpoint_label = (TESTNET_BASE if use_testnet else LIVE_BASE).replace("https://", "")
+    _dash_lock = threading.Lock()
+    _stop_mark_poller = threading.Event()
+
+    def _mark_price_poller() -> None:
+        inverse = {bn: sym for sym, bn in active_map.items()}
+        while not _stop_mark_poller.is_set():
+            try:
+                marks = client.mark_prices()
+                updates = {
+                    inverse[bn_sym]: price
+                    for bn_sym, price in marks.items()
+                    if bn_sym in inverse and price > 0
+                }
+                if updates:
+                    with _dash_lock:
+                        merged = dict(_dash.get("close_prices", {}))
+                        merged.update(updates)
+                        _dash["close_prices"] = merged
+            except Exception as exc:
+                log.debug("mark price dashboard refresh failed: %s", exc)
+            _stop_mark_poller.wait(MARK_PRICE_POLL_SECS)
+
+    threading.Thread(target=_mark_price_poller, daemon=True, name="binance-mark-prices").start()
 
     bar_count = 0
     while True:
@@ -687,7 +723,8 @@ def run(
             if df is not None and not df.empty:
                 close_prices_raw[sym] = float(df.iloc[-1]["close"])
                 log.info("  %-6s  close=%.4f  bars=%d", sym, close_prices_raw[sym], len(df))
-        _dash["close_prices"] = dict(close_prices_raw)
+        with _dash_lock:
+            _dash["close_prices"] = dict(close_prices_raw)
 
         if not close_prices_raw:
             log.error("No market data — skipping bar")
@@ -702,7 +739,8 @@ def run(
             except Exception as exc:
                 log.error("Portfolio sync failed: %s — halting trader", exc)
                 sys.exit(2)
-        _dash["equity"] = equity
+        with _dash_lock:
+            _dash["equity"] = equity
 
         try:
             result = compute_live_actions(
@@ -765,15 +803,20 @@ def run(
 
         # Display loop — refreshes every 2s while waiting for next bar
         while time.time() < next_bar_ts - 1:
+            with _dash_lock:
+                dash_close_prices = dict(_dash["close_prices"])
+                dash_equity = float(_dash["equity"])
+                dash_last_bar = str(_dash["last_bar_str"])
+                dash_next_bar = float(_dash["next_bar_ts"])
             _render_binance_dashboard(
                 endpoint=endpoint_label,
-                equity=_dash["equity"],
-                close_prices=_dash["close_prices"],
+                equity=dash_equity,
+                close_prices=dash_close_prices,
                 positions=positions,
                 entry_prices=entry_prices,
                 bar_count=bar_count,
-                last_bar_str=_dash["last_bar_str"],
-                next_bar_ts=_dash["next_bar_ts"],
+                last_bar_str=dash_last_bar,
+                next_bar_ts=dash_next_bar,
                 dry_run=dry_run,
             )
             time.sleep(2)
